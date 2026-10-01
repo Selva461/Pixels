@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Pixels</string>
+
+    <string name="home_title">Pixels</string>
+    <string name="home_subtitle">Make a photo look naturally corrected — not edited. Everything stays on your device.</string>
+    <string name="home_pick">Choose photo</string>
+
+    <string name="loading_opening">Opening photo…</string>
+    <string name="processing_stage">Enhancing: %1$s</string>
+
+    <string name="editor_close">Close</string>
+    <string name="editor_debug">Debug</string>
+    <string name="editor_mode_original">Original</string>
+    <string name="editor_mode_enhanced">Enhanced</string>
+    <string name="editor_mode_compare">Compare</string>
+    <string name="editor_split_horizontal">Side by side</string>
+    <string name="editor_split_vertical">Top / bottom</string>
+    <string name="editor_strength">Natural %1$d%%</string>
+    <string name="editor_undo">Undo</string>
+    <string name="editor_reset">Reset</string>
+    <string name="editor_save">Save</string>
+    <string name="editor_share">Share</string>
+    <string name="editor_before">Before</string>
+    <string name="editor_after">After</string>
+    <string name="editor_saving">Saving…</string>
+    <string name="editor_saved">Saved as %1$s</string>
+    <string name="editor_updating">Updating: %1$s</string>
+    <string name="share_chooser">Share enhanced photo</string>
+    <string name="share_report_chooser">Export debug report</string>
+
+    <string name="debug_title">Debug</string>
+    <string name="debug_back">Back</string>
+    <string name="debug_export">Export report</string>
+    <string name="debug_stages">Stages</string>
+    <string name="debug_run_until">Stop after</string>
+    <string name="debug_run_all">Run full pipeline</string>
+
+    <string name="error_retry">Choose another photo</string>
+    <string name="error_image_not_found">The photo could not be opened. It may have been moved or deleted.</string>
+    <string name="error_image_unsupported">This file type is not supported. Use a JPEG, PNG or WebP photo.</string>
+    <string name="error_image_decode_failed">The photo appears to be damaged and could not be read.</string>
+    <string name="error_image_too_large">This photo is too large to process.</string>
+    <string name="error_out_of_memory">Not enough memory to process this photo. Close other apps and try again.</string>
+    <string name="error_analysis_failed">The photo could not be analysed.</string>
+    <string name="error_processing_failed">Enhancement failed for this photo.</string>
+    <string name="error_validation_failed">The enhanced result did not pass quality checks, so it was not kept.</string>
+    <string name="error_output_encode_failed">The enhanced photo could not be encoded.</string>
+    <string name="error_save_failed">The enhanced photo could not be saved.</string>
+    <string name="error_unknown">Something went wrong.</string>
+</resources>

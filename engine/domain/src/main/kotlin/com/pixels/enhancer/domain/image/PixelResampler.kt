@@ -16,6 +16,17 @@ object PixelResampler {
         return max(1, (width * scale).roundToInt()) to max(1, (height * scale).roundToInt())
     }
 
+    /**
+     * Largest power-of-two decoder subsample factor that still leaves the long edge at or above
+     * [maxLongEdge], so the exact downscale afterwards only ever shrinks (never upsamples).
+     */
+    fun powerOfTwoSubsample(width: Int, height: Int, maxLongEdge: Int): Int {
+        val longEdge = max(width, height)
+        var factor = 1
+        while (longEdge / (factor * 2) >= maxLongEdge) factor *= 2
+        return factor
+    }
+
     fun downscaleToFit(source: PixelBuffer, maxLongEdge: Int): PixelBuffer {
         val (targetWidth, targetHeight) = fitWithin(maxLongEdge, source.width, source.height)
         if (targetWidth == source.width && targetHeight == source.height) return source

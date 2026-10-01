@@ -82,3 +82,19 @@ class FormattingTest {
         assertTrue(report.format().contains("84 ms"))
     }
 }
+
+class PixelResamplerTest {
+    @Test
+    fun `subsample factor never drops below the working size`() {
+        assertEquals(1, com.pixels.enhancer.domain.image.PixelResampler.powerOfTwoSubsample(2000, 1500, 2560))
+        assertEquals(1, com.pixels.enhancer.domain.image.PixelResampler.powerOfTwoSubsample(4032, 3024, 2560))
+        assertEquals(2, com.pixels.enhancer.domain.image.PixelResampler.powerOfTwoSubsample(6000, 4000, 2560))
+        assertEquals(4, com.pixels.enhancer.domain.image.PixelResampler.powerOfTwoSubsample(12000, 9000, 2560))
+    }
+
+    @Test
+    fun `fit keeps aspect ratio`() {
+        assertEquals(2560 to 1920, com.pixels.enhancer.domain.image.PixelResampler.fitWithin(2560, 4032, 3024))
+        assertEquals(100 to 50, com.pixels.enhancer.domain.image.PixelResampler.fitWithin(2560, 100, 50))
+    }
+}

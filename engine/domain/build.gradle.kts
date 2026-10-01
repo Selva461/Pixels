@@ -1,6 +1,7 @@
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
+    `java-library`
     alias(libs.plugins.kotlin.jvm)
     `java-test-fixtures`
 }
@@ -17,7 +18,8 @@ kotlin {
 }
 
 dependencies {
-    implementation(libs.kotlinx.coroutines.core)
+    // The use case exposes CoroutineDispatcher in its constructor, so coroutines are part of the API.
+    api(libs.kotlinx.coroutines.core)
 
     testFixturesImplementation(libs.kotlinx.coroutines.core)
 
