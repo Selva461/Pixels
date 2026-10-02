@@ -42,10 +42,9 @@ Initial implementation of the MVP from `Natural_Image_Enhancer_Requirements.md`.
 
 ## What was NOT verified
 
-- **The Android module has never been compiled.** The build container blocks `dl.google.com`
-  (Android SDK, AGP and AndroidX artifacts), so `app/` was written by hand and reviewed, but not built
-  or run. Expect small compile fixes on first open in Android Studio. Versions: AGP 8.10.1,
-  Kotlin 2.1.21, Compose BOM 2025.05.00, compileSdk 35, minSdk 29.
+- **The Android app compiles and packages** in GitHub Actions (`.github/workflows/android.yml`,
+  debug APK uploaded as the `pixels-debug-apk` artifact), but it has **not been run on a device**.
+  The local build container blocks `dl.google.com`, so app builds happen in CI only.
 - No real photos have been processed. All tuning used synthetic scenes (`GoldenScenario`).
 
 ## Known issues / limitations
@@ -70,7 +69,6 @@ Initial implementation of the MVP from `Natural_Image_Enhancer_Requirements.md`.
 
 ## Next single action
 
-Open the project in Android Studio (or run `./gradlew :app:assembleDebug` with the SDK installed),
-fix any compile errors in `app/`, then run the app on a device with 5–10 real photos and compare
+Install the CI debug APK on a device, run it with 5–10 real photos and compare
 the debug report's analysis scores against the synthetic calibration in `AnalysisThresholds` /
 `NaturalLimits`.
