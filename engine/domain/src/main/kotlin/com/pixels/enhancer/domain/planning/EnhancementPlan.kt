@@ -14,6 +14,9 @@ data class Adjustment(
     companion object {
         fun none(reason: String) = Adjustment(0f, enabled = false, reason = reason)
         fun of(amount: Float, reason: String) = Adjustment(amount, enabled = amount != 0f, reason = reason)
+
+        /** Creative adjustments the planner never sets on its own. */
+        val MANUAL_ONLY = none("Not set (manual control only)")
     }
 }
 
@@ -23,10 +26,15 @@ enum class AdjustmentKind(val label: String) {
     HIGHLIGHTS("Highlights"),
     SHADOWS("Shadows"),
     WHITE_BALANCE("White Balance"),
-    SATURATION("Saturation"),
+    TEMPERATURE("Temperature"),
+    TINT("Tint"),
+    SATURATION("Vibrance"),
+    GLOBAL_SATURATION("Saturation"),
     NOISE_REDUCTION("Denoise"),
-    DETAIL("Detail"),
+    DETAIL("Clarity"),
     SHARPENING("Sharpen"),
+    VIGNETTE("Vignette"),
+    GRAIN("Grain"),
 }
 
 /**
@@ -34,8 +42,11 @@ enum class AdjustmentKind(val label: String) {
  * - exposure: EV stops (white point stays anchored)
  * - contrast / highlights / shadows: peak tone-curve displacement (0..1 luma)
  * - whiteBalance: fraction of the measured cast to remove
- * - saturation: chroma scale offset (−0.1 = 10 % less chroma)
+ * - temperature / tint: −1..1 creative shift (warm/cool, magenta/green)
+ * - saturation: vibrance-style chroma offset (−0.1 = 10 % less chroma, boosts favour muted colours)
+ * - globalSaturation: uniform chroma offset (−1 = monochrome)
  * - noiseReduction / detail / sharpening: stage strength
+ * - vignette: −1..1 (negative darkens corners); grain: 0..1
  */
 data class EnhancementPlan(
     val exposure: Adjustment,
@@ -49,6 +60,11 @@ data class EnhancementPlan(
     val sharpening: Adjustment,
     val strength: Float,
     val presetId: String,
+    val temperature: Adjustment = Adjustment.MANUAL_ONLY,
+    val tint: Adjustment = Adjustment.MANUAL_ONLY,
+    val globalSaturation: Adjustment = Adjustment.MANUAL_ONLY,
+    val vignette: Adjustment = Adjustment.MANUAL_ONLY,
+    val grain: Adjustment = Adjustment.MANUAL_ONLY,
     val algorithmVersion: String = ENHANCEMENT_ALGORITHM_VERSION,
 ) {
     operator fun get(kind: AdjustmentKind): Adjustment = when (kind) {
@@ -57,10 +73,15 @@ data class EnhancementPlan(
         AdjustmentKind.HIGHLIGHTS -> highlights
         AdjustmentKind.SHADOWS -> shadows
         AdjustmentKind.WHITE_BALANCE -> whiteBalance
+        AdjustmentKind.TEMPERATURE -> temperature
+        AdjustmentKind.TINT -> tint
         AdjustmentKind.SATURATION -> saturation
+        AdjustmentKind.GLOBAL_SATURATION -> globalSaturation
         AdjustmentKind.NOISE_REDUCTION -> noiseReduction
         AdjustmentKind.DETAIL -> detail
         AdjustmentKind.SHARPENING -> sharpening
+        AdjustmentKind.VIGNETTE -> vignette
+        AdjustmentKind.GRAIN -> grain
     }
 
     fun entries(): List<Pair<AdjustmentKind, Adjustment>> = AdjustmentKind.entries.map { it to get(it) }
@@ -71,10 +92,15 @@ data class EnhancementPlan(
         highlights = transform(AdjustmentKind.HIGHLIGHTS, highlights),
         shadows = transform(AdjustmentKind.SHADOWS, shadows),
         whiteBalance = transform(AdjustmentKind.WHITE_BALANCE, whiteBalance),
+        temperature = transform(AdjustmentKind.TEMPERATURE, temperature),
+        tint = transform(AdjustmentKind.TINT, tint),
         saturation = transform(AdjustmentKind.SATURATION, saturation),
+        globalSaturation = transform(AdjustmentKind.GLOBAL_SATURATION, globalSaturation),
         noiseReduction = transform(AdjustmentKind.NOISE_REDUCTION, noiseReduction),
         detail = transform(AdjustmentKind.DETAIL, detail),
         sharpening = transform(AdjustmentKind.SHARPENING, sharpening),
+        vignette = transform(AdjustmentKind.VIGNETTE, vignette),
+        grain = transform(AdjustmentKind.GRAIN, grain),
     )
 
     val hasAnyCorrection: Boolean get() = AdjustmentKind.entries.any { get(it).enabled }

@@ -4,6 +4,7 @@ import com.pixels.enhancer.core.error.OperationResult
 import com.pixels.enhancer.domain.analysis.StatisticalImageAnalyzer
 import com.pixels.enhancer.domain.debug.DebugReport
 import com.pixels.enhancer.domain.planning.EnhancementStrength
+import com.pixels.enhancer.domain.planning.Look
 import com.pixels.enhancer.domain.planning.NaturalEnhancementPlanner
 import com.pixels.enhancer.domain.processing.PipelineImageProcessor
 import com.pixels.enhancer.domain.processing.StageConfig
@@ -60,6 +61,7 @@ private suspend fun processFile(file: File, options: HarnessOptions): Boolean {
     }
     val request = EnhanceRequest(
         strength = options.strength,
+        manual = Look.byId(options.look).adjustments,
         debugEnabled = true,
         stageConfigs = options.disabledStages.associateWith { StageConfig(enabled = false) },
         runUntilStageId = options.runUntil,
@@ -68,7 +70,7 @@ private suspend fun processFile(file: File, options: HarnessOptions): Boolean {
         is OperationResult.Failure -> return reportFailure(file, enhanced)
         is OperationResult.Success -> enhanced.value
     }
-    useCase.save(session, outcome)
+    useCase.save(session, request)
     val stem = file.nameWithoutExtension
     ImageIO.write(
         ImageIoConversions.sideBySide(session.original, outcome.processed.image),
@@ -110,10 +112,11 @@ private data class HarnessOptions(
     val disabledStages: List<String>,
     val synthetic: Boolean,
     val verbose: Boolean,
+    val look: String?,
 ) {
     companion object {
         const val USAGE = "usage: harness [--synthetic] [--out DIR] [--strength 0..1] [--until STAGE] " +
-            "[--disable STAGE,STAGE] [--verbose] [files...]"
+            "[--disable STAGE,STAGE] [--look ID] [--verbose] [files...]"
 
         fun parse(args: Array<String>): HarnessOptions? {
             val inputs = mutableListOf<String>()
@@ -123,6 +126,7 @@ private data class HarnessOptions(
             var disabled = emptyList<String>()
             var synthetic = false
             var verbose = false
+            var look: String? = null
             val iterator = args.iterator()
             while (iterator.hasNext()) {
                 when (val arg = iterator.next()) {
@@ -132,10 +136,11 @@ private data class HarnessOptions(
                     "--disable" -> disabled = iterator.nextOrNull()?.split(',') ?: return null
                     "--synthetic" -> synthetic = true
                     "--verbose" -> verbose = true
+                    "--look" -> look = iterator.nextOrNull() ?: return null
                     else -> if (arg.startsWith("--")) return null else inputs += arg
                 }
             }
-            return HarnessOptions(inputs, output, strength, until, disabled, synthetic, verbose)
+            return HarnessOptions(inputs, output, strength, until, disabled, synthetic, verbose, look)
         }
 
         private fun Iterator<String>.nextOrNull(): String? = if (hasNext()) next() else null

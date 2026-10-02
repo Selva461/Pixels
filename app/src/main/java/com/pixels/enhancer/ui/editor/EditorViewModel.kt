@@ -18,6 +18,9 @@ import com.pixels.enhancer.domain.debug.DebugReport
 import com.pixels.enhancer.domain.image.PixelBuffer
 import com.pixels.enhancer.domain.model.OutputNaming
 import com.pixels.enhancer.domain.planning.EnhancementStrength
+import com.pixels.enhancer.domain.planning.Look
+import com.pixels.enhancer.domain.planning.ManualAdjustments
+import com.pixels.enhancer.domain.planning.ManualControl
 import com.pixels.enhancer.domain.planning.QualityPreset
 import com.pixels.enhancer.domain.processing.ProcessingListener
 import com.pixels.enhancer.domain.processing.ProcessingStage
@@ -27,13 +30,18 @@ import com.pixels.enhancer.domain.usecase.EnhanceImageUseCase
 import com.pixels.enhancer.domain.usecase.EnhanceRequest
 import com.pixels.enhancer.domain.usecase.EnhancementOutcome
 import com.pixels.enhancer.domain.usecase.EnhancementSession
+import com.pixels.enhancer.domain.usecase.RenderTarget
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -42,6 +50,8 @@ import kotlinx.coroutines.withContext
 /**
  * Coordinates user actions with [EnhanceImageUseCase] and publishes [EditorUiState]. Holds no
  * image-processing logic: it only sequences calls and converts results for display.
+ *
+ * Live edits render the small preview; Save and Share render full resolution.
  */
 class EditorViewModel(
     private val enhanceImage: EnhanceImageUseCase,
@@ -60,82 +70,127 @@ class EditorViewModel(
     private var session: EnhancementSession? = null
     private var outcome: EnhancementOutcome? = null
     private var originalBitmap: ImageBitmap? = null
-    private var previousStrength: Float? = null
+
+    /** What the sliders show right now (may be mid-drag). */
+    private var current = EditState(settings.strength)
+
+    /** Last edit the user finished; undo returns to the one before it. */
+    private var committed = current
+    private val history = ArrayDeque<EditState>()
+
     private var disabledStages: Set<String> = emptySet()
     private var runUntilStageId: String? = null
-    private var work: Job? = null
+    private var openJob: Job? = null
+
+    /** Every edit becomes a preview request; newer requests cancel older renders. */
+    private val previewRequests = MutableStateFlow<EnhanceRequest?>(null)
+
+    init {
+        startPreviewRenderer()
+    }
 
     fun onImagePicked(uri: Uri) {
-        work?.cancel()
+        openJob?.cancel()
         clearSession()
-        work = viewModelScope.launch {
+        openJob = viewModelScope.launch {
             _uiState.value = EditorUiState.Loading
             when (val opened = enhanceImage.open(uri.toString(), QualityPreset.byId(settings.presetId))) {
                 is OperationResult.Failure -> _uiState.value = EditorUiState.Error(opened.code)
                 is OperationResult.Success -> {
                     session = opened.value
                     originalBitmap = toImageBitmap(opened.value.original)
-                    enhance()
+                    requestPreview()
                 }
             }
         }
     }
 
-    /** Moves the slider without reprocessing; processing happens when the drag ends. */
-    fun onStrengthChanged(value: Float) {
-        _uiState.update { state -> if (state is EditorUiState.Success) state.copy(strength = value) else state }
+    fun onStrengthChanged(value: Float) = edit(current.copy(strength = value))
+
+    fun onControlChanged(control: ManualControl, value: Float) = edit(current.copy(manual = current.manual.with(control, value)))
+
+    /** Called when a slider drag ends: records an undo step and remembers the strength. */
+    fun onEditFinished() {
+        if (current == committed) return
+        history.addLast(committed)
+        if (history.size > MAX_UNDO_STEPS) history.removeFirst()
+        committed = current
+        if (settings.strength != current.strength) {
+            settings = settings.copy(strength = current.strength)
+            settingsRepository.save(settings)
+        }
+        publishEdit()
     }
 
-    fun onStrengthChangeFinished() {
-        val requested = (_uiState.value as? EditorUiState.Success)?.strength ?: return
-        if (requested == settings.strength) return
-        applyStrength(requested, rememberForUndo = true)
+    fun onLookSelected(look: Look) {
+        edit(current.copy(manual = look.adjustments, lookId = look.id))
+        onEditFinished()
+    }
+
+    fun onResetControl(control: ManualControl) {
+        edit(current.copy(manual = current.manual.with(control, 0f)))
+        onEditFinished()
+    }
+
+    fun onResetAll() {
+        disabledStages = emptySet()
+        runUntilStageId = null
+        edit(EditState(EnhancementStrength.DEFAULT))
+        onEditFinished()
     }
 
     fun onUndo() {
-        val target = previousStrength ?: return
-        previousStrength = null
-        applyStrength(target, rememberForUndo = false)
-    }
-
-    fun onReset() {
-        disabledStages = emptySet()
-        runUntilStageId = null
-        applyStrength(EnhancementStrength.DEFAULT, rememberForUndo = true)
+        val previous = history.removeLastOrNull() ?: return
+        current = previous
+        committed = previous
+        publishEdit()
+        requestPreview()
     }
 
     fun onSave() {
         val currentSession = session ?: return
-        val currentOutcome = outcome ?: return
-        setActivity(EditorActivity.Saving)
+        val state = _uiState.value as? EditorUiState.Success ?: return
+        if (state.activity is EditorActivity.Saving) return
+        setActivity(EditorActivity.Saving(0f))
         viewModelScope.launch {
-            when (val saved = enhanceImage.save(currentSession, currentOutcome)) {
+            when (val saved = enhanceImage.save(currentSession, fullRequest(), progressListener { setActivity(EditorActivity.Saving(it)) })) {
                 is OperationResult.Failure -> setActivity(EditorActivity.Failed(saved.code))
-                is OperationResult.Success -> setActivity(EditorActivity.Saved(saved.value.displayName))
+                is OperationResult.Success -> setActivity(EditorActivity.Saved(saved.value.displayName, Uri.parse(saved.value.id)))
             }
         }
     }
 
+    fun onViewSaved(uri: Uri) {
+        viewModelScope.launch { _events.send(EditorEvent.ViewImage(uri)) }
+    }
+
     fun onShare() {
         val currentSession = session ?: return
-        val currentOutcome = outcome ?: return
+        setActivity(EditorActivity.Saving(0f))
         viewModelScope.launch {
+            val rendered = when (val result = enhanceImage.render(currentSession, fullRequest())) {
+                is OperationResult.Failure -> return@launch setActivity(EditorActivity.Failed(result.code))
+                is OperationResult.Success -> result.value
+            }
             val name = OutputNaming.enhancedName(currentSession.source.displayName)
-            when (val written = runControlled(ErrorCode.OUTPUT_ENCODE_FAILED) { shareCache.write(currentOutcome.processed.image, name) }) {
+            when (val written = runControlled(ErrorCode.OUTPUT_ENCODE_FAILED) { shareCache.write(rendered.processed.image, name) }) {
                 is OperationResult.Failure -> setActivity(EditorActivity.Failed(written.code))
-                is OperationResult.Success -> _events.send(EditorEvent.ShareImage(written.value))
+                is OperationResult.Success -> {
+                    setActivity(EditorActivity.None)
+                    _events.send(EditorEvent.ShareImage(written.value))
+                }
             }
         }
     }
 
     fun onStageToggled(stageId: String, enabled: Boolean) {
         disabledStages = if (enabled) disabledStages - stageId else disabledStages + stageId
-        reprocess()
+        requestPreview()
     }
 
     fun onRunUntilSelected(stageId: String?) {
         runUntilStageId = stageId
-        reprocess()
+        requestPreview()
     }
 
     fun onExportDebugReport() {
@@ -144,68 +199,94 @@ class EditorViewModel(
     }
 
     fun onClose() {
-        work?.cancel()
+        openJob?.cancel()
         clearSession()
         _uiState.value = EditorUiState.Idle
     }
 
-    private fun applyStrength(strength: Float, rememberForUndo: Boolean) {
-        if (rememberForUndo) previousStrength = settings.strength
-        settings = settings.copy(strength = strength)
-        settingsRepository.save(settings)
-        reprocess()
+    private fun edit(next: EditState) {
+        current = next
+        publishEdit()
+        requestPreview()
     }
 
-    private fun reprocess() {
+    /** Moves the sliders immediately; the image follows when the preview render finishes. */
+    private fun publishEdit() {
+        _uiState.update { state ->
+            if (state is EditorUiState.Success) state.copy(edit = current, canUndo = history.isNotEmpty()) else state
+        }
+    }
+
+    private fun requestPreview() {
         if (session == null) return
-        work?.cancel()
-        work = viewModelScope.launch { enhance() }
+        previewRequests.value = request(RenderTarget.PREVIEW)
     }
 
-    private suspend fun enhance() {
+    private fun request(target: RenderTarget) = EnhanceRequest(
+        strength = current.strength,
+        manual = current.manual,
+        target = target,
+        debugEnabled = isDebugBuild,
+        stageConfigs = disabledStages.associateWith { StageConfig(enabled = false) },
+        runUntilStageId = runUntilStageId,
+    )
+
+    /** Save/share always use the full pipeline, whatever the debug screen is inspecting. */
+    private fun fullRequest() = request(RenderTarget.FULL).copy(stageConfigs = emptyMap(), runUntilStageId = null)
+
+    @OptIn(FlowPreview::class)
+    private fun startPreviewRenderer() {
+        viewModelScope.launch {
+            previewRequests.filterNotNull().debounce(PREVIEW_DEBOUNCE_MS).collectLatest { request -> renderPreview(request) }
+        }
+    }
+
+    private suspend fun renderPreview(request: EnhanceRequest) {
         val currentSession = session ?: return
         val original = originalBitmap ?: return
-        val request = EnhanceRequest(
-            strength = settings.strength,
-            debugEnabled = isDebugBuild,
-            stageConfigs = disabledStages.associateWith { StageConfig(enabled = false) },
-            runUntilStageId = runUntilStageId,
-        )
-        when (val result = enhanceImage.enhance(currentSession, request, progressListener())) {
+        val listener = progressListener { progress -> showProgress(progress) }
+        when (val result = enhanceImage.enhance(currentSession, request, listener)) {
             is OperationResult.Failure -> showFailure(result.code)
             is OperationResult.Success -> {
                 outcome = result.value
-                _uiState.value = EditorUiState.Success(
-                    original = original,
-                    enhanced = toImageBitmap(result.value.processed.image),
-                    strength = settings.strength,
-                    canUndo = previousStrength != null,
-                    activity = EditorActivity.None,
-                    debug = debugInfo(currentSession, result.value),
-                )
+                val enhanced = toImageBitmap(result.value.processed.image)
+                _uiState.update { state ->
+                    EditorUiState.Success(
+                        original = original,
+                        enhanced = enhanced,
+                        edit = current,
+                        canUndo = history.isNotEmpty(),
+                        // A save in progress (or just finished) outlives preview renders; stale progress/errors do not.
+                        activity = (state as? EditorUiState.Success)?.activity
+                            ?.takeIf { it is EditorActivity.Saving || it is EditorActivity.Saved }
+                            ?: EditorActivity.None,
+                        debug = debugInfo(currentSession, result.value),
+                    )
+                }
             }
         }
     }
 
-    /** A failed re-run keeps the last good result on screen; a failed first run shows the error screen. */
+    private fun showProgress(progress: Float) {
+        _uiState.update { state ->
+            when (state) {
+                is EditorUiState.Success ->
+                    if (state.activity is EditorActivity.Saving) state else state.copy(activity = EditorActivity.Reprocessing(progress))
+                is EditorUiState.Loading, is EditorUiState.Processing -> EditorUiState.Processing(progress)
+                else -> state
+            }
+        }
+    }
+
+    /** A failed re-render keeps the last good result on screen; a failed first render shows the error screen. */
     private fun showFailure(code: ErrorCode) {
         _uiState.update { state ->
             if (state is EditorUiState.Success) state.copy(activity = EditorActivity.Failed(code)) else EditorUiState.Error(code)
         }
     }
 
-    private fun progressListener() = object : ProcessingListener {
-        override fun onStageStarted(stage: ProcessingStage, index: Int, total: Int) {
-            val progress = index / total.toFloat()
-            _uiState.update { state ->
-                when (state) {
-                    is EditorUiState.Success -> state.copy(activity = EditorActivity.Reprocessing(stage.displayName, progress))
-                    is EditorUiState.Loading, is EditorUiState.Processing -> EditorUiState.Processing(stage.displayName, progress)
-                    else -> state
-                }
-            }
-        }
-
+    private fun progressListener(onProgress: (Float) -> Unit) = object : ProcessingListener {
+        override fun onStageStarted(stage: ProcessingStage, index: Int, total: Int) = onProgress(index / total.toFloat())
         override fun onStageCompleted(stage: ProcessingStage, durationMs: Long) = Unit
     }
 
@@ -222,15 +303,23 @@ class EditorViewModel(
         withContext(Dispatchers.Default) { BitmapConversions.toBitmap(buffer).asImageBitmap() }
 
     private fun clearSession() {
+        previewRequests.value = null
         session = null
         outcome = null
         originalBitmap = null
-        previousStrength = null
+        current = EditState(settings.strength)
+        committed = current
+        history.clear()
         disabledStages = emptySet()
         runUntilStageId = null
     }
 
     companion object {
+        private const val MAX_UNDO_STEPS = 30
+
+        /** Coalesces rapid slider movement into one render. */
+        private const val PREVIEW_DEBOUNCE_MS = 60L
+
         fun factory(container: AppContainer): ViewModelProvider.Factory = viewModelFactory {
             initializer {
                 EditorViewModel(
@@ -243,4 +332,3 @@ class EditorViewModel(
         }
     }
 }
-

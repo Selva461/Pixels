@@ -7,7 +7,7 @@
     <string name="home_pick">Choose photo</string>
 
     <string name="loading_opening">Opening photo…</string>
-    <string name="processing_stage">Enhancing: %1$s</string>
+    <string name="processing_enhancing">Enhancing…</string>
 
     <string name="editor_close">Close</string>
     <string name="editor_debug">Debug</string>
@@ -16,16 +16,22 @@
     <string name="editor_mode_compare">Compare</string>
     <string name="editor_split_horizontal">Side by side</string>
     <string name="editor_split_vertical">Top / bottom</string>
-    <string name="editor_strength">Natural %1$d%%</string>
+    <string name="editor_strength">Auto strength %1$d%%</string>
     <string name="editor_undo">Undo</string>
-    <string name="editor_reset">Reset</string>
+    <string name="editor_reset_all">Reset all</string>
     <string name="editor_save">Save</string>
     <string name="editor_share">Share</string>
     <string name="editor_before">Before</string>
     <string name="editor_after">After</string>
-    <string name="editor_saving">Saving…</string>
-    <string name="editor_saved">Saved as %1$s</string>
-    <string name="editor_updating">Updating: %1$s</string>
+    <string name="editor_saving">Rendering full-quality photo…</string>
+    <string name="editor_saved">Saved to Pictures/Pixels as %1$s</string>
+    <string name="editor_view">View</string>
+    <string name="editor_updating">Updating preview…</string>
+    <string name="editor_tab_auto">Auto</string>
+    <string name="editor_tab_looks">Looks</string>
+    <string name="editor_tab_adjust">Adjust</string>
+    <string name="editor_auto_hint">Automatic natural correction. Drag to make it subtler or stronger.</string>
+    <string name="editor_reset_control_hint">Tap a value to reset it</string>
     <string name="share_chooser">Share enhanced photo</string>
     <string name="share_report_chooser">Export debug report</string>
 

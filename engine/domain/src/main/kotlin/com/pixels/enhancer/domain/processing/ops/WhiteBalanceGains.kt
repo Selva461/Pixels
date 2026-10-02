@@ -27,6 +27,25 @@ object WhiteBalanceGains {
         return ChannelGains(red / brightness, green / brightness, blue / brightness)
     }
 
+    /**
+     * Applies the user's creative temperature (+ warmer) and tint (+ magenta) on top of [gains],
+     * keeping neutral brightness unchanged.
+     */
+    fun withCreativeShift(gains: ChannelGains, temperature: Float, tint: Float): ChannelGains {
+        if (temperature == 0f && tint == 0f) return gains
+        val red = gains.red * 2f.pow(TEMPERATURE_STOPS * temperature)
+        val green = gains.green * 2f.pow(-TINT_STOPS * tint)
+        val blue = gains.blue * 2f.pow(-TEMPERATURE_STOPS * temperature)
+        val brightness = Luma.of(red, green, blue)
+        return ChannelGains(red / brightness, green / brightness, blue / brightness)
+    }
+
+    /** Full-scale temperature moves red and blue by ±0.3 stop in opposite directions. */
+    private const val TEMPERATURE_STOPS = 0.3f
+
+    /** Full-scale tint moves green by ±0.2 stop. */
+    private const val TINT_STOPS = 0.2f
+
     private fun partialGain(fullGain: Float, fraction: Float, limits: NaturalLimits): Float =
         fullGain.pow(fraction).coerceIn(limits.minChannelGain, limits.maxChannelGain)
 }

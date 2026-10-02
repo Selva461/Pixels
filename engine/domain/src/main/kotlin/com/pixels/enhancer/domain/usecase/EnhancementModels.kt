@@ -5,6 +5,7 @@ import com.pixels.enhancer.domain.analysis.ImageAnalysis
 import com.pixels.enhancer.domain.image.PixelBuffer
 import com.pixels.enhancer.domain.model.ImageSource
 import com.pixels.enhancer.domain.planning.EnhancementPlan
+import com.pixels.enhancer.domain.planning.ManualAdjustments
 import com.pixels.enhancer.domain.planning.QualityPreset
 import com.pixels.enhancer.domain.processing.ProcessedImage
 import com.pixels.enhancer.domain.processing.StageConfig
@@ -17,6 +18,8 @@ import com.pixels.enhancer.domain.validation.ValidationResult
 data class EnhancementSession(
     val source: ImageSource,
     val original: PixelBuffer,
+    /** Downscaled copy of [original] for interactive editing; the plan is still decided from the full analysis. */
+    val preview: PixelBuffer,
     val analysis: ImageAnalysis,
     val preset: QualityPreset,
     /** Decode and analysis durations. */
@@ -25,10 +28,20 @@ data class EnhancementSession(
 
 data class EnhanceRequest(
     val strength: Float,
+    val manual: ManualAdjustments = ManualAdjustments.NONE,
+    val target: RenderTarget = RenderTarget.FULL,
     val debugEnabled: Boolean = false,
     val stageConfigs: Map<String, StageConfig> = emptyMap(),
     val runUntilStageId: String? = null,
 )
+
+enum class RenderTarget {
+    /** Small image for live slider feedback. */
+    PREVIEW,
+
+    /** Working-resolution image, used for saving and sharing. */
+    FULL,
+}
 
 data class EnhancementOutcome(
     val processingId: String,

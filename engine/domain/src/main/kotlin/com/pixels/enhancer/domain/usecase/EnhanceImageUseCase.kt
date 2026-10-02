@@ -14,11 +14,14 @@ import com.pixels.enhancer.core.timing.TimingReport
 import com.pixels.enhancer.core.timing.measure
 import com.pixels.enhancer.domain.analysis.ImageAnalysis
 import com.pixels.enhancer.domain.analysis.ImageAnalyzer
+import com.pixels.enhancer.domain.image.PixelBuffer
+import com.pixels.enhancer.domain.image.PixelResampler
 import com.pixels.enhancer.domain.model.ImageSource
 import com.pixels.enhancer.domain.model.OutputNaming
 import com.pixels.enhancer.domain.model.SupportedFormats
 import com.pixels.enhancer.domain.planning.EnhancementPlan
 import com.pixels.enhancer.domain.planning.EnhancementPlanner
+import com.pixels.enhancer.domain.planning.ManualAdjustmentMerger
 import com.pixels.enhancer.domain.planning.QualityPreset
 import com.pixels.enhancer.domain.processing.ImageProcessor
 import com.pixels.enhancer.domain.processing.ProcessingContext
@@ -28,6 +31,7 @@ import com.pixels.enhancer.domain.repository.ImageSaver
 import com.pixels.enhancer.domain.repository.SaveRequest
 import com.pixels.enhancer.domain.repository.SavedImage
 import com.pixels.enhancer.domain.validation.OutputValidator
+import com.pixels.enhancer.domain.validation.ValidationMode
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -83,6 +87,7 @@ class EnhanceImageUseCase(
                 EnhancementSession(
                     source = source,
                     original = working.value,
+                    preview = PixelResampler.downscaleToFit(working.value, PREVIEW_LONG_EDGE),
                     analysis = analysis.value,
                     preset = preset,
                     loadTimings = TimingReport(
@@ -110,11 +115,14 @@ class EnhanceImageUseCase(
             ),
         )
 
-        val planned = clock.measure { planner.createPlan(session.analysis, request.strength, session.preset) }
+        val planned = clock.measure {
+            ManualAdjustmentMerger.merge(planner.createPlan(session.analysis, request.strength, session.preset), request.manual)
+        }
         logPlan(processingId, planned.value)
 
+        val source = sourceFor(session, request.target)
         val context = ProcessingContext(
-            analysis = session.analysis,
+            analysis = analysisFor(session, source),
             plan = planned.value,
             qualityPreset = session.preset,
             debugEnabled = request.debugEnabled,
@@ -123,14 +131,15 @@ class EnhanceImageUseCase(
         )
         val processed = when (
             val result = runControlled(ErrorCode.PROCESSING_FAILED) {
-                processor.process(session.original, context, listener, request.runUntilStageId)
+                processor.process(source, context, listener, request.runUntilStageId)
             }
         ) {
             is OperationResult.Failure -> return@withContext logFailure("PROCESS_FAILED", processingId, result)
             is OperationResult.Success -> result.value
         }
 
-        val validated = clock.measure { validator.validate(session.original, processed.image) }
+        val validationMode = if (request.manual.isNeutral) ValidationMode.NATURAL else ValidationMode.STRUCTURAL
+        val validated = clock.measure { validator.validate(source, processed.image, validationMode) }
         val validation = validated.value
         logger.event(
             "VALIDATION_COMPLETE",
@@ -152,22 +161,47 @@ class EnhanceImageUseCase(
         OperationResult.Success(EnhancementOutcome(processingId, request, planned.value, processed, validation, timings))
     }
 
-    suspend fun save(session: EnhancementSession, outcome: EnhancementOutcome): OperationResult<SavedImage> = withContext(dispatcher) {
-        if (!outcome.validation.passed) {
-            return@withContext logFailure(
-                "SAVE_FAILED",
-                outcome.processingId,
-                OperationResult.Failure(ErrorCode.VALIDATION_FAILED, "Refusing to save output that failed validation"),
-            )
+    /**
+     * Renders [request] at full working resolution (the preview is never saved) and stores it as a
+     * new file. The original is never overwritten.
+     */
+    suspend fun save(
+        session: EnhancementSession,
+        request: EnhanceRequest,
+        listener: ProcessingListener? = null,
+    ): OperationResult<SavedImage> = withContext(dispatcher) {
+        val fullRequest = request.copy(target = RenderTarget.FULL, runUntilStageId = null)
+        val outcome = when (val rendered = enhance(session, fullRequest, listener)) {
+            is OperationResult.Failure -> return@withContext rendered
+            is OperationResult.Success -> rendered.value
         }
-        val request = SaveRequest(displayName = OutputNaming.enhancedName(session.source.displayName))
-        when (val result = runControlled(ErrorCode.SAVE_FAILED) { clock.measure { saver.save(outcome.processed.image, request) } }) {
+        val saveRequest = SaveRequest(displayName = OutputNaming.enhancedName(session.source.displayName))
+        when (val result = runControlled(ErrorCode.SAVE_FAILED) { clock.measure { saver.save(outcome.processed.image, saveRequest) } }) {
             is OperationResult.Failure -> logFailure("SAVE_FAILED", outcome.processingId, result)
             is OperationResult.Success -> {
                 logger.event("SAVE_COMPLETE", mapOf("processingId" to outcome.processingId, "durationMs" to result.value.durationMs))
                 OperationResult.Success(result.value.value)
             }
         }
+    }
+
+    /** Renders [request] at full resolution for sharing, without saving. */
+    suspend fun render(session: EnhancementSession, request: EnhanceRequest): OperationResult<EnhancementOutcome> =
+        enhance(session, request.copy(target = RenderTarget.FULL, runUntilStageId = null))
+
+    private fun sourceFor(session: EnhancementSession, target: RenderTarget) = when (target) {
+        RenderTarget.PREVIEW -> session.preview
+        RenderTarget.FULL -> session.original
+    }
+
+    /**
+     * Noise was measured on the working image; area-downscaling to the preview averages it away
+     * by roughly the scale factor, so stages that key off noise sigma must use the smaller value.
+     */
+    private fun analysisFor(session: EnhancementSession, source: PixelBuffer): ImageAnalysis {
+        if (source === session.original) return session.analysis
+        val scale = source.width.toFloat() / session.original.width
+        return session.analysis.copy(noiseSigma = session.analysis.noiseSigma * scale)
     }
 
     private fun checkSource(source: ImageSource): OperationResult.Failure? = when {
@@ -205,5 +239,10 @@ class EnhanceImageUseCase(
     private fun logFailure(event: String, processingId: String?, failure: OperationResult.Failure): OperationResult.Failure {
         logger.error(event, mapOf("processingId" to processingId, "code" to failure.code), failure.cause)
         return failure
+    }
+
+    private companion object {
+        /** Long edge of the live-preview image; small enough that a slider move re-renders quickly on a phone. */
+        const val PREVIEW_LONG_EDGE = 1280
     }
 }

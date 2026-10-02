@@ -35,6 +35,7 @@ object DebugReport {
                 row("Original", "${source.width}x${source.height}"),
                 row("Rotation", "${source.rotationDegrees}°" + if (source.mirrored) " (mirrored)" else ""),
                 row("Working", "${session.original.width}x${session.original.height}"),
+                row("Preview", "${session.preview.width}x${session.preview.height}"),
                 row("Preset", session.preset.displayName),
             ),
         )
@@ -67,6 +68,8 @@ object DebugReport {
             row("Processing ID", outcome.processingId),
             row("Strength", "${(plan.strength * PERCENT).toInt()}%"),
             row("Algorithm", plan.algorithmVersion),
+            row("Rendered", "${outcome.request.target} ${outcome.processed.image.width}x${outcome.processed.image.height}"),
+            row("Manual", if (outcome.request.manual.isNeutral) "none" else "${outcome.request.manual.values.size} control(s)"),
             "",
         )
         val rows = plan.entries().map { (kind, adjustment) ->

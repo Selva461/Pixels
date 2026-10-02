@@ -13,12 +13,15 @@ import kotlin.math.abs
  */
 class NaturalOutputValidator(private val limits: ValidationLimits = ValidationLimits()) : OutputValidator {
 
-    override fun validate(original: PixelBuffer, enhanced: PixelBuffer): ValidationResult {
+    override fun validate(original: PixelBuffer, enhanced: PixelBuffer, mode: ValidationMode): ValidationResult {
         val dimensions = checkDimensions(original, enhanced)
         if (!dimensions.passed) return ValidationResult(listOf(dimensions))
 
         val before = LuminanceStatistics.compute(original)
         val after = LuminanceStatistics.compute(enhanced)
+        if (mode == ValidationMode.STRUCTURAL) {
+            return ValidationResult(listOf(dimensions, checkAlpha(original, enhanced), checkNotBlank(before.mean, after.mean)))
+        }
         val saturationBefore = SaturationEstimator.compute(original)
         val saturationAfter = SaturationEstimator.compute(enhanced)
         return ValidationResult(

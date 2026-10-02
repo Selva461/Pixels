@@ -72,7 +72,7 @@ private fun PixelsApp(viewModel: EditorViewModel, onPickImage: () -> Unit, modif
         EditorUiState.Idle -> HomeScreen(onPickImage, modifier)
         EditorUiState.Loading -> ProgressScreen(stringResource(R.string.loading_opening), progress = null, modifier = modifier)
         is EditorUiState.Processing -> ProgressScreen(
-            stringResource(R.string.processing_stage, current.stageName),
+            stringResource(R.string.processing_enhancing),
             progress = current.progress,
             modifier = modifier,
         )
@@ -93,11 +93,15 @@ private fun PixelsApp(viewModel: EditorViewModel, onPickImage: () -> Unit, modif
                     state = current,
                     onClose = viewModel::onClose,
                     onStrengthChanged = viewModel::onStrengthChanged,
-                    onStrengthChangeFinished = viewModel::onStrengthChangeFinished,
+                    onControlChanged = viewModel::onControlChanged,
+                    onEditFinished = viewModel::onEditFinished,
+                    onLookSelected = viewModel::onLookSelected,
+                    onResetControl = viewModel::onResetControl,
+                    onResetAll = viewModel::onResetAll,
                     onUndo = viewModel::onUndo,
-                    onReset = viewModel::onReset,
                     onSave = viewModel::onSave,
                     onShare = viewModel::onShare,
+                    onViewSaved = viewModel::onViewSaved,
                     onOpenDebug = if (debug != null) ({ showDebug = true }) else null,
                     modifier = modifier,
                 )
@@ -123,6 +127,10 @@ private fun ShareEvents(viewModel: EditorViewModel) {
                     },
                     imageChooserTitle,
                 )
+                is EditorEvent.ViewImage -> Intent(Intent.ACTION_VIEW).apply {
+                    setDataAndType(event.uri, "image/jpeg")
+                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                }
                 is EditorEvent.ShareText -> Intent.createChooser(
                     Intent(Intent.ACTION_SEND).apply {
                         type = "text/plain"
@@ -131,7 +139,8 @@ private fun ShareEvents(viewModel: EditorViewModel) {
                     reportChooserTitle,
                 )
             }
-            context.startActivity(intent)
+            // No gallery/viewer installed is not worth crashing over.
+            runCatching { context.startActivity(intent) }
         }
     }
 }

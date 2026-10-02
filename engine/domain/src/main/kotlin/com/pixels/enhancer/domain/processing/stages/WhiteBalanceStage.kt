@@ -13,11 +13,18 @@ class WhiteBalanceStage : ProcessingStage {
     override val id = StageIds.WHITE_BALANCE
     override val displayName = "White Balance"
 
-    override fun isEnabled(context: ProcessingContext) = context.plan.whiteBalance.enabled
+    override fun isEnabled(context: ProcessingContext): Boolean {
+        val plan = context.plan
+        return plan.whiteBalance.enabled || plan.temperature.enabled || plan.tint.enabled
+    }
 
     override suspend fun execute(input: PixelBuffer, context: ProcessingContext): PixelBuffer {
         val fraction = context.effectiveAmount(id, context.plan.whiteBalance)
-        val gains = WhiteBalanceGains.compute(context.analysis.neutralBalance, fraction, context.qualityPreset.limits)
+        val gains = WhiteBalanceGains.withCreativeShift(
+            WhiteBalanceGains.compute(context.analysis.neutralBalance, fraction, context.qualityPreset.limits),
+            temperature = context.effectiveAmount(id, context.plan.temperature),
+            tint = context.effectiveAmount(id, context.plan.tint),
+        )
         val pixels = input.pixels
         for (index in pixels.indices) {
             val color = pixels[index]

@@ -182,3 +182,39 @@ class ColorFinishStageTest {
         assertTrue(SaturationEstimator.chromaOf(result.pixels[0]) < SaturationEstimator.chromaOf(vivid.pixels[0]))
     }
 }
+
+class CreativeStageTest {
+    @Test
+    fun `positive temperature warms grey`() = runTest {
+        val context = withPlan({ it.copy(temperature = Adjustment.of(0.8f, "t")) })
+        val color = WhiteBalanceStage().execute(TestImages.solid(128), context).pixels[0]
+        assertTrue(Argb.red(color) > Argb.blue(color) + 10, "r=${Argb.red(color)} b=${Argb.blue(color)}")
+    }
+
+    @Test
+    fun `saturation minus one makes the image monochrome`() = runTest {
+        val context = withPlan({ it.copy(globalSaturation = Adjustment.of(-1f, "t")) })
+        val color = ColorFinishStage().execute(TestImages.solidColor(200, 60, 40), context).pixels[0]
+        assertTrue(SaturationEstimator.chromaOf(color) < 0.01f)
+    }
+
+    @Test
+    fun `negative vignette darkens corners but not the centre`() = runTest {
+        val image = TestImages.solid(150, 101, 101)
+        val result = com.pixels.enhancer.domain.processing.stages.VignetteStage()
+            .execute(image.copy(), withPlan({ it.copy(vignette = Adjustment.of(-1f, "t")) }))
+        assertEquals(150, Argb.red(result.pixels[50 * 101 + 50]))
+        assertTrue(Argb.red(result.pixels[0]) < 110)
+    }
+
+    @Test
+    fun `grain adds deterministic texture to midtones only`() = runTest {
+        val context = withPlan({ it.copy(grain = Adjustment.of(1f, "t")) })
+        val stage = com.pixels.enhancer.domain.processing.stages.GrainStage()
+        val first = stage.execute(TestImages.solid(128), context)
+        val second = stage.execute(TestImages.solid(128), context)
+        assertTrue(first.pixels.contentEquals(second.pixels))
+        assertTrue(NoiseEstimator.estimateSigma(first) > 0.01f)
+        assertEquals(Argb.opaque(0, 0, 0), stage.execute(TestImages.solid(0), context).pixels[0])
+    }
+}

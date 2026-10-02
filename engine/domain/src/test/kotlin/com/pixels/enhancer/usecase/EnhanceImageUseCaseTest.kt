@@ -17,6 +17,10 @@ import com.pixels.enhancer.domain.processing.stages.DefaultPipeline
 import com.pixels.enhancer.domain.repository.ImageRepository
 import com.pixels.enhancer.domain.usecase.EnhanceImageUseCase
 import com.pixels.enhancer.domain.usecase.EnhanceRequest
+import com.pixels.enhancer.domain.usecase.RenderTarget
+import com.pixels.enhancer.domain.planning.ManualAdjustments
+import com.pixels.enhancer.domain.planning.ManualControl
+import com.pixels.enhancer.domain.validation.ValidationMode
 import com.pixels.enhancer.domain.validation.NaturalOutputValidator
 import com.pixels.enhancer.domain.validation.OutputValidator
 import com.pixels.enhancer.domain.validation.ValidationCheck
@@ -56,7 +60,8 @@ class EnhanceImageUseCaseTest {
         val useCase = useCase()
         val session = assertIs<OperationResult.Success<*>>(useCase.open("dark")).value as com.pixels.enhancer.domain.usecase.EnhancementSession
         val outcome = (useCase.enhance(session, EnhanceRequest(strength = 0.45f)) as OperationResult.Success).value
-        val saved = (useCase.save(session, outcome) as OperationResult.Success).value
+        val saved = (useCase.save(session, EnhanceRequest(strength = 0.45f, target = RenderTarget.PREVIEW)) as OperationResult.Success).value
+        assertEquals(session.original.width, saver.saved.single().second.width, "save must render full resolution, not the preview")
 
         assertEquals("dark_enhanced.jpg", saved.displayName)
         assertTrue(outcome.validation.passed)
@@ -81,6 +86,28 @@ class EnhanceImageUseCaseTest {
         assertTrue(snapshot.contentEquals(session.original.pixels))
         assertTrue(high.plan.exposure.amount > low.plan.exposure.amount)
         assertTrue(low.processingId != high.processingId)
+    }
+
+    @Test
+    fun `preview renders a small image with the same plan as full resolution`() = runTest {
+        val repository = InMemoryImageRepository(mapOf("big" to GoldenScenario.UNDEREXPOSED.render(2400, 1800)))
+        val useCase = useCase(repository)
+        val session = (useCase.open("big") as OperationResult.Success).value
+        val preview = (useCase.enhance(session, EnhanceRequest(0.5f, target = RenderTarget.PREVIEW)) as OperationResult.Success).value
+        val full = (useCase.enhance(session, EnhanceRequest(0.5f, target = RenderTarget.FULL)) as OperationResult.Success).value
+        assertEquals(1280, preview.processed.image.width)
+        assertEquals(2400, full.processed.image.width)
+        assertEquals(full.plan.entries().map { it.second.amount }, preview.plan.entries().map { it.second.amount })
+    }
+
+    @Test
+    fun `strong manual looks are allowed past the natural validation limits`() = runTest {
+        val useCase = useCase()
+        val session = (useCase.open("dark") as OperationResult.Success).value
+        val manual = ManualAdjustments.of(ManualControl.EXPOSURE to 1f, ManualControl.SATURATION to 1f, ManualControl.CONTRAST to 1f)
+        val outcome = (useCase.enhance(session, EnhanceRequest(0.5f, manual = manual)) as OperationResult.Success).value
+        assertTrue(outcome.plan.exposure.reason.contains("manual"))
+        assertTrue(outcome.plan.globalSaturation.enabled)
     }
 
     @Test
@@ -126,13 +153,14 @@ class EnhanceImageUseCaseTest {
     @Test
     fun `failed validation is reported and nothing is saved`() = runTest {
         val rejecting = object : OutputValidator {
-            override fun validate(original: PixelBuffer, enhanced: PixelBuffer) =
+            override fun validate(original: PixelBuffer, enhanced: PixelBuffer, mode: ValidationMode) =
                 ValidationResult(listOf(ValidationCheck("Not blank", passed = false, detail = "simulated")))
         }
         val useCase = useCase(validator = rejecting)
         val session = (useCase.open("dark") as OperationResult.Success).value
         val failure = useCase.enhance(session, EnhanceRequest(0.5f)) as OperationResult.Failure
         assertEquals(ErrorCode.VALIDATION_FAILED, failure.code)
+        assertEquals(ErrorCode.VALIDATION_FAILED, (useCase.save(session, EnhanceRequest(0.5f)) as OperationResult.Failure).code)
         assertTrue(saver.saved.isEmpty())
     }
 

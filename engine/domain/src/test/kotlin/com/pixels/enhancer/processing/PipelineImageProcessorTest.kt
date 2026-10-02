@@ -40,6 +40,11 @@ fun everythingPlan(plan: com.pixels.enhancer.domain.planning.EnhancementPlan) = 
     noiseReduction = Adjustment.of(0.5f, "test"),
     detail = Adjustment.of(0.1f, "test"),
     sharpening = Adjustment.of(0.2f, "test"),
+    temperature = Adjustment.of(0.2f, "test"),
+    tint = Adjustment.of(0.1f, "test"),
+    globalSaturation = Adjustment.of(0.1f, "test"),
+    vignette = Adjustment.of(-0.3f, "test"),
+    grain = Adjustment.of(0.2f, "test"),
 )
 
 class PipelineImageProcessorTest {
@@ -49,7 +54,7 @@ class PipelineImageProcessorTest {
         assertEquals(
             listOf(
                 StageIds.EXPOSURE, StageIds.WHITE_BALANCE, StageIds.TONE, StageIds.NOISE_REDUCTION,
-                StageIds.DETAIL, StageIds.SHARPEN, StageIds.COLOR_FINISH,
+                StageIds.DETAIL, StageIds.SHARPEN, StageIds.COLOR_FINISH, StageIds.VIGNETTE, StageIds.GRAIN,
             ),
             DefaultPipeline.stages().map { it.id },
         )
@@ -67,7 +72,7 @@ class PipelineImageProcessorTest {
     fun `stages with nothing planned are skipped with a reason`() = runTest {
         val result = PipelineImageProcessor(DefaultPipeline.stages()).process(TestImages.solid(120), contextFor())
         assertTrue(result.executedStages.isEmpty())
-        assertEquals(7, result.skippedStages.size)
+        assertEquals(DefaultPipeline.stages().size, result.skippedStages.size)
         assertTrue(result.skippedStages.all { it.reason == "No correction planned" })
     }
 
