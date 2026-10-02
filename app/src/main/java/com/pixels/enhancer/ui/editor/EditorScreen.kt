@@ -18,6 +18,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
@@ -41,12 +42,16 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.pixels.enhancer.R
+import com.pixels.enhancer.domain.geometry.CropRect
+import com.pixels.enhancer.domain.geometry.Geometry
 import com.pixels.enhancer.domain.planning.Look
 import com.pixels.enhancer.domain.planning.ManualControl
 import com.pixels.enhancer.ui.ErrorMessages
 import com.pixels.enhancer.ui.compare.CompareMode
 import com.pixels.enhancer.ui.compare.CompareView
 import com.pixels.enhancer.ui.compare.SplitOrientation
+import com.pixels.enhancer.ui.crop.CropEditor
+import java.util.Locale
 import kotlin.math.roundToInt
 
 private const val PERCENT = 100
@@ -58,7 +63,21 @@ private enum class EditorTab(val titleRes: Int) {
     AUTO(R.string.editor_tab_auto),
     LOOKS(R.string.editor_tab_looks),
     ADJUST(R.string.editor_tab_adjust),
+    CROP(R.string.editor_tab_crop),
 }
+
+/** Callbacks for the Crop tab, grouped to keep EditorScreen's signature readable. */
+class CropActions(
+    val onRotateClockwise: () -> Unit,
+    val onRotateCounterClockwise: () -> Unit,
+    val onFlip: () -> Unit,
+    val onStraightenChanged: (Float) -> Unit,
+    val onCropChanged: (CropRect) -> Unit,
+    val onAspectSelected: (CropAspect) -> Unit,
+    val onReset: () -> Unit,
+    val onCropModeChanged: (Boolean) -> Unit,
+    val ratioFor: (CropAspect) -> Float?,
+)
 
 @Composable
 fun EditorScreen(
@@ -74,6 +93,7 @@ fun EditorScreen(
     onSave: () -> Unit,
     onShare: () -> Unit,
     onViewSaved: (Uri) -> Unit,
+    crop: CropActions,
     onOpenDebug: (() -> Unit)?,
     modifier: Modifier = Modifier,
 ) {
@@ -84,25 +104,37 @@ fun EditorScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     BackHandler(onBack = onClose)
     ResultSnackbar(state.activity, snackbarHostState, onViewSaved)
+    LaunchedEffect(tab) { crop.onCropModeChanged(tab == EditorTab.CROP) }
 
     Box(modifier.fillMaxSize()) {
         Column(Modifier.fillMaxSize()) {
             TopBar(state, onClose, onUndo, onShare, onSave, onOpenDebug)
-            CompareView(
-                original = state.original,
-                enhanced = state.enhanced,
-                mode = mode,
-                split = split,
-                beforeLabel = stringResource(R.string.editor_before),
-                afterLabel = stringResource(R.string.editor_after),
-                resetKey = viewResetKey,
-                modifier = Modifier.weight(1f).fillMaxWidth(),
-            )
+            if (tab == EditorTab.CROP && state.cropMode) {
+                CropEditor(
+                    image = state.enhanced,
+                    crop = state.edit.geometry.crop,
+                    pixelRatio = crop.ratioFor(state.cropAspect),
+                    onCropChanged = crop.onCropChanged,
+                    onCropFinished = onEditFinished,
+                    modifier = Modifier.weight(1f).fillMaxWidth(),
+                )
+            } else {
+                CompareView(
+                    original = state.original,
+                    enhanced = state.enhanced,
+                    mode = mode,
+                    split = split,
+                    beforeLabel = stringResource(R.string.editor_before),
+                    afterLabel = stringResource(R.string.editor_after),
+                    resetKey = viewResetKey,
+                    modifier = Modifier.weight(1f).fillMaxWidth(),
+                )
+            }
             ActivityLine(state.activity)
-            ModeSelector(mode, split, onModeChange = { mode = it }, onSplitChange = { split = it })
+            if (tab != EditorTab.CROP) ModeSelector(mode, split, onModeChange = { mode = it }, onSplitChange = { split = it })
             TabRow(selectedTabIndex = tab.ordinal) {
                 EditorTab.entries.forEach { entry ->
-                    Tab(selected = tab == entry, onClick = { tab = entry }, text = { Text(stringResource(entry.titleRes)) })
+                    Tab(selected = tab == entry, onClick = { tab = entry }, text = { Text(stringResource(entry.titleRes), maxLines = 1) })
                 }
             }
             Box(Modifier.fillMaxWidth().height(PANEL_HEIGHT)) {
@@ -113,6 +145,7 @@ fun EditorScreen(
                     })
                     EditorTab.LOOKS -> LooksPanel(state.edit.lookId, onLookSelected)
                     EditorTab.ADJUST -> AdjustPanel(state.edit, onControlChanged, onEditFinished, onResetControl)
+                    EditorTab.CROP -> CropPanel(state.edit, state.cropAspect, crop, onEditFinished)
                 }
             }
         }
@@ -203,6 +236,37 @@ private fun AdjustPanel(
                 onValueChangeFinished = onEditFinished,
                 valueRange = control.min..control.max,
             )
+        }
+    }
+}
+
+@Composable
+private fun CropPanel(edit: EditState, aspect: CropAspect, crop: CropActions, onEditFinished: () -> Unit) {
+    val straighten = edit.geometry.straightenDegrees
+    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 8.dp)) {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedButton(onClick = crop.onRotateCounterClockwise) { Text(stringResource(R.string.crop_rotate_left), maxLines = 1) }
+            OutlinedButton(onClick = crop.onRotateClockwise) { Text(stringResource(R.string.crop_rotate_right), maxLines = 1) }
+            OutlinedButton(onClick = crop.onFlip) { Text(stringResource(R.string.crop_flip), maxLines = 1) }
+        }
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                stringResource(R.string.crop_straighten, String.format(Locale.ROOT, "%.1f", straighten)),
+                style = MaterialTheme.typography.labelLarge,
+                modifier = Modifier.weight(1f),
+            )
+            TextButton(onClick = crop.onReset) { Text(stringResource(R.string.crop_reset)) }
+        }
+        Slider(
+            value = straighten,
+            onValueChange = crop.onStraightenChanged,
+            onValueChangeFinished = onEditFinished,
+            valueRange = -Geometry.MAX_STRAIGHTEN_DEGREES..Geometry.MAX_STRAIGHTEN_DEGREES,
+        )
+        Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            CropAspect.entries.forEach { option ->
+                FilterChip(selected = option == aspect, onClick = { crop.onAspectSelected(option) }, label = { Text(option.label) })
+            }
         }
     }
 }

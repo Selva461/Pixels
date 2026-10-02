@@ -73,7 +73,7 @@ private suspend fun processFile(file: File, options: HarnessOptions): Boolean {
     useCase.save(session, request)
     val stem = file.nameWithoutExtension
     ImageIO.write(
-        ImageIoConversions.sideBySide(session.original, outcome.processed.image),
+        ImageIoConversions.sideBySide(outcome.originalView, outcome.output),
         "png",
         File(options.outputDirectory, "${stem}_compare.png"),
     )

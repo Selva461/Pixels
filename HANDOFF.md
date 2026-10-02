@@ -4,7 +4,24 @@ _Last updated: 2026-10-01 · algorithm version 1.0_
 
 ## What changed
 
+### 2026-10-02 — crop and rotate
+
+- `domain/geometry`: `Geometry` (quarter turns, flip, straighten ±45°, normalised `CropRect`),
+  `GeometryOps` (pixel transforms; straighten auto-crops to the largest same-aspect rectangle so no
+  empty corners appear) and `CropMath` (move / corner-resize with optional aspect lock).
+- Geometry runs after processing and validation; `EnhancementOutcome.output` and `originalView`
+  carry it so before/after stay aligned. Save and share use `output`.
+- App: Crop tab (rotate left/right, flip, straighten slider, aspect presets Free/Original/1:1/4:5/
+  3:2/16:9) and `CropEditor` overlay (drag inside to move, corners to resize, rule-of-thirds guides).
+  While on the tab the preview is rendered uncropped; the crop applies when leaving it. Geometry is
+  part of `EditState`, so undo covers it.
+- Instrumented test saves a rotated + cropped edit and checks the saved dimensions.
+
 ### 2026-10-02 — manual controls, looks, save fix
+
+- **Actual save bug:** `MediaStoreImageSaver.verifyDecodable` treated the (always null) result of a
+  bounds-only decode as "cannot open", so every save was reported as failed and deleted. Found by
+  `SaveFlowTest` on the CI emulator; fixed.
 
 - **Save fix (likely cause):** the editor's bottom row held 5 buttons and overflowed on normal phone
   widths, squeezing *Save* off-screen. Save/Share/Undo now live in the top bar; a snackbar confirms

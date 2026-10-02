@@ -15,6 +15,10 @@ import com.pixels.enhancer.core.error.runControlled
 import com.pixels.enhancer.data.decoder.BitmapConversions
 import com.pixels.enhancer.data.storage.ShareCache
 import com.pixels.enhancer.domain.debug.DebugReport
+import com.pixels.enhancer.domain.geometry.CropMath
+import com.pixels.enhancer.domain.geometry.CropRect
+import com.pixels.enhancer.domain.geometry.Geometry
+import com.pixels.enhancer.domain.geometry.GeometryOps
 import com.pixels.enhancer.domain.image.PixelBuffer
 import com.pixels.enhancer.domain.model.OutputNaming
 import com.pixels.enhancer.domain.planning.EnhancementStrength
@@ -69,7 +73,8 @@ class EditorViewModel(
     private var settings = settingsRepository.load()
     private var session: EnhancementSession? = null
     private var outcome: EnhancementOutcome? = null
-    private var originalBitmap: ImageBitmap? = null
+    private var cropMode = false
+    private var cropAspect = CropAspect.FREE
 
     /** What the sliders show right now (may be mid-drag). */
     private var current = EditState(settings.strength)
@@ -98,7 +103,6 @@ class EditorViewModel(
                 is OperationResult.Failure -> _uiState.value = EditorUiState.Error(opened.code)
                 is OperationResult.Success -> {
                     session = opened.value
-                    originalBitmap = toImageBitmap(opened.value.original)
                     requestPreview()
                 }
             }
@@ -120,6 +124,60 @@ class EditorViewModel(
             settingsRepository.save(settings)
         }
         publishEdit()
+    }
+
+    fun onRotateClockwise() = commitGeometry(current.geometry.rotatedClockwise())
+
+    fun onRotateCounterClockwise() = commitGeometry(current.geometry.rotatedCounterClockwise())
+
+    fun onFlip() = commitGeometry(current.geometry.flipped())
+
+    /** Live while dragging; [onEditFinished] records the undo step. */
+    fun onStraightenChanged(degrees: Float) = edit(current.copy(geometry = current.geometry.straightened(degrees)))
+
+    /**
+     * The crop frame moves on top of an uncropped preview, so dragging it needs no re-render;
+     * the crop is applied when the user leaves the Crop tab.
+     */
+    fun onCropChanged(crop: CropRect) = edit(current.copy(geometry = current.geometry.copy(crop = crop)), render = !cropMode)
+
+    fun onCropAspectSelected(aspect: CropAspect) {
+        cropAspect = aspect
+        val ratio = aspectRatioFor(aspect)
+        if (ratio != null) onCropChanged(CropMath.largestCentered(current.geometry.crop, ratio, frameAspect()))
+        onEditFinished()
+        _uiState.update { state -> if (state is EditorUiState.Success) state.copy(cropAspect = aspect) else state }
+    }
+
+    fun onResetGeometry() {
+        cropAspect = CropAspect.FREE
+        commitGeometry(Geometry.NONE)
+    }
+
+    fun onCropModeChanged(enabled: Boolean) {
+        if (cropMode == enabled) return
+        cropMode = enabled
+        requestPreview()
+    }
+
+    /** Pixel width/height ratio a [CropAspect] asks for; ORIGINAL means the unrotated photo's shape. */
+    fun aspectRatioFor(aspect: CropAspect): Float? {
+        if (aspect != CropAspect.ORIGINAL) return aspect.ratio
+        val source = session?.original ?: return null
+        val ratio = source.width.toFloat() / source.height
+        return if (current.geometry.swapsAxes) 1f / ratio else ratio
+    }
+
+    /** Width/height of the uncropped frame the crop rectangle lives in. */
+    private fun frameAspect(): Float {
+        val source = session?.original ?: return 1f
+        val (width, height) = GeometryOps.outputSize(source.width, source.height, current.geometry.withoutCrop())
+        return width.toFloat() / height
+    }
+
+    private fun commitGeometry(geometry: Geometry) {
+        edit(current.copy(geometry = geometry))
+        onEditFinished()
     }
 
     fun onLookSelected(look: Look) {
@@ -173,7 +231,7 @@ class EditorViewModel(
                 is OperationResult.Success -> result.value
             }
             val name = OutputNaming.enhancedName(currentSession.source.displayName)
-            when (val written = runControlled(ErrorCode.OUTPUT_ENCODE_FAILED) { shareCache.write(rendered.processed.image, name) }) {
+            when (val written = runControlled(ErrorCode.OUTPUT_ENCODE_FAILED) { shareCache.write(rendered.output, name) }) {
                 is OperationResult.Failure -> setActivity(EditorActivity.Failed(written.code))
                 is OperationResult.Success -> {
                     setActivity(EditorActivity.None)
@@ -204,10 +262,10 @@ class EditorViewModel(
         _uiState.value = EditorUiState.Idle
     }
 
-    private fun edit(next: EditState) {
+    private fun edit(next: EditState, render: Boolean = true) {
         current = next
         publishEdit()
-        requestPreview()
+        if (render) requestPreview()
     }
 
     /** Moves the sliders immediately; the image follows when the preview render finishes. */
@@ -225,6 +283,7 @@ class EditorViewModel(
     private fun request(target: RenderTarget) = EnhanceRequest(
         strength = current.strength,
         manual = current.manual,
+        geometry = if (cropMode && target == RenderTarget.PREVIEW) current.geometry.withoutCrop() else current.geometry,
         target = target,
         debugEnabled = isDebugBuild,
         stageConfigs = disabledStages.associateWith { StageConfig(enabled = false) },
@@ -243,19 +302,21 @@ class EditorViewModel(
 
     private suspend fun renderPreview(request: EnhanceRequest) {
         val currentSession = session ?: return
-        val original = originalBitmap ?: return
         val listener = progressListener { progress -> showProgress(progress) }
         when (val result = enhanceImage.enhance(currentSession, request, listener)) {
             is OperationResult.Failure -> showFailure(result.code)
             is OperationResult.Success -> {
                 outcome = result.value
-                val enhanced = toImageBitmap(result.value.processed.image)
+                val enhanced = toImageBitmap(result.value.output)
+                val original = toImageBitmap(result.value.originalView)
                 _uiState.update { state ->
                     EditorUiState.Success(
                         original = original,
                         enhanced = enhanced,
                         edit = current,
                         canUndo = history.isNotEmpty(),
+                        cropMode = request.geometry.crop.isFull && cropMode,
+                        cropAspect = cropAspect,
                         // A save in progress (or just finished) outlives preview renders; stale progress/errors do not.
                         activity = (state as? EditorUiState.Success)?.activity
                             ?.takeIf { it is EditorActivity.Saving || it is EditorActivity.Saved }
@@ -306,7 +367,8 @@ class EditorViewModel(
         previewRequests.value = null
         session = null
         outcome = null
-        originalBitmap = null
+        cropMode = false
+        cropAspect = CropAspect.FREE
         current = EditState(settings.strength)
         committed = current
         history.clear()

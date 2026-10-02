@@ -30,6 +30,12 @@
     <string name="editor_tab_auto">Auto</string>
     <string name="editor_tab_looks">Looks</string>
     <string name="editor_tab_adjust">Adjust</string>
+    <string name="editor_tab_crop">Crop</string>
+    <string name="crop_rotate_left">Rotate left</string>
+    <string name="crop_rotate_right">Rotate right</string>
+    <string name="crop_flip">Flip</string>
+    <string name="crop_straighten">Straighten %1$s°</string>
+    <string name="crop_reset">Reset</string>
     <string name="editor_auto_hint">Automatic natural correction. Drag to make it subtler or stronger.</string>
     <string name="editor_reset_control_hint">Tap a value to reset it</string>
     <string name="share_chooser">Share enhanced photo</string>

@@ -8,6 +8,8 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.pixels.enhancer.core.error.OperationResult
 import com.pixels.enhancer.data.storage.MediaStoreImageSaver
+import com.pixels.enhancer.domain.geometry.CropRect
+import com.pixels.enhancer.domain.geometry.Geometry
 import com.pixels.enhancer.domain.image.Argb
 import com.pixels.enhancer.domain.image.PixelBuffer
 import com.pixels.enhancer.domain.planning.Look
@@ -58,6 +60,21 @@ class SaveFlowTest {
         assertTrue(saved != source)
         assertEquals(1600 to 1200, decodedSize(saved))
         assertEquals(1600 to 1200, decodedSize(source))
+    }
+
+    @Test
+    fun rotatedAndCroppedEditIsSavedWithTheNewShape() = runBlocking {
+        val source = Uri.parse(saver.save(gradient(1600, 1200), SaveRequest("pixels_test_geometry.jpg")).id).also { created += it }
+        val useCase = (context.applicationContext as PixelsApplication).container.enhanceImageUseCase
+        val session = (useCase.open(source.toString()) as OperationResult.Success).value
+
+        // Turn to portrait (1200x1600), then keep the left half.
+        val geometry = Geometry.NONE.rotatedClockwise().copy(crop = CropRect.of(0f, 0f, 0.5f, 1f))
+        val result = useCase.save(session, EnhanceRequest(strength = 0.45f, geometry = geometry))
+
+        assertTrue("save failed: $result", result is OperationResult.Success)
+        val saved = Uri.parse((result as OperationResult.Success).value.id).also { created += it }
+        assertEquals(600 to 1600, decodedSize(saved))
     }
 
     private fun decodedSize(uri: Uri): Pair<Int, Int> {

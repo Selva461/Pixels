@@ -70,6 +70,7 @@ object DebugReport {
             row("Algorithm", plan.algorithmVersion),
             row("Rendered", "${outcome.request.target} ${outcome.processed.image.width}x${outcome.processed.image.height}"),
             row("Manual", if (outcome.request.manual.isNeutral) "none" else "${outcome.request.manual.values.size} control(s)"),
+            row("Geometry", geometryText(outcome)),
             "",
         )
         val rows = plan.entries().map { (kind, adjustment) ->
@@ -77,6 +78,14 @@ object DebugReport {
             row(kind.label, amount) + "  ${adjustment.reason}"
         }
         return DebugSection("Enhancement Plan", header + rows)
+    }
+
+    private fun geometryText(outcome: EnhancementOutcome): String {
+        val geometry = outcome.request.geometry
+        if (geometry.isIdentity) return "none"
+        val crop = geometry.crop
+        return "turns=${geometry.quarterTurns} flip=${geometry.flipHorizontal} straighten=${fmt(geometry.straightenDegrees, 1)}° " +
+            "crop=${fmt(crop.left)},${fmt(crop.top)}-${fmt(crop.right)},${fmt(crop.bottom)} -> ${outcome.output.width}x${outcome.output.height}"
     }
 
     private fun pipelineSection(outcome: EnhancementOutcome): DebugSection {

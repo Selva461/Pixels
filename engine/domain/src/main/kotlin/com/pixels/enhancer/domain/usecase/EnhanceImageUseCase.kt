@@ -14,6 +14,7 @@ import com.pixels.enhancer.core.timing.TimingReport
 import com.pixels.enhancer.core.timing.measure
 import com.pixels.enhancer.domain.analysis.ImageAnalysis
 import com.pixels.enhancer.domain.analysis.ImageAnalyzer
+import com.pixels.enhancer.domain.geometry.GeometryOps
 import com.pixels.enhancer.domain.image.PixelBuffer
 import com.pixels.enhancer.domain.image.PixelResampler
 import com.pixels.enhancer.domain.model.ImageSource
@@ -153,12 +154,21 @@ class EnhanceImageUseCase(
             return@withContext logFailure("PROCESS_FAILED", processingId, failure)
         }
 
+        // Geometry runs after validation: validation compares same-sized images pixel for pixel.
+        val geometry = clock.measure {
+            GeometryOps.apply(processed.image, request.geometry) to GeometryOps.apply(source, request.geometry)
+        }
+        val (output, originalView) = geometry.value
+
         val timings = session.loadTimings +
             TimingReport(listOf(StageTiming("Plan", planned.durationMs))) +
             processed.stageTimings +
-            TimingReport(listOf(StageTiming("Validation", validated.durationMs)))
-        logger.event("PROCESS_COMPLETE", mapOf("processingId" to processingId, "totalMs" to timings.totalMs))
-        OperationResult.Success(EnhancementOutcome(processingId, request, planned.value, processed, validation, timings))
+            TimingReport(listOf(StageTiming("Validation", validated.durationMs), StageTiming("Geometry", geometry.durationMs)))
+        logger.event(
+            "PROCESS_COMPLETE",
+            mapOf("processingId" to processingId, "outputWidth" to output.width, "outputHeight" to output.height, "totalMs" to timings.totalMs),
+        )
+        OperationResult.Success(EnhancementOutcome(processingId, request, planned.value, processed, validation, output, originalView, timings))
     }
 
     /**
@@ -176,7 +186,7 @@ class EnhanceImageUseCase(
             is OperationResult.Success -> rendered.value
         }
         val saveRequest = SaveRequest(displayName = OutputNaming.enhancedName(session.source.displayName))
-        when (val result = runControlled(ErrorCode.SAVE_FAILED) { clock.measure { saver.save(outcome.processed.image, saveRequest) } }) {
+        when (val result = runControlled(ErrorCode.SAVE_FAILED) { clock.measure { saver.save(outcome.output, saveRequest) } }) {
             is OperationResult.Failure -> logFailure("SAVE_FAILED", outcome.processingId, result)
             is OperationResult.Success -> {
                 logger.event("SAVE_COMPLETE", mapOf("processingId" to outcome.processingId, "durationMs" to result.value.durationMs))
