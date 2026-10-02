@@ -62,8 +62,10 @@ class MediaStoreImageSaver(private val contentResolver: ContentResolver) : Image
     /** Output validation: the saved file must exist and decode back to the expected size. */
     private fun verifyDecodable(uri: Uri, image: PixelBuffer) {
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-        contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, bounds) }
+        // decodeStream always returns null in bounds-only mode, so check the stream, not the result.
+        val stream = contentResolver.openInputStream(uri)
             ?: throw EnhancerException(ErrorCode.SAVE_FAILED, "Saved file cannot be opened")
+        stream.use { BitmapFactory.decodeStream(it, null, bounds) }
         if (bounds.outWidth != image.width || bounds.outHeight != image.height) {
             throw EnhancerException(ErrorCode.OUTPUT_ENCODE_FAILED, "Saved file decodes to ${bounds.outWidth}x${bounds.outHeight}")
         }
