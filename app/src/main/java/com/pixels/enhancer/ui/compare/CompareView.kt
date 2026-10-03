@@ -71,6 +71,7 @@ fun CompareView(
     var scale by remember(resetKey) { mutableFloatStateOf(MIN_ZOOM) }
     var pan by remember(resetKey) { mutableStateOf(Offset.Zero) }
     var divider by remember(resetKey, split) { mutableFloatStateOf(0.5f) }
+    var holdingForOriginal by remember { mutableStateOf(false) }
 
     BoxWithConstraints(
         modifier
@@ -83,10 +84,18 @@ fun CompareView(
                 }
             }
             .pointerInput(resetKey) {
-                detectTapGestures(onDoubleTap = {
-                    scale = if (scale > MIN_ZOOM) MIN_ZOOM else DOUBLE_TAP_ZOOM
-                    pan = Offset.Zero
-                })
+                detectTapGestures(
+                    onDoubleTap = {
+                        scale = if (scale > MIN_ZOOM) MIN_ZOOM else DOUBLE_TAP_ZOOM
+                        pan = Offset.Zero
+                    },
+                    // Press and hold shows the untouched original until the finger lifts.
+                    onPress = {
+                        holdingForOriginal = true
+                        tryAwaitRelease()
+                        holdingForOriginal = false
+                    },
+                )
             },
     ) {
         val widthPx = constraints.maxWidth.toFloat()
@@ -98,8 +107,11 @@ fun CompareView(
             translationY = pan.y
         }
 
-        when (mode) {
-            CompareMode.ORIGINAL -> FitImage(original, transform)
+        when (if (holdingForOriginal) CompareMode.ORIGINAL else mode) {
+            CompareMode.ORIGINAL -> {
+                FitImage(original, transform)
+                if (holdingForOriginal) Label(beforeLabel, Alignment.TopStart)
+            }
             CompareMode.ENHANCED -> FitImage(enhanced, transform)
             CompareMode.COMPARE -> {
                 FitImage(original, transform)

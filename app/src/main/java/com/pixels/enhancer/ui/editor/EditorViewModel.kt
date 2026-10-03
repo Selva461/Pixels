@@ -15,7 +15,12 @@ import com.pixels.enhancer.core.error.runControlled
 import com.pixels.enhancer.data.decoder.BitmapConversions
 import com.pixels.enhancer.data.storage.ShareCache
 import com.pixels.enhancer.domain.debug.DebugReport
+import com.pixels.enhancer.data.storage.ThumbnailStore
+import com.pixels.enhancer.domain.editing.EditHistory
+import com.pixels.enhancer.domain.editing.EditState
 import com.pixels.enhancer.domain.export.ExportOptions
+import com.pixels.enhancer.domain.project.Project
+import com.pixels.enhancer.domain.project.ProjectManager
 import com.pixels.enhancer.domain.geometry.CropMath
 import com.pixels.enhancer.domain.geometry.CropRect
 import com.pixels.enhancer.domain.geometry.Geometry
@@ -24,7 +29,6 @@ import com.pixels.enhancer.domain.image.PixelBuffer
 import com.pixels.enhancer.domain.model.OutputNaming
 import com.pixels.enhancer.domain.planning.EnhancementStrength
 import com.pixels.enhancer.domain.planning.Look
-import com.pixels.enhancer.domain.planning.ManualAdjustments
 import com.pixels.enhancer.domain.planning.ManualControl
 import com.pixels.enhancer.domain.planning.QualityPreset
 import com.pixels.enhancer.domain.processing.ProcessingListener
@@ -50,6 +54,8 @@ import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 
 /**
@@ -62,10 +68,12 @@ class EditorViewModel(
     private val enhanceImage: EnhanceImageUseCase,
     private val settingsRepository: SettingsRepository,
     private val shareCache: ShareCache,
+    private val projectManager: ProjectManager,
+    private val thumbnails: ThumbnailStore,
     private val isDebugBuild: Boolean,
 ) : ViewModel() {
 
-    private val _uiState = MutableStateFlow<EditorUiState>(EditorUiState.Idle)
+    private val _uiState = MutableStateFlow<EditorUiState>(EditorUiState.Idle())
     val uiState: StateFlow<EditorUiState> = _uiState.asStateFlow()
 
     private val _events = Channel<EditorEvent>(Channel.BUFFERED)
@@ -80,9 +88,14 @@ class EditorViewModel(
     /** What the sliders show right now (may be mid-drag). */
     private var current = EditState(settings.strength)
 
-    /** Last edit the user finished; undo returns to the one before it. */
-    private var committed = current
-    private val history = ArrayDeque<EditState>()
+    /** Committed edits; one finished slider drag is one step. */
+    private var history = EditHistory(current)
+
+    /** The open project; every committed edit is autosaved to it. */
+    private var project: Project? = null
+
+    /** Autosaves run one at a time so two quick edits never race on the same file. */
+    private val saveMutex = Mutex()
 
     private var disabledStages: Set<String> = emptySet()
     private var runUntilStageId: String? = null
@@ -94,20 +107,53 @@ class EditorViewModel(
 
     init {
         startPreviewRenderer()
+        refreshRecent()
     }
 
-    fun onImagePicked(uri: Uri) {
+    fun onImagePicked(uri: Uri) = openSource(uri.toString(), projectId = null)
+
+    fun onOpenProject(id: String) {
+        viewModelScope.launch {
+            val saved = projectManager.load(id) ?: return@launch refreshRecent()
+            openSource(saved.sourceId, saved.id)
+        }
+    }
+
+    /** Removes the project from Recent; the original photo is never touched. */
+    fun onDeleteProject(id: String) {
+        viewModelScope.launch {
+            projectManager.delete(id)
+            thumbnails.delete(id)
+            refreshRecent()
+        }
+    }
+
+    private fun openSource(sourceId: String, projectId: String?) {
         openJob?.cancel()
         clearSession()
         openJob = viewModelScope.launch {
             _uiState.value = EditorUiState.Loading
-            when (val opened = enhanceImage.open(uri.toString(), QualityPreset.byId(settings.presetId))) {
+            when (val opened = enhanceImage.open(sourceId, QualityPreset.byId(settings.presetId))) {
                 is OperationResult.Failure -> _uiState.value = EditorUiState.Error(opened.code)
                 is OperationResult.Success -> {
                     session = opened.value
+                    val resumed = projectId?.let { projectManager.load(it) }
+                        ?: projectManager.startOrResume(opened.value.source, EditState(settings.strength), settings.export)
+                    project = resumed
+                    history = projectManager.historyOf(resumed)
+                    current = history.current
                     requestPreview()
                 }
             }
+        }
+    }
+
+    private fun refreshRecent() {
+        viewModelScope.launch {
+            val recent = projectManager.recent().map { saved ->
+                RecentProject(saved.id, saved.displayName ?: saved.id.take(8), saved.modifiedAtMillis, thumbnails.load(saved.id))
+            }
+            _uiState.update { state -> if (state is EditorUiState.Idle) EditorUiState.Idle(recent) else state }
         }
     }
 
@@ -117,10 +163,8 @@ class EditorViewModel(
 
     /** Called when a slider drag ends: records an undo step and remembers the strength. */
     fun onEditFinished() {
-        if (current == committed) return
-        history.addLast(committed)
-        if (history.size > MAX_UNDO_STEPS) history.removeFirst()
-        committed = current
+        if (!history.commit(current)) return
+        autosave()
         if (settings.strength != current.strength) {
             settings = settings.copy(strength = current.strength)
             settingsRepository.save(settings)
@@ -192,6 +236,7 @@ class EditorViewModel(
         onEditFinished()
     }
 
+    /** Back to the automatic correction at the default strength. */
     fun onResetAll() {
         disabledStages = emptySet()
         runUntilStageId = null
@@ -199,19 +244,42 @@ class EditorViewModel(
         onEditFinished()
     }
 
-    fun onUndo() {
-        val previous = history.removeLastOrNull() ?: return
-        current = previous
-        committed = previous
+    /** The true zero state: no enhancement, no adjustments, no crop — the original appearance. */
+    fun onShowOriginalEdit() {
+        edit(EditState.ORIGINAL)
+        onEditFinished()
+    }
+
+    fun onUndo() = restore(history.undo())
+
+    fun onRedo() = restore(history.redo())
+
+    private fun restore(state: EditState?) {
+        current = state ?: return
+        autosave()
         publishEdit()
         requestPreview()
+    }
+
+    /** Persists the edit and history so the project survives restarts; failures are logged, never fatal to editing. */
+    private fun autosave() {
+        val saved = project ?: return
+        val snapshot = history
+        viewModelScope.launch {
+            saveMutex.withLock {
+                val latest = project?.takeIf { it.id == saved.id } ?: saved
+                runCatching { projectManager.recordHistory(latest, snapshot) }
+                    .onSuccess { updated -> if (project?.id == updated.id) project = updated }
+                outcome?.output?.let { runCatching { thumbnails.save(saved.id, it) } }
+            }
+        }
     }
 
     /** Save opens the export dialog with the last-used options. */
     fun onSave() {
         val state = _uiState.value as? EditorUiState.Success ?: return
         if (state.activity is EditorActivity.Saving) return
-        showExportDialog(settings.export)
+        showExportDialog(project?.exportOptions ?: settings.export)
     }
 
     fun onExportOptionsChanged(options: ExportOptions) = showExportDialog(options)
@@ -233,6 +301,9 @@ class EditorViewModel(
                 is OperationResult.Success -> {
                     val result = exported.value
                     setActivity(EditorActivity.Saved(result.saved.displayName, Uri.parse(result.saved.id), result.width, result.height))
+                    project?.let { saved ->
+                        runCatching { projectManager.recordExport(saved, options, current) }.onSuccess { project = it }
+                    }
                 }
             }
         }
@@ -291,11 +362,25 @@ class EditorViewModel(
         viewModelScope.launch { _events.send(EditorEvent.ShareText(DebugReport.format(currentSession, outcome))) }
     }
 
+    /** Close asks first when the current edit has never been exported. */
+    fun onCloseRequested() {
+        if (project?.hasUnexportedChanges == true) {
+            _uiState.update { state -> if (state is EditorUiState.Success) state.copy(confirmLeave = true) else state }
+        } else {
+            onClose()
+        }
+    }
+
+    fun onLeaveDismissed() {
+        _uiState.update { state -> if (state is EditorUiState.Success) state.copy(confirmLeave = false) else state }
+    }
+
     fun onClose() {
         openJob?.cancel()
         exportJob?.cancel()
         clearSession()
-        _uiState.value = EditorUiState.Idle
+        _uiState.value = EditorUiState.Idle()
+        refreshRecent()
     }
 
     private fun edit(next: EditState, render: Boolean = true) {
@@ -307,7 +392,7 @@ class EditorViewModel(
     /** Moves the sliders immediately; the image follows when the preview render finishes. */
     private fun publishEdit() {
         _uiState.update { state ->
-            if (state is EditorUiState.Success) state.copy(edit = current, canUndo = history.isNotEmpty()) else state
+            if (state is EditorUiState.Success) state.copy(edit = current, canUndo = history.canUndo, canRedo = history.canRedo) else state
         }
     }
 
@@ -350,10 +435,12 @@ class EditorViewModel(
                         original = original,
                         enhanced = enhanced,
                         edit = current,
-                        canUndo = history.isNotEmpty(),
+                        canUndo = history.canUndo,
+                        canRedo = history.canRedo,
                         cropMode = request.geometry.crop.isFull && cropMode,
                         cropAspect = cropAspect,
                         exportDialog = (state as? EditorUiState.Success)?.exportDialog,
+                        confirmLeave = (state as? EditorUiState.Success)?.confirmLeave ?: false,
                         // A save in progress (or just finished) outlives preview renders; stale progress/errors do not.
                         activity = (state as? EditorUiState.Success)?.activity
                             ?.takeIf { it is EditorActivity.Saving || it is EditorActivity.Saved }
@@ -407,15 +494,13 @@ class EditorViewModel(
         cropMode = false
         cropAspect = CropAspect.FREE
         current = EditState(settings.strength)
-        committed = current
-        history.clear()
+        history = EditHistory(current)
+        project = null
         disabledStages = emptySet()
         runUntilStageId = null
     }
 
     companion object {
-        private const val MAX_UNDO_STEPS = 30
-
         /** Coalesces rapid slider movement into one render. */
         private const val PREVIEW_DEBOUNCE_MS = 60L
 
@@ -425,6 +510,8 @@ class EditorViewModel(
                     enhanceImage = container.enhanceImageUseCase,
                     settingsRepository = container.settingsRepository,
                     shareCache = container.shareCache,
+                    projectManager = container.projectManager,
+                    thumbnails = container.thumbnails,
                     isDebugBuild = container.isDebugBuild,
                 )
             }

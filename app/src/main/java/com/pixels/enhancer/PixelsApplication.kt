@@ -7,6 +7,10 @@ import com.pixels.enhancer.data.decoder.AndroidImageRepository
 import com.pixels.enhancer.data.preferences.SharedPreferencesSettingsRepository
 import com.pixels.enhancer.data.storage.MediaStoreImageSaver
 import com.pixels.enhancer.data.storage.ShareCache
+import com.pixels.enhancer.data.storage.ThumbnailStore
+import com.pixels.enhancer.domain.project.FileProjectStore
+import com.pixels.enhancer.domain.project.ProjectManager
+import java.io.File
 import com.pixels.enhancer.domain.analysis.StatisticalImageAnalyzer
 import com.pixels.enhancer.domain.planning.NaturalEnhancementPlanner
 import com.pixels.enhancer.domain.processing.PipelineImageProcessor
@@ -40,6 +44,10 @@ class AppContainer(context: Context) {
     val settingsRepository: SettingsRepository = SharedPreferencesSettingsRepository(appContext)
 
     val shareCache = ShareCache(appContext)
+
+    val projectManager = ProjectManager(FileProjectStore(File(appContext.filesDir, "projects"), logger))
+
+    val thumbnails = ThumbnailStore(File(appContext.filesDir, "thumbnails"))
 
     val enhanceImageUseCase = EnhanceImageUseCase(
         imageRepository = AndroidImageRepository(appContext.contentResolver),

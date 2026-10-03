@@ -44,7 +44,22 @@ class MainActivity : ComponentActivity() {
     }
 
     private val pickImage = registerForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
-        if (uri != null) viewModel.onImagePicked(uri)
+        if (uri != null) {
+            keepAccess(uri)
+            viewModel.onImagePicked(uri)
+        }
+    }
+
+    /**
+     * Projects reopen the original later, so ask to keep read access across restarts. Not every
+     * provider allows it; then the project still works until the app is closed.
+     */
+    private fun keepAccess(uri: android.net.Uri) {
+        try {
+            contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        } catch (_: SecurityException) {
+            // Access stays valid for this session; reopening after a restart may ask to pick again.
+        }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -71,7 +86,13 @@ private fun PixelsApp(viewModel: EditorViewModel, onPickImage: () -> Unit, modif
     ShareEvents(viewModel)
 
     when (val current = state) {
-        EditorUiState.Idle -> HomeScreen(onPickImage, modifier)
+        is EditorUiState.Idle -> HomeScreen(
+            recent = current.recent,
+            onPickImage = onPickImage,
+            onOpenProject = viewModel::onOpenProject,
+            onDeleteProject = viewModel::onDeleteProject,
+            modifier = modifier,
+        )
         EditorUiState.Loading -> ProgressScreen(stringResource(R.string.loading_opening), progress = null, modifier = modifier)
         is EditorUiState.Processing -> ProgressScreen(
             stringResource(R.string.processing_enhancing),
@@ -93,7 +114,11 @@ private fun PixelsApp(viewModel: EditorViewModel, onPickImage: () -> Unit, modif
             } else {
                 EditorScreen(
                     state = current,
-                    onClose = viewModel::onClose,
+                    onClose = viewModel::onCloseRequested,
+                    onConfirmLeave = viewModel::onClose,
+                    onDismissLeave = viewModel::onLeaveDismissed,
+                    onRedo = viewModel::onRedo,
+                    onShowOriginalEdit = viewModel::onShowOriginalEdit,
                     onStrengthChanged = viewModel::onStrengthChanged,
                     onControlChanged = viewModel::onControlChanged,
                     onEditFinished = viewModel::onEditFinished,

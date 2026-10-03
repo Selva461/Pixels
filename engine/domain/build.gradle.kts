@@ -3,6 +3,8 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 plugins {
     `java-library`
     alias(libs.plugins.kotlin.jvm)
+    // Project files: compile-time JSON codecs, no reflection.
+    alias(libs.plugins.kotlin.serialization)
     `java-test-fixtures`
 }
 
@@ -20,6 +22,7 @@ kotlin {
 dependencies {
     // The use case exposes CoroutineDispatcher in its constructor, so coroutines are part of the API.
     api(libs.kotlinx.coroutines.core)
+    implementation(libs.kotlinx.serialization.json)
 
     testFixturesImplementation(libs.kotlinx.coroutines.core)
 

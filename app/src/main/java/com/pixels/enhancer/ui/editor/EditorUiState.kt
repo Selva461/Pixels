@@ -4,15 +4,14 @@ import android.net.Uri
 import androidx.compose.ui.graphics.ImageBitmap
 import com.pixels.enhancer.core.error.ErrorCode
 import com.pixels.enhancer.domain.debug.DebugSection
+import com.pixels.enhancer.domain.editing.EditState
 import com.pixels.enhancer.domain.export.ExportOptions
-import com.pixels.enhancer.domain.geometry.Geometry
-import com.pixels.enhancer.domain.planning.Look
-import com.pixels.enhancer.domain.planning.ManualAdjustments
 
 /** Single state model for the whole flow — no independent isLoading / hasError flags. */
 sealed interface EditorUiState {
 
-    data object Idle : EditorUiState
+    /** Home screen, with recent projects to resume. */
+    data class Idle(val recent: List<RecentProject> = emptyList()) : EditorUiState
 
     data object Loading : EditorUiState
 
@@ -26,10 +25,13 @@ sealed interface EditorUiState {
         val enhanced: ImageBitmap,
         val edit: EditState,
         val canUndo: Boolean,
+        val canRedo: Boolean,
         val cropMode: Boolean,
         val cropAspect: CropAspect,
         /** Non-null while the export dialog is open. */
         val exportDialog: ExportDialogState? = null,
+        /** True while asking whether to leave with edits that were never exported. */
+        val confirmLeave: Boolean = false,
         val activity: EditorActivity,
         /** Present only in developer builds. */
         val debug: DebugInfo?,
@@ -49,13 +51,7 @@ sealed interface EditorActivity {
 
 data class ExportDialogState(val options: ExportOptions, val width: Int, val height: Int)
 
-/** Everything the user controls. Undo restores a previous EditState. */
-data class EditState(
-    val strength: Float,
-    val manual: ManualAdjustments = ManualAdjustments.NONE,
-    val lookId: String = Look.NONE.id,
-    val geometry: Geometry = Geometry.NONE,
-)
+data class RecentProject(val id: String, val name: String, val modifiedAtMillis: Long, val thumbnail: ImageBitmap?)
 
 /** Crop aspect presets; [ratio] is width / height in pixels, null = free. */
 enum class CropAspect(val label: String, val ratio: Float?) {

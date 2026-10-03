@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.LinearProgressIndicator
@@ -42,6 +43,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.pixels.enhancer.R
+import com.pixels.enhancer.domain.editing.EditState
 import com.pixels.enhancer.domain.export.ExportOptions
 import com.pixels.enhancer.domain.geometry.CropRect
 import com.pixels.enhancer.domain.geometry.Geometry
@@ -93,6 +95,10 @@ class CropActions(
 fun EditorScreen(
     state: EditorUiState.Success,
     onClose: () -> Unit,
+    onConfirmLeave: () -> Unit,
+    onDismissLeave: () -> Unit,
+    onRedo: () -> Unit,
+    onShowOriginalEdit: () -> Unit,
     onStrengthChanged: (Float) -> Unit,
     onControlChanged: (ManualControl, Float) -> Unit,
     onEditFinished: () -> Unit,
@@ -119,10 +125,19 @@ fun EditorScreen(
     state.exportDialog?.let { dialog ->
         ExportDialog(dialog, export.onOptionsChanged, export.onConfirm, export.onDismiss)
     }
+    if (state.confirmLeave) {
+        AlertDialog(
+            onDismissRequest = onDismissLeave,
+            title = { Text(stringResource(R.string.leave_title)) },
+            text = { Text(stringResource(R.string.leave_message)) },
+            confirmButton = { TextButton(onClick = onConfirmLeave) { Text(stringResource(R.string.leave_confirm)) } },
+            dismissButton = { Button(onClick = onDismissLeave) { Text(stringResource(R.string.leave_stay)) } },
+        )
+    }
 
     Box(modifier.fillMaxSize()) {
         Column(Modifier.fillMaxSize()) {
-            TopBar(state, onClose, onUndo, onShare, onSave, onOpenDebug)
+            TopBar(state, onClose, onUndo, onRedo, onShare, onSave, onOpenDebug)
             if (tab == EditorTab.CROP && state.cropMode) {
                 CropEditor(
                     image = state.enhanced,
@@ -153,7 +168,7 @@ fun EditorScreen(
             }
             Box(Modifier.fillMaxWidth().height(PANEL_HEIGHT)) {
                 when (tab) {
-                    EditorTab.AUTO -> AutoPanel(state.edit.strength, onStrengthChanged, onEditFinished, onResetAll = {
+                    EditorTab.AUTO -> AutoPanel(state.edit.strength, onStrengthChanged, onEditFinished, onShowOriginalEdit, onResetAll = {
                         viewResetKey++
                         onResetAll()
                     })
@@ -172,6 +187,7 @@ private fun TopBar(
     state: EditorUiState.Success,
     onClose: () -> Unit,
     onUndo: () -> Unit,
+    onRedo: () -> Unit,
     onShare: () -> Unit,
     onSave: () -> Unit,
     onOpenDebug: (() -> Unit)?,
@@ -182,6 +198,7 @@ private fun TopBar(
         if (onOpenDebug != null) TextButton(onClick = onOpenDebug) { Text(stringResource(R.string.editor_debug)) }
         Spacer(Modifier.weight(1f))
         TextButton(onClick = onUndo, enabled = state.canUndo) { Text(stringResource(R.string.editor_undo)) }
+        TextButton(onClick = onRedo, enabled = state.canRedo) { Text(stringResource(R.string.editor_redo)) }
         TextButton(onClick = onShare, enabled = !busy) { Text(stringResource(R.string.editor_share)) }
         Button(onClick = onSave, enabled = !busy) { Text(stringResource(R.string.editor_save)) }
     }
@@ -207,13 +224,23 @@ private fun ResultSnackbar(activity: EditorActivity, hostState: SnackbarHostStat
 }
 
 @Composable
-private fun AutoPanel(strength: Float, onStrengthChanged: (Float) -> Unit, onEditFinished: () -> Unit, onResetAll: () -> Unit) {
+private fun AutoPanel(
+    strength: Float,
+    onStrengthChanged: (Float) -> Unit,
+    onEditFinished: () -> Unit,
+    onShowOriginalEdit: () -> Unit,
+    onResetAll: () -> Unit,
+) {
     Column(Modifier.fillMaxSize().padding(16.dp)) {
         Text(stringResource(R.string.editor_strength, (strength * PERCENT).roundToInt()), style = MaterialTheme.typography.titleSmall)
         Slider(value = strength, onValueChange = onStrengthChanged, onValueChangeFinished = onEditFinished)
         Text(stringResource(R.string.editor_auto_hint), style = MaterialTheme.typography.bodySmall)
+        Text(stringResource(R.string.editor_hold_hint), style = MaterialTheme.typography.bodySmall)
         Spacer(Modifier.weight(1f))
-        TextButton(onClick = onResetAll) { Text(stringResource(R.string.editor_reset_all)) }
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            TextButton(onClick = onResetAll) { Text(stringResource(R.string.editor_reset_all)) }
+            TextButton(onClick = onShowOriginalEdit) { Text(stringResource(R.string.editor_original_state)) }
+        }
     }
 }
 

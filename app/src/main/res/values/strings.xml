@@ -5,6 +5,16 @@
     <string name="home_title">Pixels</string>
     <string name="home_subtitle">Make a photo look naturally corrected — not edited. Everything stays on your device.</string>
     <string name="home_pick">Choose photo</string>
+    <string name="home_recent">Recent edits</string>
+    <string name="home_recent_hint">Edits are saved automatically. Removing a project never deletes your photo.</string>
+    <string name="home_remove">Remove</string>
+    <string name="editor_redo">Redo</string>
+    <string name="editor_original_state">Original (no edits)</string>
+    <string name="editor_hold_hint">Press and hold the photo to see the original.</string>
+    <string name="leave_title">Leave without exporting?</string>
+    <string name="leave_message">Your edits are saved in Recent edits, but the enhanced photo has not been exported to your gallery yet.</string>
+    <string name="leave_confirm">Leave</string>
+    <string name="leave_stay">Keep editing</string>
 
     <string name="loading_opening">Opening photo…</string>
     <string name="processing_enhancing">Enhancing…</string>
@@ -18,7 +28,7 @@
     <string name="editor_split_vertical">Top / bottom</string>
     <string name="editor_strength">Auto strength %1$d%%</string>
     <string name="editor_undo">Undo</string>
-    <string name="editor_reset_all">Reset all</string>
+    <string name="editor_reset_all">Reset to auto</string>
     <string name="editor_save">Save</string>
     <string name="editor_share">Share</string>
     <string name="editor_before">Before</string>
