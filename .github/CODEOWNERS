@@ -1,0 +1,4 @@
+# Code owners: require @Selva461 to review all changes
+# This makes GitHub request a review from @Selva461 on any PR that modifies the repository.
+
+* @Selva461
