@@ -27,6 +27,18 @@ debug report to calibrate the scene classifier.
 
 ## What changed
 
+### 2026-10-03 — design pass against a "looks auto-generated" checklist
+
+The user supplied a list of 30 visual anti-patterns. Applied to the app: own palette (warm paper /
+ink neutrals, one muted burnt-orange accent; no Material purple, no wallpaper dynamic colour, no
+pure white or pure black), 2–12 dp corners and square-ish buttons, serif wordmark/headings, neutral
+grey photo canvas, single-tone histogram, copy without "not X, Y" phrasing or em dashes, skeleton
+loaders (editor layout while opening, Recent list rows), and an About screen with a privacy policy,
+terms of use and open-source credits (`ui/about`). Not applicable to a native app: pricing tiers,
+feature cards, bento grids, hover effects. Not done: a real product demo (needs real photos the
+owner has rights to). The privacy text is accurate to the code (no INTERNET permission, no
+analytics); have it reviewed before any store listing.
+
 ### 2026-10-03 — new requirements (REQUIREMENTS.md): export, projects, controls, scenes
 
 - **Export** (`EnhanceImageUseCase.export`, `ExportOptions`): JPEG/PNG, quality, Full/Large/Medium/

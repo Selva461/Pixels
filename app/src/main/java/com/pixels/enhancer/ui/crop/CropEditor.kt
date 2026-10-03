@@ -28,6 +28,7 @@ import androidx.compose.ui.unit.dp
 import com.pixels.enhancer.domain.geometry.CropCorner
 import com.pixels.enhancer.domain.geometry.CropMath
 import com.pixels.enhancer.domain.geometry.CropRect
+import com.pixels.enhancer.ui.theme.PhotoCanvas
 import kotlin.math.min
 
 private enum class DragTarget { MOVE, TOP_LEFT, TOP_RIGHT, BOTTOM_LEFT, BOTTOM_RIGHT }
@@ -54,7 +55,7 @@ fun CropEditor(
     val touchSlopPx = with(LocalDensity.current) { 36.dp.toPx() }
     var target by remember { mutableStateOf<DragTarget?>(null) }
 
-    BoxWithConstraints(modifier.clipToBounds().background(Color.Black)) {
+    BoxWithConstraints(modifier.clipToBounds().background(PhotoCanvas)) {
         val boxWidth = constraints.maxWidth.toFloat()
         val boxHeight = constraints.maxHeight.toFloat()
         val scale = min(boxWidth / image.width, boxHeight / image.height)

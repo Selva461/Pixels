@@ -35,6 +35,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import com.pixels.enhancer.R
 import com.pixels.enhancer.core.error.ErrorCode
 import com.pixels.enhancer.ui.ErrorMessages
+import com.pixels.enhancer.ui.components.RecentSkeletonRow
 import com.pixels.enhancer.ui.editor.RecentProject
 import java.text.DateFormat
 import java.util.Date
@@ -42,7 +43,9 @@ import java.util.Date
 @Composable
 fun HomeScreen(
     recent: List<RecentProject>,
+    recentLoaded: Boolean,
     onPickImage: () -> Unit,
+    onOpenAbout: () -> Unit,
     onOpenProject: (String) -> Unit,
     onDeleteProject: (String) -> Unit,
     modifier: Modifier = Modifier,
@@ -53,16 +56,26 @@ fun HomeScreen(
         Spacer(Modifier.height(8.dp))
         Text(stringResource(R.string.home_subtitle), style = MaterialTheme.typography.bodyLarge)
         Spacer(Modifier.height(24.dp))
-        Button(onClick = onPickImage, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.home_pick)) }
+        Button(shape = MaterialTheme.shapes.small, onClick = onPickImage, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.home_pick)) }
         Spacer(Modifier.height(24.dp))
-        if (recent.isNotEmpty()) {
-            Text(stringResource(R.string.home_recent), style = MaterialTheme.typography.titleMedium)
-            Text(stringResource(R.string.home_recent_hint), style = MaterialTheme.typography.bodySmall)
-            HorizontalDivider(Modifier.padding(vertical = 8.dp))
-            LazyColumn(Modifier.weight(1f)) {
-                items(recent, key = { it.id }) { project -> RecentRow(project, onOpenProject, onDeleteProject) }
+        when {
+            !recentLoaded -> {
+                Text(stringResource(R.string.home_recent), style = MaterialTheme.typography.titleMedium)
+                HorizontalDivider(Modifier.padding(vertical = 8.dp))
+                repeat(SKELETON_ROWS) { RecentSkeletonRow() }
+                Spacer(Modifier.weight(1f))
             }
+            recent.isNotEmpty() -> {
+                Text(stringResource(R.string.home_recent), style = MaterialTheme.typography.titleMedium)
+                Text(stringResource(R.string.home_recent_hint), style = MaterialTheme.typography.bodySmall)
+                HorizontalDivider(Modifier.padding(vertical = 8.dp))
+                LazyColumn(Modifier.weight(1f)) {
+                    items(recent, key = { it.id }) { project -> RecentRow(project, onOpenProject, onDeleteProject) }
+                }
+            }
+            else -> Spacer(Modifier.weight(1f))
         }
+        TextButton(onClick = onOpenAbout, modifier = Modifier.padding(vertical = 8.dp)) { Text(stringResource(R.string.home_about)) }
     }
 }
 
@@ -89,6 +102,8 @@ private fun RecentRow(project: RecentProject, onOpen: (String) -> Unit, onDelete
     }
 }
 
+private const val SKELETON_ROWS = 3
+
 /** [progress] null shows an indeterminate spinner. */
 @Composable
 fun ProgressScreen(message: String, progress: Float?, modifier: Modifier = Modifier) {
@@ -108,7 +123,7 @@ fun ErrorScreen(code: ErrorCode, onPickImage: () -> Unit, modifier: Modifier = M
     CenteredColumn(modifier) {
         Text(stringResource(ErrorMessages.forCode(code)), style = MaterialTheme.typography.bodyLarge, textAlign = TextAlign.Center)
         Spacer(Modifier.height(24.dp))
-        Button(onClick = onPickImage) { Text(stringResource(R.string.error_retry)) }
+        Button(shape = MaterialTheme.shapes.small, onClick = onPickImage) { Text(stringResource(R.string.error_retry)) }
     }
 }
 

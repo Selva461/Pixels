@@ -17,6 +17,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import com.pixels.enhancer.ui.theme.PhotoCanvas
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -76,7 +78,7 @@ fun CompareView(
     BoxWithConstraints(
         modifier
             .clipToBounds()
-            .background(Color.Black)
+            .background(PhotoCanvas)
             .pointerInput(resetKey) {
                 detectTransformGestures { _, panChange, zoomChange, _ ->
                     scale = (scale * zoomChange).coerceIn(MIN_ZOOM, MAX_ZOOM)
@@ -186,7 +188,7 @@ private fun BoxScope.Label(text: String, alignment: Alignment) {
         modifier = Modifier
             .align(alignment)
             .padding(8.dp)
-            .background(Color.Black.copy(alpha = 0.5f), CircleShape)
+            .background(Color.Black.copy(alpha = 0.55f), RoundedCornerShape(4.dp))
             .padding(horizontal = 8.dp, vertical = 2.dp),
     )
 }

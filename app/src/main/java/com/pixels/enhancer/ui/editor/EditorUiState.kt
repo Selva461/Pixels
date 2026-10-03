@@ -13,7 +13,7 @@ import com.pixels.enhancer.domain.export.ExportOptions
 sealed interface EditorUiState {
 
     /** Home screen, with recent projects to resume. */
-    data class Idle(val recent: List<RecentProject> = emptyList()) : EditorUiState
+    data class Idle(val recent: List<RecentProject> = emptyList(), val recentLoaded: Boolean = false) : EditorUiState
 
     data object Loading : EditorUiState
 

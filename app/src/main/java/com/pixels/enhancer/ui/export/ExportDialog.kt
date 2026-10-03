@@ -68,7 +68,7 @@ fun ExportDialog(
                 Text(stringResource(R.string.export_original_kept), style = MaterialTheme.typography.bodySmall)
             }
         },
-        confirmButton = { Button(onClick = onConfirm) { Text(stringResource(R.string.export_confirm)) } },
+        confirmButton = { Button(shape = MaterialTheme.shapes.small, onClick = onConfirm) { Text(stringResource(R.string.export_confirm)) } },
         dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.export_cancel)) } },
     )
 }

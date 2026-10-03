@@ -158,7 +158,7 @@ class EditorViewModel(
             val recent = projectManager.recent().map { saved ->
                 RecentProject(saved.id, saved.displayName ?: saved.id.take(8), saved.modifiedAtMillis, thumbnails.load(saved.id))
             }
-            _uiState.update { state -> if (state is EditorUiState.Idle) EditorUiState.Idle(recent) else state }
+            _uiState.update { state -> if (state is EditorUiState.Idle) EditorUiState.Idle(recent, recentLoaded = true) else state }
         }
     }
 

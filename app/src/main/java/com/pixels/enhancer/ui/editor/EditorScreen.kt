@@ -145,7 +145,7 @@ fun EditorScreen(
             title = { Text(stringResource(R.string.leave_title)) },
             text = { Text(stringResource(R.string.leave_message)) },
             confirmButton = { TextButton(onClick = onConfirmLeave) { Text(stringResource(R.string.leave_confirm)) } },
-            dismissButton = { Button(onClick = onDismissLeave) { Text(stringResource(R.string.leave_stay)) } },
+            dismissButton = { Button(shape = MaterialTheme.shapes.small, onClick = onDismissLeave) { Text(stringResource(R.string.leave_stay)) } },
         )
     }
 
@@ -215,7 +215,7 @@ private fun TopBar(
         TextButton(onClick = onUndo, enabled = state.canUndo) { Text(stringResource(R.string.editor_undo)) }
         TextButton(onClick = onRedo, enabled = state.canRedo) { Text(stringResource(R.string.editor_redo)) }
         TextButton(onClick = onShare, enabled = !busy) { Text(stringResource(R.string.editor_share)) }
-        Button(onClick = onSave, enabled = !busy) { Text(stringResource(R.string.editor_save)) }
+        Button(shape = MaterialTheme.shapes.small, onClick = onSave, enabled = !busy) { Text(stringResource(R.string.editor_save)) }
     }
 }
 
@@ -289,9 +289,9 @@ private fun CropPanel(edit: EditState, aspect: CropAspect, crop: CropActions, on
     val straighten = edit.geometry.straightenDegrees
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 8.dp)) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            OutlinedButton(onClick = crop.onRotateCounterClockwise) { Text(stringResource(R.string.crop_rotate_left), maxLines = 1) }
-            OutlinedButton(onClick = crop.onRotateClockwise) { Text(stringResource(R.string.crop_rotate_right), maxLines = 1) }
-            OutlinedButton(onClick = crop.onFlip) { Text(stringResource(R.string.crop_flip), maxLines = 1) }
+            OutlinedButton(shape = MaterialTheme.shapes.small, onClick = crop.onRotateCounterClockwise) { Text(stringResource(R.string.crop_rotate_left), maxLines = 1) }
+            OutlinedButton(shape = MaterialTheme.shapes.small, onClick = crop.onRotateClockwise) { Text(stringResource(R.string.crop_rotate_right), maxLines = 1) }
+            OutlinedButton(shape = MaterialTheme.shapes.small, onClick = crop.onFlip) { Text(stringResource(R.string.crop_flip), maxLines = 1) }
         }
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(

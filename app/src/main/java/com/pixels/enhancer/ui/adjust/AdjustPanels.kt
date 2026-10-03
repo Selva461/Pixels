@@ -122,12 +122,12 @@ private fun LabelledSlider(
     Slider(value = value, onValueChange = onChange, onValueChangeFinished = onFinished, valueRange = range)
 }
 
-/** Luma histogram with faint RGB channels behind it; shows the edited preview, not the source. */
+/** Brightness histogram of the edited preview (not the source). One neutral tone keeps it readable. */
 @Composable
 fun HistogramView(histogram: Histogram, modifier: Modifier = Modifier) {
-    val lumaColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f)
+    val lumaColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
     Canvas(modifier) {
-        val peak = histogram.peak.coerceAtLeast(1).toFloat()
+        val peak = histogram.luma.max().coerceAtLeast(1).toFloat()
         val barWidth = size.width / histogram.bins
         fun drawChannel(values: IntArray, color: Color) {
             values.forEachIndexed { index, count ->
@@ -135,9 +135,6 @@ fun HistogramView(histogram: Histogram, modifier: Modifier = Modifier) {
                 drawRect(color, Offset(index * barWidth, size.height - barHeight), Size(barWidth, barHeight))
             }
         }
-        drawChannel(histogram.red, Color.Red.copy(alpha = 0.25f))
-        drawChannel(histogram.green, Color.Green.copy(alpha = 0.25f))
-        drawChannel(histogram.blue, Color.Blue.copy(alpha = 0.25f))
         drawChannel(histogram.luma, lumaColor)
     }
 }

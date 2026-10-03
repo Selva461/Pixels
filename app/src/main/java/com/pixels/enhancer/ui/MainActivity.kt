@@ -25,6 +25,8 @@ import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.pixels.enhancer.PixelsApplication
 import com.pixels.enhancer.R
+import com.pixels.enhancer.ui.about.AboutScreen
+import com.pixels.enhancer.ui.components.EditorSkeleton
 import com.pixels.enhancer.ui.debug.DebugScreen
 import com.pixels.enhancer.ui.editor.ColorActions
 import com.pixels.enhancer.ui.editor.CropActions
@@ -35,7 +37,6 @@ import com.pixels.enhancer.ui.editor.EditorUiState
 import com.pixels.enhancer.ui.editor.EditorViewModel
 import com.pixels.enhancer.ui.home.ErrorScreen
 import com.pixels.enhancer.ui.home.HomeScreen
-import com.pixels.enhancer.ui.home.ProgressScreen
 import com.pixels.enhancer.ui.theme.PixelsTheme
 
 class MainActivity : ComponentActivity() {
@@ -84,22 +85,25 @@ class MainActivity : ComponentActivity() {
 private fun PixelsApp(viewModel: EditorViewModel, onPickImage: () -> Unit, modifier: Modifier = Modifier) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     var showDebug by rememberSaveable { mutableStateOf(false) }
+    var showAbout by rememberSaveable { mutableStateOf(false) }
     ShareEvents(viewModel)
 
     when (val current = state) {
-        is EditorUiState.Idle -> HomeScreen(
-            recent = current.recent,
-            onPickImage = onPickImage,
-            onOpenProject = viewModel::onOpenProject,
-            onDeleteProject = viewModel::onDeleteProject,
-            modifier = modifier,
-        )
-        EditorUiState.Loading -> ProgressScreen(stringResource(R.string.loading_opening), progress = null, modifier = modifier)
-        is EditorUiState.Processing -> ProgressScreen(
-            stringResource(R.string.processing_enhancing),
-            progress = current.progress,
-            modifier = modifier,
-        )
+        is EditorUiState.Idle -> if (showAbout) {
+            AboutScreen(onBack = { showAbout = false }, modifier = modifier)
+        } else {
+            HomeScreen(
+                recent = current.recent,
+                recentLoaded = current.recentLoaded,
+                onPickImage = onPickImage,
+                onOpenAbout = { showAbout = true },
+                onOpenProject = viewModel::onOpenProject,
+                onDeleteProject = viewModel::onDeleteProject,
+                modifier = modifier,
+            )
+        }
+        EditorUiState.Loading -> EditorSkeleton(stringResource(R.string.loading_analysing), progress = null, modifier = modifier)
+        is EditorUiState.Processing -> EditorSkeleton(stringResource(R.string.processing_enhancing), progress = current.progress, modifier = modifier)
         is EditorUiState.Error -> ErrorScreen(current.code, onPickImage, modifier)
         is EditorUiState.Success -> {
             val debug = current.debug

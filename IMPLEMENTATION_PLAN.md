@@ -52,7 +52,7 @@ in `app/` is compiled in CI but has not been run on a phone by the developer.
 | Export: verified write, cleanup, no false success | ✅ | Pending → verify → metadata → verify → publish → verify; device-verified |
 | Export: cancel | ✅ | Partial file deleted |
 | Export: colour profile choice, HEIC output | ⬜ | |
-| Camera entry point, settings/help screens | ⬜ | |
+| Camera entry point, settings/help screens | 🟡 | About screen with privacy policy, terms, licences; settings and camera ⬜ |
 | Visual regression with real photos | 🟡 | Synthetic golden scenes only; real-photo set not yet collected |
 | Performance benchmarks on devices | ⬜ | Desktop timings only (see TESTING.md) |
 
