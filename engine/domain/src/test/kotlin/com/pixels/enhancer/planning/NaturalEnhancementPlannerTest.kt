@@ -127,7 +127,7 @@ class NaturalEnhancementPlannerTest {
         val plan = planner.createPlan(goodAnalysis(), 0.4f, preset)
         assertEquals(0.4f, plan.strength)
         assertEquals(preset.id, plan.presetId)
-        assertEquals("1.0", plan.algorithmVersion)
+        assertEquals("1.1", plan.algorithmVersion)
         assertEquals(AdjustmentKind.entries.size, plan.entries().size)
     }
 }

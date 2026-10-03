@@ -3,6 +3,8 @@ package com.pixels.enhancer.ui.editor
 import android.net.Uri
 import androidx.compose.ui.graphics.ImageBitmap
 import com.pixels.enhancer.core.error.ErrorCode
+import com.pixels.enhancer.domain.analysis.Histogram
+import com.pixels.enhancer.domain.analysis.SceneType
 import com.pixels.enhancer.domain.debug.DebugSection
 import com.pixels.enhancer.domain.editing.EditState
 import com.pixels.enhancer.domain.export.ExportOptions
@@ -32,6 +34,10 @@ sealed interface EditorUiState {
         val exportDialog: ExportDialogState? = null,
         /** True while asking whether to leave with edits that were never exported. */
         val confirmLeave: Boolean = false,
+        /** Scene Auto Enhance detected; the override (if any) is in [edit]. */
+        val detectedScene: SceneType = SceneType.GENERAL,
+        /** Histogram of the current preview result. */
+        val histogram: Histogram? = null,
         val activity: EditorActivity,
         /** Present only in developer builds. */
         val debug: DebugInfo?,

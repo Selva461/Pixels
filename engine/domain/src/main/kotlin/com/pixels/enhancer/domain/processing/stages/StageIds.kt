@@ -5,11 +5,13 @@ import com.pixels.enhancer.domain.processing.ProcessingStage
 object StageIds {
     const val EXPOSURE = "exposure"
     const val WHITE_BALANCE = "white_balance"
+    const val DEHAZE = "dehaze"
     const val TONE = "tone"
     const val NOISE_REDUCTION = "noise_reduction"
     const val DETAIL = "detail"
     const val SHARPEN = "sharpen"
     const val COLOR_FINISH = "color_finish"
+    const val COLOR_MIXER = "color_mixer"
     const val VIGNETTE = "vignette"
     const val GRAIN = "grain"
 }
@@ -23,11 +25,13 @@ object DefaultPipeline {
     fun stages(): List<ProcessingStage> = listOf(
         ExposureStage(),
         WhiteBalanceStage(),
+        DehazeStage(),
         ToneStage(),
         NoiseReductionStage(),
         DetailStage(),
         SharpenStage(),
         ColorFinishStage(),
+        ColorMixerStage(),
         VignetteStage(),
         GrainStage(),
     )

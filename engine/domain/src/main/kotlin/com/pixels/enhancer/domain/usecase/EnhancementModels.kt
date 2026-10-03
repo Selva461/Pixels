@@ -2,9 +2,12 @@ package com.pixels.enhancer.domain.usecase
 
 import com.pixels.enhancer.core.timing.TimingReport
 import com.pixels.enhancer.domain.analysis.ImageAnalysis
+import com.pixels.enhancer.domain.analysis.SceneEstimate
+import com.pixels.enhancer.domain.analysis.SceneType
 import com.pixels.enhancer.domain.geometry.Geometry
 import com.pixels.enhancer.domain.image.PixelBuffer
 import com.pixels.enhancer.domain.model.ImageSource
+import com.pixels.enhancer.domain.planning.ColorMixer
 import com.pixels.enhancer.domain.planning.EnhancementPlan
 import com.pixels.enhancer.domain.planning.ManualAdjustments
 import com.pixels.enhancer.domain.planning.QualityPreset
@@ -22,6 +25,8 @@ data class EnhancementSession(
     /** Downscaled copy of [original] for interactive editing; the plan is still decided from the full analysis. */
     val preview: PixelBuffer,
     val analysis: ImageAnalysis,
+    /** Detected scene; advisory — [EnhanceRequest.sceneOverride] wins. */
+    val scene: SceneEstimate,
     val preset: QualityPreset,
     /** Decode and analysis durations. */
     val loadTimings: TimingReport,
@@ -31,11 +36,17 @@ data class EnhanceRequest(
     val strength: Float,
     val manual: ManualAdjustments = ManualAdjustments.NONE,
     val geometry: Geometry = Geometry.NONE,
+    val colorMixer: ColorMixer = ColorMixer.NONE,
+    /** User's scene choice; null uses the detected scene. */
+    val sceneOverride: SceneType? = null,
     val target: RenderTarget = RenderTarget.FULL,
     val debugEnabled: Boolean = false,
     val stageConfigs: Map<String, StageConfig> = emptyMap(),
     val runUntilStageId: String? = null,
 )
+
+/** True when the user asked for creative changes, so validation only checks for broken output. */
+val EnhanceRequest.hasManualEdits: Boolean get() = !manual.isNeutral || !colorMixer.isNeutral
 
 enum class RenderTarget {
     /** Small image for live slider feedback. */
@@ -60,3 +71,5 @@ data class EnhancementOutcome(
 )
 
 data class ExportResult(val saved: com.pixels.enhancer.domain.repository.SavedImage, val width: Int, val height: Int)
+
+fun EnhancementSession.sceneFor(request: EnhanceRequest): SceneType = request.sceneOverride ?: scene.scene

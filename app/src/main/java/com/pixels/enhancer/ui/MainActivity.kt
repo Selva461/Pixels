@@ -26,6 +26,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.pixels.enhancer.PixelsApplication
 import com.pixels.enhancer.R
 import com.pixels.enhancer.ui.debug.DebugScreen
+import com.pixels.enhancer.ui.editor.ColorActions
 import com.pixels.enhancer.ui.editor.CropActions
 import com.pixels.enhancer.ui.editor.ExportActions
 import com.pixels.enhancer.ui.editor.EditorEvent
@@ -139,6 +140,11 @@ private fun PixelsApp(viewModel: EditorViewModel, onPickImage: () -> Unit, modif
                         onReset = viewModel::onResetGeometry,
                         onCropModeChanged = viewModel::onCropModeChanged,
                         ratioFor = viewModel::aspectRatioFor,
+                    ),
+                    color = ColorActions(
+                        onShiftChanged = viewModel::onColorMixerChanged,
+                        onResetAll = viewModel::onResetColorMixer,
+                        onSceneSelected = viewModel::onSceneSelected,
                     ),
                     export = ExportActions(
                         onOptionsChanged = viewModel::onExportOptionsChanged,

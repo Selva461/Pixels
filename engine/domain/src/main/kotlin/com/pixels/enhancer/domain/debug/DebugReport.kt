@@ -37,6 +37,9 @@ object DebugReport {
                 row("Working", "${session.original.width}x${session.original.height}"),
                 row("Preview", "${session.preview.width}x${session.preview.height}"),
                 row("Preset", session.preset.displayName),
+                row("Scene", "${session.scene.scene.label} (${fmt(session.scene.confidence)})"),
+                row("Scene scores", session.scene.scores.entries.sortedByDescending { it.value }.take(SCENE_SCORES_SHOWN)
+                    .joinToString { "${it.key.label} ${fmt(it.value)}" }),
             ),
         )
     }
@@ -108,4 +111,5 @@ object DebugReport {
     private fun signed(value: Float) = String.format(Locale.ROOT, "%+.3f", value)
 
     private const val PERCENT = 100
+    private const val SCENE_SCORES_SHOWN = 3
 }

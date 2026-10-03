@@ -14,6 +14,7 @@ import com.pixels.enhancer.core.timing.TimingReport
 import com.pixels.enhancer.core.timing.measure
 import com.pixels.enhancer.domain.analysis.ImageAnalysis
 import com.pixels.enhancer.domain.analysis.ImageAnalyzer
+import com.pixels.enhancer.domain.analysis.SceneClassifier
 import com.pixels.enhancer.domain.export.ExportOptions
 import com.pixels.enhancer.domain.geometry.GeometryOps
 import com.pixels.enhancer.domain.image.PixelBuffer
@@ -87,6 +88,8 @@ class EnhanceImageUseCase(
             if (analyzed is OperationResult.Failure) return@withContext logFailure("OPEN_FAILED", null, analyzed)
             val analysis = (analyzed as OperationResult.Success).value
             logAnalysis(analysis.value)
+            val scene = clock.measure { SceneClassifier.classify(working.value, analysis.value) }
+            logger.event("SCENE_DETECTED", mapOf("scene" to scene.value.scene, "confidence" to scene.value.confidence))
 
             OperationResult.Success(
                 EnhancementSession(
@@ -94,9 +97,14 @@ class EnhanceImageUseCase(
                     original = working.value,
                     preview = PixelResampler.downscaleToFit(working.value, PREVIEW_LONG_EDGE),
                     analysis = analysis.value,
+                    scene = scene.value,
                     preset = preset,
                     loadTimings = TimingReport(
-                        listOf(StageTiming("Decode", working.durationMs), StageTiming("Analyze", analysis.durationMs)),
+                        listOf(
+                            StageTiming("Decode", working.durationMs),
+                            StageTiming("Analyze", analysis.durationMs),
+                            StageTiming("Scene", scene.durationMs),
+                        ),
                     ),
                 ),
             )
@@ -125,20 +133,22 @@ class EnhanceImageUseCase(
                 "width" to source.width,
                 "height" to source.height,
                 "preset" to session.preset.id,
+                "scene" to session.sceneFor(request),
                 "strength" to request.strength,
                 "algorithmVersion" to ENHANCEMENT_ALGORITHM_VERSION,
             ),
         )
 
         val planned = clock.measure {
-            ManualAdjustmentMerger.merge(planner.createPlan(session.analysis, request.strength, session.preset), request.manual)
+            ManualAdjustmentMerger.merge(planner.createPlan(session.analysis, request.strength, presetFor(session, request)), request.manual)
+                .copy(colorMixer = request.colorMixer)
         }
         logPlan(processingId, planned.value)
 
         val context = ProcessingContext(
             analysis = analysisFor(session, source),
             plan = planned.value,
-            qualityPreset = session.preset,
+            qualityPreset = presetFor(session, request),
             debugEnabled = request.debugEnabled,
             processingId = processingId,
             stageConfigs = request.stageConfigs,
@@ -152,7 +162,7 @@ class EnhanceImageUseCase(
             is OperationResult.Success -> result.value
         }
 
-        val validationMode = if (request.manual.isNeutral) ValidationMode.NATURAL else ValidationMode.STRUCTURAL
+        val validationMode = if (request.hasManualEdits) ValidationMode.STRUCTURAL else ValidationMode.NATURAL
         val validated = clock.measure { validator.validate(source, processed.image, validationMode) }
         val validation = validated.value
         logger.event(
@@ -281,6 +291,9 @@ class EnhanceImageUseCase(
     /** Renders [request] at working resolution for sharing, without saving. */
     suspend fun renderForShare(session: EnhancementSession, request: EnhanceRequest): OperationResult<EnhancementOutcome> =
         enhance(session, request.copy(target = RenderTarget.FULL, runUntilStageId = null, stageConfigs = emptyMap()))
+
+    private fun presetFor(session: EnhancementSession, request: EnhanceRequest) =
+        QualityPreset.forScene(session.sceneFor(request), session.preset)
 
     private fun sourceFor(session: EnhancementSession, target: RenderTarget) = when (target) {
         RenderTarget.PREVIEW -> session.preview

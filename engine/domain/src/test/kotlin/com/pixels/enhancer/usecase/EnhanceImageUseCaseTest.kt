@@ -67,8 +67,8 @@ class EnhanceImageUseCaseTest {
         assertTrue(outcome.validation.passed)
         assertTrue(outcome.processed.executedStages.isNotEmpty())
         assertEquals(
-            listOf("SOURCE_OPENED", "ANALYSIS_COMPLETE", "PROCESS_START", "PLAN_CREATED"),
-            logger.names().take(4),
+            listOf("SOURCE_OPENED", "ANALYSIS_COMPLETE", "SCENE_DETECTED", "PROCESS_START", "PLAN_CREATED"),
+            logger.names().take(5),
         )
         assertTrue(logger.names().containsAll(listOf("STAGE_COMPLETE", "VALIDATION_COMPLETE", "PROCESS_COMPLETE", "EXPORT_COMPLETE")))
         assertTrue(logger.lines.all { !it.contains("dark.jpg") }, "file names must not be logged")

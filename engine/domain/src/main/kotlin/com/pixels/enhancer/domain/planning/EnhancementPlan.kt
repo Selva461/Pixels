@@ -25,6 +25,10 @@ enum class AdjustmentKind(val label: String) {
     CONTRAST("Contrast"),
     HIGHLIGHTS("Highlights"),
     SHADOWS("Shadows"),
+    WHITES("Whites"),
+    BLACKS("Blacks"),
+    MIDTONES("Midtones"),
+    DEHAZE("Dehaze"),
     WHITE_BALANCE("White Balance"),
     TEMPERATURE("Temperature"),
     TINT("Tint"),
@@ -46,6 +50,8 @@ enum class AdjustmentKind(val label: String) {
  * - saturation: vibrance-style chroma offset (−0.1 = 10 % less chroma, boosts favour muted colours)
  * - globalSaturation: uniform chroma offset (−1 = monochrome)
  * - noiseReduction / detail / sharpening: stage strength
+ * - whites / blacks / midtones: peak tone-curve displacement in that tonal region
+ * - dehaze: −1..1 fraction of the measured haze veil removed (negative adds haze)
  * - vignette: −1..1 (negative darkens corners); grain: 0..1
  */
 data class EnhancementPlan(
@@ -65,6 +71,12 @@ data class EnhancementPlan(
     val globalSaturation: Adjustment = Adjustment.MANUAL_ONLY,
     val vignette: Adjustment = Adjustment.MANUAL_ONLY,
     val grain: Adjustment = Adjustment.MANUAL_ONLY,
+    val whites: Adjustment = Adjustment.MANUAL_ONLY,
+    val blacks: Adjustment = Adjustment.MANUAL_ONLY,
+    val midtones: Adjustment = Adjustment.MANUAL_ONLY,
+    val dehaze: Adjustment = Adjustment.MANUAL_ONLY,
+    /** Per-hue-band HSL shifts (manual only). */
+    val colorMixer: ColorMixer = ColorMixer.NONE,
     val algorithmVersion: String = ENHANCEMENT_ALGORITHM_VERSION,
 ) {
     operator fun get(kind: AdjustmentKind): Adjustment = when (kind) {
@@ -72,6 +84,10 @@ data class EnhancementPlan(
         AdjustmentKind.CONTRAST -> contrast
         AdjustmentKind.HIGHLIGHTS -> highlights
         AdjustmentKind.SHADOWS -> shadows
+        AdjustmentKind.WHITES -> whites
+        AdjustmentKind.BLACKS -> blacks
+        AdjustmentKind.MIDTONES -> midtones
+        AdjustmentKind.DEHAZE -> dehaze
         AdjustmentKind.WHITE_BALANCE -> whiteBalance
         AdjustmentKind.TEMPERATURE -> temperature
         AdjustmentKind.TINT -> tint
@@ -91,6 +107,10 @@ data class EnhancementPlan(
         contrast = transform(AdjustmentKind.CONTRAST, contrast),
         highlights = transform(AdjustmentKind.HIGHLIGHTS, highlights),
         shadows = transform(AdjustmentKind.SHADOWS, shadows),
+        whites = transform(AdjustmentKind.WHITES, whites),
+        blacks = transform(AdjustmentKind.BLACKS, blacks),
+        midtones = transform(AdjustmentKind.MIDTONES, midtones),
+        dehaze = transform(AdjustmentKind.DEHAZE, dehaze),
         whiteBalance = transform(AdjustmentKind.WHITE_BALANCE, whiteBalance),
         temperature = transform(AdjustmentKind.TEMPERATURE, temperature),
         tint = transform(AdjustmentKind.TINT, tint),
@@ -103,5 +123,5 @@ data class EnhancementPlan(
         grain = transform(AdjustmentKind.GRAIN, grain),
     )
 
-    val hasAnyCorrection: Boolean get() = AdjustmentKind.entries.any { get(it).enabled }
+    val hasAnyCorrection: Boolean get() = AdjustmentKind.entries.any { get(it).enabled } || !colorMixer.isNeutral
 }

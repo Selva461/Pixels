@@ -3,6 +3,7 @@ package com.pixels.enhancer.domain.planning
 import com.pixels.enhancer.domain.analysis.ImageAnalysis
 import com.pixels.enhancer.domain.image.Srgb
 import com.pixels.enhancer.domain.processing.ops.ExposureCurve
+import com.pixels.enhancer.domain.processing.ops.ToneCurve
 import java.util.Locale
 import kotlin.math.ln
 import kotlin.math.max
@@ -103,16 +104,37 @@ class NaturalEnhancementPlanner : EnhancementPlanner {
         val spread = predictedSpread(analysis, exposure)
         val clipping = analysis.highlightClipping + analysis.shadowClipping
         return when {
-            spread < limits.flatContrastThreshold -> Adjustment.of(
-                limits.maxContrastBoost * unitRatio(limits.flatContrastThreshold - spread, FLAT_CONTRAST_RANGE),
-                "Image looks flat (tonal spread ${fmt(spread)} < ${fmt(limits.flatContrastThreshold)})",
-            )
+            spread < limits.flatContrastThreshold -> {
+                val wanted = limits.maxContrastBoost * unitRatio(limits.flatContrastThreshold - spread, FLAT_CONTRAST_RANGE)
+                val safe = clippingSafeContrast(wanted, analysis, exposure)
+                val note = if (safe < wanted) "; reduced to protect shadows/highlights from clipping" else ""
+                Adjustment.of(safe, "Image looks flat (tonal spread ${fmt(spread)} < ${fmt(limits.flatContrastThreshold)})$note")
+            }
             spread > limits.harshContrastThreshold && clipping > HARSH_CONTRAST_MIN_CLIPPING -> Adjustment.of(
                 -limits.maxContrastReduction * unitRatio(spread - limits.harshContrastThreshold, 1f - limits.harshContrastThreshold),
                 "Contrast is harsh (tonal spread ${fmt(spread)}, ${pct(clipping)} clipped)",
             )
             else -> Adjustment.none("Contrast within natural range (tonal spread ${fmt(spread)})")
         }
+    }
+
+    /**
+     * Halves a contrast boost until the S-curve no longer pushes the 5th-percentile tone into black
+     * or the 95th into white. A dark, flat photo (e.g. night) otherwise gets its shadows crushed.
+     */
+    private fun clippingSafeContrast(wanted: Float, analysis: ImageAnalysis, exposure: Adjustment): Float {
+        val ev = if (exposure.enabled) exposure.amount else 0f
+        val p5 = ExposureCurve.applyEncoded(analysis.luminance.p5, ev)
+        val p95 = ExposureCurve.applyEncoded(analysis.luminance.p95, ev)
+        val shadowFloor = min(p5, CLIP_GUARD_SHADOW) - CLIP_GUARD_TOLERANCE
+        val highlightCeiling = max(p95, CLIP_GUARD_HIGHLIGHT) + CLIP_GUARD_TOLERANCE
+        var amount = wanted
+        repeat(CLIP_GUARD_ATTEMPTS) {
+            val curve = ToneCurve.build(contrast = amount, highlights = 0f, shadows = 0f)
+            if (curve.map(p5) >= shadowFloor && curve.map(p95) <= highlightCeiling) return amount
+            amount /= 2f
+        }
+        return 0f
     }
 
     private fun predictedSpread(analysis: ImageAnalysis, exposure: Adjustment): Float {
@@ -133,6 +155,10 @@ class NaturalEnhancementPlanner : EnhancementPlanner {
             neutralFraction < limits.lowConfidenceNeutralFraction -> Adjustment.of(
                 amount * limits.lowConfidenceWhiteBalanceFactor,
                 "Colour cast detected (score ${fmt(cast)}) but few neutral reference pixels (${pct(neutralFraction)}); correction reduced",
+            )
+            analysis.neutralBalance.red > analysis.neutralBalance.blue && analysis.exposureScore < limits.warmDimSceneMaxLuma -> Adjustment.of(
+                amount * limits.warmDimSceneWhiteBalanceFactor,
+                "Warm cast in a dim scene (score ${fmt(cast)}) looks like intended warm light; correction reduced",
             )
             analysis.saturationScore > limits.vividSaturationThreshold -> Adjustment.of(
                 amount * limits.vividSceneWhiteBalanceFactor,
@@ -239,6 +265,12 @@ class NaturalEnhancementPlanner : EnhancementPlanner {
 
         /** Sharpness deficit (below the soft threshold) that earns the full sharpening amount. */
         const val SOFTNESS_RANGE = 0.35f
+
+        /** Tones the contrast boost must not push the 5th/95th percentiles past (≈9/255 and ≈246/255). */
+        const val CLIP_GUARD_SHADOW = 0.035f
+        const val CLIP_GUARD_HIGHLIGHT = 0.965f
+        const val CLIP_GUARD_TOLERANCE = 0.005f
+        const val CLIP_GUARD_ATTEMPTS = 4
 
         /** Contrast is only reduced when it is actually destroying detail at both ends. */
         const val HARSH_CONTRAST_MIN_CLIPPING = 0.04f

@@ -1,5 +1,6 @@
 package com.pixels.enhancer.domain.project
 
+import com.pixels.enhancer.domain.analysis.SceneType
 import com.pixels.enhancer.domain.editing.EditState
 import com.pixels.enhancer.domain.export.ExportFormat
 import com.pixels.enhancer.domain.export.ExportOptions
@@ -7,6 +8,9 @@ import com.pixels.enhancer.domain.export.ExportSize
 import com.pixels.enhancer.domain.export.MetadataPolicy
 import com.pixels.enhancer.domain.geometry.CropRect
 import com.pixels.enhancer.domain.geometry.Geometry
+import com.pixels.enhancer.domain.planning.ColorMixer
+import com.pixels.enhancer.domain.planning.HslShift
+import com.pixels.enhancer.domain.planning.HueBand
 import com.pixels.enhancer.domain.planning.ManualAdjustments
 import com.pixels.enhancer.domain.planning.ManualControl
 import kotlinx.serialization.Serializable
@@ -103,6 +107,9 @@ private data class EditFile(
     val flipHorizontal: Boolean = false,
     val straightenDegrees: Float = 0f,
     val crop: List<Float> = listOf(0f, 0f, 1f, 1f),
+    /** Keyed by [HueBand] name, value = [hue, saturation, luminance]. Added without a schema bump (defaults to none). */
+    val colorMixer: Map<String, List<Float>> = emptyMap(),
+    val sceneOverride: String? = null,
 ) {
     fun toEdit(): EditState {
         val controls = manual.mapNotNull { (name, value) -> ManualControl.entries.firstOrNull { it.name == name }?.let { it to value } }
@@ -118,11 +125,17 @@ private data class EditFile(
                 straightenDegrees = straightenDegrees.coerceIn(-Geometry.MAX_STRAIGHTEN_DEGREES, Geometry.MAX_STRAIGHTEN_DEGREES),
                 crop = CropRect.of(crop[0], crop[1], crop[2], crop[3]),
             ),
+            colorMixer = colorMixer.entries.fold(ColorMixer.NONE) { mixer, (name, values) ->
+                val band = HueBand.entries.firstOrNull { it.name == name }
+                if (band == null || values.size != HSL_VALUES) mixer else mixer.with(band, HslShift(values[0], values[1], values[2]))
+            },
+            sceneOverride = SceneType.entries.firstOrNull { it.name == sceneOverride },
         )
     }
 
     companion object {
         private const val CROP_VALUES = 4
+        private const val HSL_VALUES = 3
         private const val QUARTER_TURNS = 4
 
         fun from(edit: EditState) = EditFile(
@@ -133,6 +146,8 @@ private data class EditFile(
             flipHorizontal = edit.geometry.flipHorizontal,
             straightenDegrees = edit.geometry.straightenDegrees,
             crop = with(edit.geometry.crop) { listOf(left, top, right, bottom) },
+            colorMixer = edit.colorMixer.shifts.entries.associate { (band, shift) -> band.name to listOf(shift.hue, shift.saturation, shift.luminance) },
+            sceneOverride = edit.sceneOverride?.name,
         )
     }
 }

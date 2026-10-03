@@ -45,6 +45,14 @@ fun everythingPlan(plan: com.pixels.enhancer.domain.planning.EnhancementPlan) = 
     globalSaturation = Adjustment.of(0.1f, "test"),
     vignette = Adjustment.of(-0.3f, "test"),
     grain = Adjustment.of(0.2f, "test"),
+    whites = Adjustment.of(0.05f, "test"),
+    blacks = Adjustment.of(-0.05f, "test"),
+    midtones = Adjustment.of(0.05f, "test"),
+    dehaze = Adjustment.of(0.3f, "test"),
+    colorMixer = com.pixels.enhancer.domain.planning.ColorMixer.NONE.with(
+        com.pixels.enhancer.domain.planning.HueBand.GREEN,
+        com.pixels.enhancer.domain.planning.HslShift(0.2f, -0.3f, 0.1f),
+    ),
 )
 
 class PipelineImageProcessorTest {
@@ -53,8 +61,8 @@ class PipelineImageProcessorTest {
     fun `default stage order follows the spec - denoise before detail and sharpening`() {
         assertEquals(
             listOf(
-                StageIds.EXPOSURE, StageIds.WHITE_BALANCE, StageIds.TONE, StageIds.NOISE_REDUCTION,
-                StageIds.DETAIL, StageIds.SHARPEN, StageIds.COLOR_FINISH, StageIds.VIGNETTE, StageIds.GRAIN,
+                StageIds.EXPOSURE, StageIds.WHITE_BALANCE, StageIds.DEHAZE, StageIds.TONE, StageIds.NOISE_REDUCTION,
+                StageIds.DETAIL, StageIds.SHARPEN, StageIds.COLOR_FINISH, StageIds.COLOR_MIXER, StageIds.VIGNETTE, StageIds.GRAIN,
             ),
             DefaultPipeline.stages().map { it.id },
         )
@@ -88,7 +96,7 @@ class PipelineImageProcessorTest {
     fun `run until stops after the selected stage`() = runTest {
         val result = PipelineImageProcessor(DefaultPipeline.stages())
             .process(TestImages.solid(120), contextFor(planOverride = ::everythingPlan), runUntilStageId = StageIds.NOISE_REDUCTION)
-        assertEquals(listOf(StageIds.EXPOSURE, StageIds.WHITE_BALANCE, StageIds.TONE, StageIds.NOISE_REDUCTION), result.executedStages)
+        assertEquals(listOf(StageIds.EXPOSURE, StageIds.WHITE_BALANCE, StageIds.DEHAZE, StageIds.TONE, StageIds.NOISE_REDUCTION), result.executedStages)
     }
 
     @Test

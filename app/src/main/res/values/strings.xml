@@ -51,6 +51,13 @@
     <string name="editor_tab_looks">Looks</string>
     <string name="editor_tab_adjust">Adjust</string>
     <string name="editor_tab_crop">Crop</string>
+    <string name="editor_tab_color">Color</string>
+    <string name="editor_scene">Scene: %1$s (detected: %2$s)</string>
+    <string name="editor_scene_auto">Auto-detect</string>
+    <string name="mixer_hue">Hue</string>
+    <string name="mixer_saturation">Saturation</string>
+    <string name="mixer_luminance">Luminance</string>
+    <string name="mixer_reset">Reset all colours</string>
     <string name="crop_rotate_left">Rotate left</string>
     <string name="crop_rotate_right">Rotate right</string>
     <string name="crop_flip">Flip</string>

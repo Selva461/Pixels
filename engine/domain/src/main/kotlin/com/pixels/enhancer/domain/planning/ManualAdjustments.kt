@@ -10,25 +10,39 @@ import java.util.Locale
  */
 enum class ManualControl(
     val label: String,
+    val group: ControlGroup,
     val kind: AdjustmentKind,
     val min: Float,
     val max: Float,
     val scale: Float,
     val combinedRange: AmountRange,
+    /** Shown under the slider in the editor. */
+    val description: String,
 ) {
-    EXPOSURE("Exposure", AdjustmentKind.EXPOSURE, -1f, 1f, 1.2f, AmountRange(-1.5f, 1.5f)),
-    CONTRAST("Contrast", AdjustmentKind.CONTRAST, -1f, 1f, 0.15f, AmountRange(-0.2f, 0.25f)),
-    HIGHLIGHTS("Highlights", AdjustmentKind.HIGHLIGHTS, -1f, 1f, 0.2f, AmountRange(-0.3f, 0.2f)),
-    SHADOWS("Shadows", AdjustmentKind.SHADOWS, -1f, 1f, 0.2f, AmountRange(-0.2f, 0.3f)),
-    TEMPERATURE("Temperature", AdjustmentKind.TEMPERATURE, -1f, 1f, 1f, AmountRange(-1f, 1f)),
-    TINT("Tint", AdjustmentKind.TINT, -1f, 1f, 1f, AmountRange(-1f, 1f)),
-    VIBRANCE("Vibrance", AdjustmentKind.SATURATION, -1f, 1f, 0.35f, AmountRange(-0.4f, 0.4f)),
-    SATURATION("Saturation", AdjustmentKind.GLOBAL_SATURATION, -1f, 1f, 1f, AmountRange(-1f, 1f)),
-    CLARITY("Clarity", AdjustmentKind.DETAIL, -1f, 1f, 0.25f, AmountRange(-0.25f, 0.35f)),
-    SHARPNESS("Sharpness", AdjustmentKind.SHARPENING, 0f, 1f, 0.6f, AmountRange(0f, 0.8f)),
-    NOISE_REDUCTION("Noise reduction", AdjustmentKind.NOISE_REDUCTION, 0f, 1f, 1f, AmountRange(0f, 1f)),
-    VIGNETTE("Vignette", AdjustmentKind.VIGNETTE, -1f, 1f, 1f, AmountRange(-1f, 1f)),
-    GRAIN("Grain", AdjustmentKind.GRAIN, 0f, 1f, 1f, AmountRange(0f, 1f)),
+    EXPOSURE("Exposure", ControlGroup.LIGHT, AdjustmentKind.EXPOSURE, -1f, 1f, 1.2f, AmountRange(-1.5f, 1.5f), "Overall brightness, in camera stops"),
+    CONTRAST("Contrast", ControlGroup.LIGHT, AdjustmentKind.CONTRAST, -1f, 1f, 0.15f, AmountRange(-0.2f, 0.25f), "Separation between light and dark"),
+    HIGHLIGHTS("Highlights", ControlGroup.LIGHT, AdjustmentKind.HIGHLIGHTS, -1f, 1f, 0.2f, AmountRange(-0.3f, 0.2f), "Bright areas; lower to recover detail"),
+    SHADOWS("Shadows", ControlGroup.LIGHT, AdjustmentKind.SHADOWS, -1f, 1f, 0.2f, AmountRange(-0.2f, 0.3f), "Dark areas; raise to open them up"),
+    WHITES("Whites", ControlGroup.LIGHT, AdjustmentKind.WHITES, -1f, 1f, 0.15f, AmountRange(-0.15f, 0.15f), "The brightest tones and white point"),
+    BLACKS("Blacks", ControlGroup.LIGHT, AdjustmentKind.BLACKS, -1f, 1f, 0.15f, AmountRange(-0.15f, 0.15f), "The darkest tones and black point"),
+    MIDTONES("Midtones", ControlGroup.LIGHT, AdjustmentKind.MIDTONES, -1f, 1f, 0.15f, AmountRange(-0.15f, 0.15f), "Middle brightness without moving black or white"),
+    TEMPERATURE("Temperature", ControlGroup.COLOR, AdjustmentKind.TEMPERATURE, -1f, 1f, 1f, AmountRange(-1f, 1f), "Cooler (blue) to warmer (yellow)"),
+    TINT("Tint", ControlGroup.COLOR, AdjustmentKind.TINT, -1f, 1f, 1f, AmountRange(-1f, 1f), "Green to magenta"),
+    VIBRANCE("Vibrance", ControlGroup.COLOR, AdjustmentKind.SATURATION, -1f, 1f, 0.35f, AmountRange(-0.4f, 0.4f), "Boosts muted colours more than vivid ones and spares skin"),
+    SATURATION("Saturation", ControlGroup.COLOR, AdjustmentKind.GLOBAL_SATURATION, -1f, 1f, 1f, AmountRange(-1f, 1f), "All colours equally; −100 is black and white"),
+    CLARITY("Clarity", ControlGroup.DETAIL, AdjustmentKind.DETAIL, -1f, 1f, 0.25f, AmountRange(-0.25f, 0.35f), "Local contrast in midtones"),
+    DEHAZE("Dehaze", ControlGroup.DETAIL, AdjustmentKind.DEHAZE, -1f, 1f, 0.8f, AmountRange(-0.8f, 0.8f), "Removes (or adds) atmospheric haze"),
+    SHARPNESS("Sharpness", ControlGroup.DETAIL, AdjustmentKind.SHARPENING, 0f, 1f, 0.6f, AmountRange(0f, 0.8f), "Edge definition; cannot restore missing detail"),
+    NOISE_REDUCTION("Noise reduction", ControlGroup.DETAIL, AdjustmentKind.NOISE_REDUCTION, 0f, 1f, 1f, AmountRange(0f, 1f), "Smooths grain while keeping edges"),
+    VIGNETTE("Vignette", ControlGroup.EFFECTS, AdjustmentKind.VIGNETTE, -1f, 1f, 1f, AmountRange(-1f, 1f), "Darker or lighter corners"),
+    GRAIN("Grain", ControlGroup.EFFECTS, AdjustmentKind.GRAIN, 0f, 1f, 1f, AmountRange(0f, 1f), "Film-like texture"),
+}
+
+enum class ControlGroup(val label: String) {
+    LIGHT("Light"),
+    COLOR("Color"),
+    DETAIL("Detail"),
+    EFFECTS("Effects"),
 }
 
 /** Slider positions for every [ManualControl]; missing entries are 0 (no change). */

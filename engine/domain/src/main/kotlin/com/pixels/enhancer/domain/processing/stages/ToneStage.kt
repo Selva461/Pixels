@@ -7,14 +7,15 @@ import com.pixels.enhancer.domain.processing.ProcessingStage
 import com.pixels.enhancer.domain.processing.ops.ChromaOps
 import com.pixels.enhancer.domain.processing.ops.ToneCurve
 
-/** Highlight/shadow recovery and global contrast, applied as one luma curve. */
+/** Highlights, shadows, whites, blacks, midtones and contrast, applied as one luma curve. */
 class ToneStage : ProcessingStage {
     override val id = StageIds.TONE
     override val displayName = "Tone"
 
     override fun isEnabled(context: ProcessingContext): Boolean {
         val plan = context.plan
-        return plan.contrast.enabled || plan.highlights.enabled || plan.shadows.enabled
+        return plan.contrast.enabled || plan.highlights.enabled || plan.shadows.enabled ||
+            plan.whites.enabled || plan.blacks.enabled || plan.midtones.enabled
     }
 
     override suspend fun execute(input: PixelBuffer, context: ProcessingContext): PixelBuffer {
@@ -23,6 +24,9 @@ class ToneStage : ProcessingStage {
             contrast = context.effectiveAmount(id, plan.contrast),
             highlights = context.effectiveAmount(id, plan.highlights),
             shadows = context.effectiveAmount(id, plan.shadows),
+            whites = context.effectiveAmount(id, plan.whites),
+            blacks = context.effectiveAmount(id, plan.blacks),
+            midtones = context.effectiveAmount(id, plan.midtones),
         )
         val pixels = input.pixels
         for (index in pixels.indices) {

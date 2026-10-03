@@ -14,6 +14,8 @@ import com.pixels.enhancer.core.error.OperationResult
 import com.pixels.enhancer.core.error.runControlled
 import com.pixels.enhancer.data.decoder.BitmapConversions
 import com.pixels.enhancer.data.storage.ShareCache
+import com.pixels.enhancer.domain.analysis.Histogram
+import com.pixels.enhancer.domain.analysis.SceneType
 import com.pixels.enhancer.domain.debug.DebugReport
 import com.pixels.enhancer.data.storage.ThumbnailStore
 import com.pixels.enhancer.domain.editing.EditHistory
@@ -27,7 +29,10 @@ import com.pixels.enhancer.domain.geometry.Geometry
 import com.pixels.enhancer.domain.geometry.GeometryOps
 import com.pixels.enhancer.domain.image.PixelBuffer
 import com.pixels.enhancer.domain.model.OutputNaming
+import com.pixels.enhancer.domain.planning.ColorMixer
 import com.pixels.enhancer.domain.planning.EnhancementStrength
+import com.pixels.enhancer.domain.planning.HslShift
+import com.pixels.enhancer.domain.planning.HueBand
 import com.pixels.enhancer.domain.planning.Look
 import com.pixels.enhancer.domain.planning.ManualControl
 import com.pixels.enhancer.domain.planning.QualityPreset
@@ -226,6 +231,20 @@ class EditorViewModel(
         onEditFinished()
     }
 
+    /** Live while dragging a colour-mixer slider; [onEditFinished] records the undo step. */
+    fun onColorMixerChanged(band: HueBand, shift: HslShift) = edit(current.copy(colorMixer = current.colorMixer.with(band, shift)))
+
+    fun onResetColorMixer() {
+        edit(current.copy(colorMixer = ColorMixer.NONE))
+        onEditFinished()
+    }
+
+    /** null returns to the detected scene. */
+    fun onSceneSelected(scene: SceneType?) {
+        edit(current.copy(sceneOverride = scene))
+        onEditFinished()
+    }
+
     fun onLookSelected(look: Look) {
         edit(current.copy(manual = look.adjustments, lookId = look.id))
         onEditFinished()
@@ -405,6 +424,8 @@ class EditorViewModel(
         strength = current.strength,
         manual = current.manual,
         geometry = if (cropMode && target == RenderTarget.PREVIEW) current.geometry.withoutCrop() else current.geometry,
+        colorMixer = current.colorMixer,
+        sceneOverride = current.sceneOverride,
         target = target,
         debugEnabled = isDebugBuild,
         stageConfigs = disabledStages.associateWith { StageConfig(enabled = false) },
@@ -430,6 +451,7 @@ class EditorViewModel(
                 outcome = result.value
                 val enhanced = toImageBitmap(result.value.output)
                 val original = toImageBitmap(result.value.originalView)
+                val histogram = withContext(Dispatchers.Default) { Histogram.compute(result.value.output) }
                 _uiState.update { state ->
                     EditorUiState.Success(
                         original = original,
@@ -441,6 +463,8 @@ class EditorViewModel(
                         cropAspect = cropAspect,
                         exportDialog = (state as? EditorUiState.Success)?.exportDialog,
                         confirmLeave = (state as? EditorUiState.Success)?.confirmLeave ?: false,
+                        detectedScene = currentSession.scene.scene,
+                        histogram = histogram,
                         // A save in progress (or just finished) outlives preview renders; stale progress/errors do not.
                         activity = (state as? EditorUiState.Success)?.activity
                             ?.takeIf { it is EditorActivity.Saving || it is EditorActivity.Saved }

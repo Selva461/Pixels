@@ -43,7 +43,12 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.pixels.enhancer.R
+import com.pixels.enhancer.domain.analysis.SceneType
 import com.pixels.enhancer.domain.editing.EditState
+import com.pixels.enhancer.domain.planning.HslShift
+import com.pixels.enhancer.domain.planning.HueBand
+import com.pixels.enhancer.ui.adjust.AdjustPanel
+import com.pixels.enhancer.ui.adjust.ColorMixerPanel
 import com.pixels.enhancer.domain.export.ExportOptions
 import com.pixels.enhancer.domain.geometry.CropRect
 import com.pixels.enhancer.domain.geometry.Geometry
@@ -67,6 +72,7 @@ private enum class EditorTab(val titleRes: Int) {
     AUTO(R.string.editor_tab_auto),
     LOOKS(R.string.editor_tab_looks),
     ADJUST(R.string.editor_tab_adjust),
+    COLOR(R.string.editor_tab_color),
     CROP(R.string.editor_tab_crop),
 }
 
@@ -76,6 +82,13 @@ class ExportActions(
     val onConfirm: () -> Unit,
     val onDismiss: () -> Unit,
     val onCancel: () -> Unit,
+)
+
+/** Callbacks for scene choice and the colour mixer. */
+class ColorActions(
+    val onShiftChanged: (HueBand, HslShift) -> Unit,
+    val onResetAll: () -> Unit,
+    val onSceneSelected: (SceneType?) -> Unit,
 )
 
 /** Callbacks for the Crop tab, grouped to keep EditorScreen's signature readable. */
@@ -111,6 +124,7 @@ fun EditorScreen(
     onViewSaved: (Uri) -> Unit,
     crop: CropActions,
     export: ExportActions,
+    color: ColorActions,
     onOpenDebug: (() -> Unit)?,
     modifier: Modifier = Modifier,
 ) {
@@ -168,12 +182,13 @@ fun EditorScreen(
             }
             Box(Modifier.fillMaxWidth().height(PANEL_HEIGHT)) {
                 when (tab) {
-                    EditorTab.AUTO -> AutoPanel(state.edit.strength, onStrengthChanged, onEditFinished, onShowOriginalEdit, onResetAll = {
+                    EditorTab.AUTO -> AutoPanel(state, color.onSceneSelected, onStrengthChanged, onEditFinished, onShowOriginalEdit, onResetAll = {
                         viewResetKey++
                         onResetAll()
                     })
                     EditorTab.LOOKS -> LooksPanel(state.edit.lookId, onLookSelected)
-                    EditorTab.ADJUST -> AdjustPanel(state.edit, onControlChanged, onEditFinished, onResetControl)
+                    EditorTab.ADJUST -> AdjustPanel(state.edit, state.histogram, onControlChanged, onEditFinished, onResetControl)
+                    EditorTab.COLOR -> ColorMixerPanel(state.edit, color.onShiftChanged, onEditFinished, color.onResetAll)
                     EditorTab.CROP -> CropPanel(state.edit, state.cropAspect, crop, onEditFinished)
                 }
             }
@@ -225,18 +240,31 @@ private fun ResultSnackbar(activity: EditorActivity, hostState: SnackbarHostStat
 
 @Composable
 private fun AutoPanel(
-    strength: Float,
+    state: EditorUiState.Success,
+    onSceneSelected: (SceneType?) -> Unit,
     onStrengthChanged: (Float) -> Unit,
     onEditFinished: () -> Unit,
     onShowOriginalEdit: () -> Unit,
     onResetAll: () -> Unit,
 ) {
-    Column(Modifier.fillMaxSize().padding(16.dp)) {
+    val strength = state.edit.strength
+    val override = state.edit.sceneOverride
+    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp)) {
         Text(stringResource(R.string.editor_strength, (strength * PERCENT).roundToInt()), style = MaterialTheme.typography.titleSmall)
         Slider(value = strength, onValueChange = onStrengthChanged, onValueChangeFinished = onEditFinished)
         Text(stringResource(R.string.editor_auto_hint), style = MaterialTheme.typography.bodySmall)
         Text(stringResource(R.string.editor_hold_hint), style = MaterialTheme.typography.bodySmall)
-        Spacer(Modifier.weight(1f))
+        Text(
+            stringResource(R.string.editor_scene, (override ?: state.detectedScene).label, state.detectedScene.label),
+            style = MaterialTheme.typography.labelLarge,
+            modifier = Modifier.padding(top = 8.dp),
+        )
+        Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            FilterChip(override == null, { onSceneSelected(null) }, { Text(stringResource(R.string.editor_scene_auto)) })
+            SceneType.entries.forEach { scene ->
+                FilterChip(override == scene, { onSceneSelected(scene) }, { Text(scene.label) })
+            }
+        }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             TextButton(onClick = onResetAll) { Text(stringResource(R.string.editor_reset_all)) }
             TextButton(onClick = onShowOriginalEdit) { Text(stringResource(R.string.editor_original_state)) }
@@ -252,31 +280,6 @@ private fun LooksPanel(selectedLookId: String, onLookSelected: (Look) -> Unit) {
     ) {
         Look.ALL.forEach { look ->
             FilterChip(selected = look.id == selectedLookId, onClick = { onLookSelected(look) }, label = { Text(look.name) })
-        }
-    }
-}
-
-@Composable
-private fun AdjustPanel(
-    edit: EditState,
-    onControlChanged: (ManualControl, Float) -> Unit,
-    onEditFinished: () -> Unit,
-    onResetControl: (ManualControl) -> Unit,
-) {
-    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 8.dp)) {
-        Text(stringResource(R.string.editor_reset_control_hint), style = MaterialTheme.typography.bodySmall)
-        ManualControl.entries.forEach { control ->
-            val value = edit.manual[control]
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(control.label, style = MaterialTheme.typography.labelLarge, modifier = Modifier.weight(1f))
-                TextButton(onClick = { onResetControl(control) }) { Text(formatValue(value)) }
-            }
-            Slider(
-                value = value,
-                onValueChange = { onControlChanged(control, it) },
-                onValueChangeFinished = onEditFinished,
-                valueRange = control.min..control.max,
-            )
         }
     }
 }
@@ -312,10 +315,6 @@ private fun CropPanel(edit: EditState, aspect: CropAspect, crop: CropActions, on
     }
 }
 
-private fun formatValue(value: Float): String {
-    val percent = (value * PERCENT).roundToInt()
-    return if (percent > 0) "+$percent" else percent.toString()
-}
 
 @Composable
 private fun ModeSelector(

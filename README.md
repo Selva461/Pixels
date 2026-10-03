@@ -32,4 +32,6 @@ The app consumes the engine as an included build, so the dependency direction is
 The harness writes `<name>_enhanced.png`, `<name>_compare.png` (before | after) and `<name>_report.txt`
 (the same report as the in-app debug screen).
 
-See [HANDOFF.md](HANDOFF.md) for implementation state, known issues and the next action.
+Documentation: [REQUIREMENTS.md](REQUIREMENTS.md) (product spec) · [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md)
+(status matrix) · [ARCHITECTURE.md](ARCHITECTURE.md) · [TESTING.md](TESTING.md) · [HANDOFF.md](HANDOFF.md)
+(current state, known issues, next action).

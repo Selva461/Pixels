@@ -44,6 +44,9 @@ data class NaturalLimits(
     val lowConfidenceWhiteBalanceFactor: Float = 0.5f,
     /** Very saturated scenes bias the grey-edge estimate, so a detected cast is trusted less. */
     val vividSceneWhiteBalanceFactor: Float = 0.5f,
+    /** Warm light in a dim scene (candlelight, dusk) is usually intended; only part of it is neutralised. */
+    val warmDimSceneWhiteBalanceFactor: Float = 0.4f,
+    val warmDimSceneMaxLuma: Float = 0.35f,
     val minChannelGain: Float = 0.80f,
     val maxChannelGain: Float = 1.25f,
 
@@ -83,6 +86,10 @@ data class NaturalLimits(
             AdjustmentKind.SHADOWS to AmountRange(0f, 0.15f),
             AdjustmentKind.WHITE_BALANCE to AmountRange(0f, 1f),
             AdjustmentKind.TEMPERATURE to AmountRange(0f, 0f),
+            AdjustmentKind.WHITES to AmountRange(0f, 0f),
+            AdjustmentKind.BLACKS to AmountRange(0f, 0f),
+            AdjustmentKind.MIDTONES to AmountRange(0f, 0f),
+            AdjustmentKind.DEHAZE to AmountRange(0f, 0f),
             AdjustmentKind.TINT to AmountRange(0f, 0f),
             AdjustmentKind.GLOBAL_SATURATION to AmountRange(0f, 0f),
             AdjustmentKind.VIGNETTE to AmountRange(0f, 0f),

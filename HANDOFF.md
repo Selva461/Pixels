@@ -1,8 +1,51 @@
 # HANDOFF
 
-_Last updated: 2026-10-01 · algorithm version 1.0_
+_Last updated: 2026-10-03 · algorithm version 1.1_
+
+## Current status (2026-10-03)
+
+- Engine: `./gradlew -p engine build` — 149 tests pass, no warnings.
+- Last green CI (APK + 3 device tests): commit 91a359a (crop/rotate).
+- **CI has been blocked since commit 39fe15c** by a GitHub billing error on the repository owner's
+  account ("recent account payments have failed or your spending limit needs to be increased").
+  Therefore everything in `app/` added since 91a359a — export dialog, projects/Home, redo,
+  press-and-hold, leave prompt, grouped Adjust panel, Color tab, scene chips, and the 3 new device
+  tests — has **not been compiled or run**. Expect possible compile fixes on the next CI run.
+
+## Known issues
+
+- See IMPLEMENTATION_PLAN.md for unimplemented requirements (curves, masks, lens/perspective,
+  portrait face tools, eyedropper, HEIC, colour profiles, Kelvin temperature, settings/help).
+- Scene classifier and all thresholds are tuned on synthetic images only.
+- Preview renders on every slider move at 1280 px; not yet benchmarked on a phone.
+
+## Next single action
+
+Restore GitHub Actions (fix billing or make the repository public), let CI build commit HEAD, fix
+any compile errors in `app/`, and confirm the 6 device tests pass. Then review real photos with the
+debug report to calibrate the scene classifier.
 
 ## What changed
+
+### 2026-10-03 — new requirements (REQUIREMENTS.md): export, projects, controls, scenes
+
+- **Export** (`EnhanceImageUseCase.export`, `ExportOptions`): JPEG/PNG, quality, Full/Large/Medium/
+  Small, metadata keep/remove-location/remove-all. Full size re-decodes the source (≤24 MP) and
+  renders in 1024 px tiles with stage-declared overlap. `MediaStoreImageSaver` now writes hidden,
+  verifies, copies EXIF, verifies, publishes and verifies the published entry; deletes on any
+  failure or cancellation. New `INSUFFICIENT_STORAGE` / `PERMISSION_DENIED` errors. Export dialog
+  shows exact output dimensions; progress with Cancel.
+- **Projects** (`editing/`, `project/`): `EditState`, bounded `EditHistory`, versioned JSON
+  `ProjectCodec` (kotlinx.serialization, migration hook), atomic `FileProjectStore`,
+  `ProjectManager`. App autosaves every commit, lists Recent edits with thumbnails, resumes with
+  history, persists the picker grant, prompts before leaving un-exported edits. Redo,
+  "Original (no edits)", press-and-hold original.
+- **Controls:** Whites, Blacks, Midtones (tone curve), Dehaze stage, HSL colour mixer stage
+  (8 bands), histogram; Adjust tab grouped with descriptions; new Color tab.
+- **Scene-aware Auto Enhance:** `SceneClassifier` (11 scenes, advisory, overridable, persisted),
+  per-scene `QualityPreset.forScene` limits, warm-dim-scene WB protection, and a planner guard that
+  shrinks contrast boosts that would clip the 5th/95th percentiles (found by a failing test).
+- Docs: REQUIREMENTS.md, IMPLEMENTATION_PLAN.md (status matrix), ARCHITECTURE.md, TESTING.md.
 
 ### 2026-10-02 — crop and rotate
 
@@ -67,46 +110,3 @@ Initial implementation of the MVP from `Natural_Image_Enhancer_Requirements.md`.
   Home, Editor (before/after with drag divider, horizontal/vertical split, pinch-zoom/pan,
   double-tap zoom, strength slider, undo, reset, save, share), Debug (developer builds only:
   report, stage toggles, stop-after-stage, export report).
-
-## What works (verified)
-
-- `./gradlew -p engine build` — engine compiles with no warnings, **89 tests pass** (unit tests for
-  analysis, planning cases A–F, strength scaling, stage order, every stage, validation, error mapping,
-  use-case flow and failure paths, plus 9 golden scenarios).
-- Visual check through the harness on synthetic scenes: underexposed, overexposed, colour cast and
-  hazy outputs look like natural corrections; the clean scene is left untouched.
-- Desktop JVM timing at 2560×1920 (noisy low-light scene): decode 202, analyse 219, tone 141,
-  denoise 964, detail 270, sharpen 384, validation 58 ms — about 2.3 s total.
-
-## What was NOT verified
-
-- **The Android app compiles and packages** in GitHub Actions (`.github/workflows/android.yml`,
-  debug APK uploaded as the `pixels-debug-apk` artifact), but it has **not been run on a device**.
-  The local build container blocks `dl.google.com`, so app builds happen in CI only.
-- No real photos have been processed. All tuning used synthetic scenes (`GoldenScenario`).
-
-## Known issues / limitations
-
-- Processing and export happen at the working resolution (long edge 2560 px), not full sensor
-  resolution. Saving full resolution needs tiled processing.
-- Denoise allocates ~6 float planes (~120 MB at 2560×1920). `largeHeap` is enabled and OOM maps to a
-  controlled `OUT_OF_MEMORY` error, but low-memory devices may hit it.
-- Every slider release re-runs the full pipeline at working resolution (likely 2–5 s on a phone).
-  A low-resolution preview pass would make the slider feel live.
-- Chroma denoise is a plain blur and can bleed colour across strong colour edges.
-- White balance uses grey-edge on low-chroma pixels. On very colourful scenes it is less reliable
-  (the planner halves the correction there). It has only been tuned on synthetic scenes.
-- Sharpening on soft images is deliberately mild (radius 1, overshoot-clamped).
-- No JPEG-artifact (deblocking) stage yet; the `09_compressed` golden scenario is not implemented.
-- EXIF metadata (date, camera) is not copied to the saved file; only orientation is applied to pixels.
-- The harness uses ImageIO, which ignores EXIF orientation.
-- `ProcessingStage.execute` takes `PixelBuffer` rather than the abstract `ImageBuffer`, so a
-  GPU-backed buffer would need its own stage implementations.
-- `ImageAnalyzer.analyze` takes the decoded `PixelBuffer` rather than `ImageSource` (deliberate
-  deviation from the spec sketch: decoding belongs to the repository, not the analyzer).
-
-## Next single action
-
-Install the CI debug APK on a device, run it with 5–10 real photos and compare
-the debug report's analysis scores against the synthetic calibration in `AnalysisThresholds` /
-`NaturalLimits`.
