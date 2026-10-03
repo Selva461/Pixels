@@ -14,27 +14,11 @@
     <string name="about_version">Version %1$s · enhancement engine %2$s</string>
     <string name="about_privacy_title">Privacy policy</string>
     <string name="about_privacy_updated">Effective 3 October 2026</string>
-    <string name="about_privacy_body">Pixels edits photos on your phone. The app has no internet permission, so it cannot send your photos, edits or any other data anywhere.
-
-What the app reads: only the photos you choose in the system photo picker. It reads the photo's pixels and its orientation tag. When you export with "Keep all" or "Remove location" metadata, it also reads the original's camera details (date, camera model, lens and exposure settings), and with "Keep all" its location, to copy them into the new file.
-
-What the app stores: exported photos go to Pictures/Pixels in your gallery. Projects (your slider settings, crop and edit history, plus a reference to the original photo and a small preview image) are kept in the app's private storage. A temporary copy is made in the app's cache only when you use Share. Your last enhancement strength and export choices are remembered.
-
-What the app does not do: no accounts, no analytics, no advertising, no tracking, no crash reporting, no cloud processing and no sharing with third parties.
-
-Deleting your data: remove a project from Recent edits to delete its settings and preview. Exported photos are ordinary gallery files you can delete there. Clearing the app's storage or uninstalling removes all projects. Your original photos are never modified or deleted by the app.
-
-If a future version adds any online feature, it will be opt-in and explained before anything leaves your device.</string>
+    <string name="about_privacy_body">Pixels edits photos on your phone. The app has no internet permission, so it cannot send your photos, edits or any other data anywhere.\n\nWhat the app reads: only the photos you choose in the system photo picker. It reads the photo\'s pixels and its orientation tag. When you export with \"Keep all\" or \"Remove location\" metadata, it also reads the original\'s camera details (date, camera model, lens and exposure settings), and with \"Keep all\" its location, to copy them into the new file.\n\nWhat the app stores: exported photos go to Pictures/Pixels in your gallery. Projects (your slider settings, crop and edit history, plus a reference to the original photo and a small preview image) are kept in the app\'s private storage. A temporary copy is made in the app\'s cache only when you use Share. Your last enhancement strength and export choices are remembered.\n\nWhat the app does not do: no accounts, no analytics, no advertising, no tracking, no crash reporting, no cloud processing and no sharing with third parties.\n\nDeleting your data: remove a project from Recent edits to delete its settings and preview. Exported photos are ordinary gallery files you can delete there. Clearing the app\'s storage or uninstalling removes all projects. Your original photos are never modified or deleted by the app.\n\nIf a future version adds any online feature, it will be opt-in and explained before anything leaves your device.</string>
     <string name="about_terms_title">Terms of use</string>
-    <string name="about_terms_body">Pixels is provided free of charge, as is, without warranty of any kind. Automatic corrections are suggestions; review results before you rely on them.
-
-You are responsible for having the right to edit and share the photos you open. Pixels never overwrites your originals, but keep your own backups of photos that matter.
-
-The app adjusts the pixels that are already in a photo. It does not generate, add or remove people, objects or scenery, and it cannot recover detail the camera did not capture.
-
-To the extent the law allows, the authors are not liable for any loss or damage arising from use of the app.</string>
+    <string name="about_terms_body">Pixels is provided free of charge, as is, without warranty of any kind. Automatic corrections are suggestions; review results before you rely on them.\n\nYou are responsible for having the right to edit and share the photos you open. Pixels never overwrites your originals, but keep your own backups of photos that matter.\n\nThe app adjusts the pixels that are already in a photo. It does not generate, add or remove people, objects or scenery, and it cannot recover detail the camera did not capture.\n\nTo the extent the law allows, the authors are not liable for any loss or damage arising from use of the app.</string>
     <string name="about_licences_title">Open-source software</string>
-    <string name="about_licences_body">Pixels is built with Kotlin, kotlinx.coroutines and kotlinx.serialization (JetBrains) and Android Jetpack libraries including Compose, Activity, Lifecycle, Core and ExifInterface (Google), all under the Apache License 2.0. Image processing is Pixels' own code.</string>
+    <string name="about_licences_body">Pixels is built with Kotlin, kotlinx.coroutines and kotlinx.serialization (JetBrains) and Android Jetpack libraries including Compose, Activity, Lifecycle, Core and ExifInterface (Google), all under the Apache License 2.0. Image processing is Pixels\' own code.</string>
     <string name="editor_redo">Redo</string>
     <string name="editor_original_state">Original (no edits)</string>
     <string name="editor_hold_hint">Press and hold the photo to see the original.</string>
