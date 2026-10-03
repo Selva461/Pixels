@@ -27,6 +27,7 @@ import com.pixels.enhancer.PixelsApplication
 import com.pixels.enhancer.R
 import com.pixels.enhancer.ui.debug.DebugScreen
 import com.pixels.enhancer.ui.editor.CropActions
+import com.pixels.enhancer.ui.editor.ExportActions
 import com.pixels.enhancer.ui.editor.EditorEvent
 import com.pixels.enhancer.ui.editor.EditorScreen
 import com.pixels.enhancer.ui.editor.EditorUiState
@@ -113,6 +114,12 @@ private fun PixelsApp(viewModel: EditorViewModel, onPickImage: () -> Unit, modif
                         onReset = viewModel::onResetGeometry,
                         onCropModeChanged = viewModel::onCropModeChanged,
                         ratioFor = viewModel::aspectRatioFor,
+                    ),
+                    export = ExportActions(
+                        onOptionsChanged = viewModel::onExportOptionsChanged,
+                        onConfirm = viewModel::onExportConfirmed,
+                        onDismiss = viewModel::onExportDismissed,
+                        onCancel = viewModel::onCancelExport,
                     ),
                     onOpenDebug = if (debug != null) ({ showDebug = true }) else null,
                     modifier = modifier,

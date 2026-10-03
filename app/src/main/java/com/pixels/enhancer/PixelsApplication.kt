@@ -47,7 +47,7 @@ class AppContainer(context: Context) {
         planner = NaturalEnhancementPlanner(),
         processor = PipelineImageProcessor(DefaultPipeline.stages(), logger = logger),
         validator = NaturalOutputValidator(),
-        saver = MediaStoreImageSaver(appContext.contentResolver),
+        saver = MediaStoreImageSaver(appContext.contentResolver, logger),
         logger = logger,
     )
 }

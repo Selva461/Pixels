@@ -3,6 +3,7 @@ package com.pixels.enhancer.domain.processing.stages
 import com.pixels.enhancer.domain.image.BoxBlur
 import com.pixels.enhancer.domain.image.LumaPlane
 import com.pixels.enhancer.domain.image.PixelBuffer
+import com.pixels.enhancer.domain.processing.ImageFrame
 import com.pixels.enhancer.domain.processing.ProcessingContext
 import com.pixels.enhancer.domain.processing.ProcessingStage
 import kotlin.math.max
@@ -16,12 +17,17 @@ class DetailStage : ProcessingStage {
 
     override fun isEnabled(context: ProcessingContext) = context.plan.detail.enabled
 
+    /** Two box passes of the size-relative radius. */
+    override fun margin(context: ProcessingContext, frame: ImageFrame) = 2 * radiusFor(frame.fullWidth, frame.fullHeight)
+
     override suspend fun execute(input: PixelBuffer, context: ProcessingContext): PixelBuffer {
         val amount = context.effectiveAmount(id, context.plan.detail) * DETAIL_GAIN
         val luma = LumaPlane.extract(input)
         val base = FloatArray(input.pixelCount)
         val scratch = FloatArray(input.pixelCount)
-        val radius = radiusFor(input)
+        val frame = context.frameOf(input)
+        // The radius follows the full image, not the tile, so tiled and whole-image output match.
+        val radius = radiusFor(frame.fullWidth, frame.fullHeight)
         BoxBlur.blur(luma, base, input.width, input.height, radius, scratch)
         BoxBlur.blur(base, base, input.width, input.height, radius, scratch)
 
@@ -46,7 +52,7 @@ class DetailStage : ProcessingStage {
         private const val RADIUS_FRACTION_OF_SHORT_EDGE = 0.008f
         private const val MIN_RADIUS = 4
 
-        fun radiusFor(image: PixelBuffer): Int =
-            max(MIN_RADIUS, (min(image.width, image.height) * RADIUS_FRACTION_OF_SHORT_EDGE).roundToInt())
+        fun radiusFor(width: Int, height: Int): Int =
+            max(MIN_RADIUS, (min(width, height) * RADIUS_FRACTION_OF_SHORT_EDGE).roundToInt())
     }
 }

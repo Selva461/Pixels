@@ -42,6 +42,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.pixels.enhancer.R
+import com.pixels.enhancer.domain.export.ExportOptions
 import com.pixels.enhancer.domain.geometry.CropRect
 import com.pixels.enhancer.domain.geometry.Geometry
 import com.pixels.enhancer.domain.planning.Look
@@ -51,6 +52,7 @@ import com.pixels.enhancer.ui.compare.CompareMode
 import com.pixels.enhancer.ui.compare.CompareView
 import com.pixels.enhancer.ui.compare.SplitOrientation
 import com.pixels.enhancer.ui.crop.CropEditor
+import com.pixels.enhancer.ui.export.ExportDialog
 import java.util.Locale
 import kotlin.math.roundToInt
 
@@ -65,6 +67,14 @@ private enum class EditorTab(val titleRes: Int) {
     ADJUST(R.string.editor_tab_adjust),
     CROP(R.string.editor_tab_crop),
 }
+
+/** Callbacks for the export dialog and running export. */
+class ExportActions(
+    val onOptionsChanged: (ExportOptions) -> Unit,
+    val onConfirm: () -> Unit,
+    val onDismiss: () -> Unit,
+    val onCancel: () -> Unit,
+)
 
 /** Callbacks for the Crop tab, grouped to keep EditorScreen's signature readable. */
 class CropActions(
@@ -94,6 +104,7 @@ fun EditorScreen(
     onShare: () -> Unit,
     onViewSaved: (Uri) -> Unit,
     crop: CropActions,
+    export: ExportActions,
     onOpenDebug: (() -> Unit)?,
     modifier: Modifier = Modifier,
 ) {
@@ -105,6 +116,9 @@ fun EditorScreen(
     BackHandler(onBack = onClose)
     ResultSnackbar(state.activity, snackbarHostState, onViewSaved)
     LaunchedEffect(tab) { crop.onCropModeChanged(tab == EditorTab.CROP) }
+    state.exportDialog?.let { dialog ->
+        ExportDialog(dialog, export.onOptionsChanged, export.onConfirm, export.onDismiss)
+    }
 
     Box(modifier.fillMaxSize()) {
         Column(Modifier.fillMaxSize()) {
@@ -130,7 +144,7 @@ fun EditorScreen(
                     modifier = Modifier.weight(1f).fillMaxWidth(),
                 )
             }
-            ActivityLine(state.activity)
+            ActivityLine(state.activity, export.onCancel)
             if (tab != EditorTab.CROP) ModeSelector(mode, split, onModeChange = { mode = it }, onSplitChange = { split = it })
             TabRow(selectedTabIndex = tab.ordinal) {
                 EditorTab.entries.forEach { entry ->
@@ -180,7 +194,7 @@ private fun ResultSnackbar(activity: EditorActivity, hostState: SnackbarHostStat
         when (activity) {
             is EditorActivity.Saved -> {
                 val result = hostState.showSnackbar(
-                    message = context.getString(R.string.editor_saved, activity.displayName),
+                    message = context.getString(R.string.editor_saved, activity.displayName, activity.width, activity.height),
                     actionLabel = context.getString(R.string.editor_view),
                     duration = SnackbarDuration.Long,
                 )
@@ -306,7 +320,7 @@ private fun ModeSelector(
 }
 
 @Composable
-private fun ActivityLine(activity: EditorActivity) {
+private fun ActivityLine(activity: EditorActivity, onCancelExport: () -> Unit) {
     val modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp)
     when (activity) {
         is EditorActivity.Reprocessing -> Column(modifier) {
@@ -315,7 +329,10 @@ private fun ActivityLine(activity: EditorActivity) {
         }
         is EditorActivity.Saving -> Column(modifier) {
             LinearProgressIndicator(progress = { activity.progress }, modifier = Modifier.fillMaxWidth())
-            Text(stringResource(R.string.editor_saving), style = MaterialTheme.typography.bodySmall)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(stringResource(R.string.editor_saving), style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f))
+                TextButton(onClick = onCancelExport) { Text(stringResource(R.string.editor_cancel_export)) }
+            }
         }
         else -> Spacer(Modifier.height(4.dp))
     }

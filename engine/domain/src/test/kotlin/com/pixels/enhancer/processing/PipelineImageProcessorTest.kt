@@ -137,3 +137,29 @@ class PipelineImageProcessorTest {
         assertEquals(-1, result.image.pixels[0])
     }
 }
+
+class TiledProcessingTest {
+    @Test
+    fun `tiled output matches whole-image output with every stage enabled`() = runTest {
+        val image = com.pixels.enhancer.testing.GoldenScenario.LOW_LIGHT_NOISE.render(300, 220)
+        val context = contextFor(planOverride = ::everythingPlan)
+        val whole = PipelineImageProcessor(DefaultPipeline.stages()).process(image, context)
+        val tiled = PipelineImageProcessor(DefaultPipeline.stages(), tilePixelThreshold = 1, tileSize = 64).process(image, context)
+        assertEquals(whole.executedStages, tiled.executedStages)
+        var maxDifference = 0
+        var totalDifference = 0L
+        for (index in whole.image.pixels.indices) {
+            val a = whole.image.pixels[index]
+            val b = tiled.image.pixels[index]
+            for (shift in listOf(0, 8, 16)) {
+                val difference = kotlin.math.abs(((a shr shift) and 0xFF) - ((b shr shift) and 0xFF))
+                maxDifference = maxOf(maxDifference, difference)
+                totalDifference += difference
+            }
+        }
+        // Running box-blur sums accumulate float rounding differently over shorter tile rows, so a
+        // couple of code values may differ; a real seam would show as large, systematic differences.
+        assertTrue(maxDifference <= 2, "tile seams visible: max channel difference $maxDifference")
+        assertTrue(totalDifference.toDouble() / (whole.image.pixelCount * 3) < 0.05, "mean difference too high")
+    }
+}

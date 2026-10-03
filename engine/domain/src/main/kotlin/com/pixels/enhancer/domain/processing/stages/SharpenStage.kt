@@ -4,6 +4,7 @@ import com.pixels.enhancer.domain.image.BoxBlur
 import com.pixels.enhancer.domain.image.LumaPlane
 import com.pixels.enhancer.domain.image.PixelBuffer
 import com.pixels.enhancer.domain.image.smoothstep
+import com.pixels.enhancer.domain.processing.ImageFrame
 import com.pixels.enhancer.domain.processing.ProcessingContext
 import com.pixels.enhancer.domain.processing.ProcessingStage
 import com.pixels.enhancer.domain.processing.ops.SkinToneDetector
@@ -21,6 +22,9 @@ class SharpenStage : ProcessingStage {
     override val displayName = "Sharpen"
 
     override fun isEnabled(context: ProcessingContext) = context.plan.sharpening.enabled
+
+    /** Box blur radius plus the 3×3 overshoot clamp. */
+    override fun margin(context: ProcessingContext, frame: ImageFrame) = RADIUS + 1
 
     override suspend fun execute(input: PixelBuffer, context: ProcessingContext): PixelBuffer {
         val amount = context.effectiveAmount(id, context.plan.sharpening) * SHARPEN_GAIN

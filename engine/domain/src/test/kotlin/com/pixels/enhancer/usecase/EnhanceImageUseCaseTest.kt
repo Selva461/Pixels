@@ -70,7 +70,7 @@ class EnhanceImageUseCaseTest {
             listOf("SOURCE_OPENED", "ANALYSIS_COMPLETE", "PROCESS_START", "PLAN_CREATED"),
             logger.names().take(4),
         )
-        assertTrue(logger.names().containsAll(listOf("STAGE_COMPLETE", "VALIDATION_COMPLETE", "PROCESS_COMPLETE", "SAVE_COMPLETE")))
+        assertTrue(logger.names().containsAll(listOf("STAGE_COMPLETE", "VALIDATION_COMPLETE", "PROCESS_COMPLETE", "EXPORT_COMPLETE")))
         assertTrue(logger.lines.all { !it.contains("dark.jpg") }, "file names must not be logged")
         val timingNames = outcome.timings.entries.map { it.name }
         assertTrue(timingNames.containsAll(listOf("Decode", "Analyze", "Plan", "Validation")))

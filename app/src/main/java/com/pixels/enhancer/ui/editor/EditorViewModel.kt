@@ -15,6 +15,7 @@ import com.pixels.enhancer.core.error.runControlled
 import com.pixels.enhancer.data.decoder.BitmapConversions
 import com.pixels.enhancer.data.storage.ShareCache
 import com.pixels.enhancer.domain.debug.DebugReport
+import com.pixels.enhancer.domain.export.ExportOptions
 import com.pixels.enhancer.domain.geometry.CropMath
 import com.pixels.enhancer.domain.geometry.CropRect
 import com.pixels.enhancer.domain.geometry.Geometry
@@ -86,6 +87,7 @@ class EditorViewModel(
     private var disabledStages: Set<String> = emptySet()
     private var runUntilStageId: String? = null
     private var openJob: Job? = null
+    private var exportJob: Job? = null
 
     /** Every edit becomes a preview request; newer requests cancel older renders. */
     private val previewRequests = MutableStateFlow<EnhanceRequest?>(null)
@@ -205,16 +207,49 @@ class EditorViewModel(
         requestPreview()
     }
 
+    /** Save opens the export dialog with the last-used options. */
     fun onSave() {
-        val currentSession = session ?: return
         val state = _uiState.value as? EditorUiState.Success ?: return
         if (state.activity is EditorActivity.Saving) return
-        setActivity(EditorActivity.Saving(0f))
-        viewModelScope.launch {
-            when (val saved = enhanceImage.save(currentSession, fullRequest(), progressListener { setActivity(EditorActivity.Saving(it)) })) {
-                is OperationResult.Failure -> setActivity(EditorActivity.Failed(saved.code))
-                is OperationResult.Success -> setActivity(EditorActivity.Saved(saved.value.displayName, Uri.parse(saved.value.id)))
+        showExportDialog(settings.export)
+    }
+
+    fun onExportOptionsChanged(options: ExportOptions) = showExportDialog(options)
+
+    fun onExportDismissed() {
+        _uiState.update { state -> if (state is EditorUiState.Success) state.copy(exportDialog = null) else state }
+    }
+
+    fun onExportConfirmed() {
+        val currentSession = session ?: return
+        val options = (_uiState.value as? EditorUiState.Success)?.exportDialog?.options ?: return
+        settings = settings.copy(export = options)
+        settingsRepository.save(settings)
+        _uiState.update { state -> if (state is EditorUiState.Success) state.copy(exportDialog = null, activity = EditorActivity.Saving(0f)) else state }
+        exportJob = viewModelScope.launch {
+            val listener = progressListener { setActivity(EditorActivity.Saving(it)) }
+            when (val exported = enhanceImage.export(currentSession, fullRequest(), options, listener)) {
+                is OperationResult.Failure -> setActivity(EditorActivity.Failed(exported.code))
+                is OperationResult.Success -> {
+                    val result = exported.value
+                    setActivity(EditorActivity.Saved(result.saved.displayName, Uri.parse(result.saved.id), result.width, result.height))
+                }
             }
+        }
+    }
+
+    /** The saver deletes any partial file when cancelled, so nothing half-written reaches the gallery. */
+    fun onCancelExport() {
+        exportJob?.cancel()
+        exportJob = null
+        setActivity(EditorActivity.None)
+    }
+
+    private fun showExportDialog(options: ExportOptions) {
+        val currentSession = session ?: return
+        val (width, height) = enhanceImage.estimateExportSize(currentSession, fullRequest(), options)
+        _uiState.update { state ->
+            if (state is EditorUiState.Success) state.copy(exportDialog = ExportDialogState(options, width, height)) else state
         }
     }
 
@@ -225,8 +260,8 @@ class EditorViewModel(
     fun onShare() {
         val currentSession = session ?: return
         setActivity(EditorActivity.Saving(0f))
-        viewModelScope.launch {
-            val rendered = when (val result = enhanceImage.render(currentSession, fullRequest())) {
+        exportJob = viewModelScope.launch {
+            val rendered = when (val result = enhanceImage.renderForShare(currentSession, fullRequest())) {
                 is OperationResult.Failure -> return@launch setActivity(EditorActivity.Failed(result.code))
                 is OperationResult.Success -> result.value
             }
@@ -258,6 +293,7 @@ class EditorViewModel(
 
     fun onClose() {
         openJob?.cancel()
+        exportJob?.cancel()
         clearSession()
         _uiState.value = EditorUiState.Idle
     }
@@ -317,6 +353,7 @@ class EditorViewModel(
                         canUndo = history.isNotEmpty(),
                         cropMode = request.geometry.crop.isFull && cropMode,
                         cropAspect = cropAspect,
+                        exportDialog = (state as? EditorUiState.Success)?.exportDialog,
                         // A save in progress (or just finished) outlives preview renders; stale progress/errors do not.
                         activity = (state as? EditorUiState.Success)?.activity
                             ?.takeIf { it is EditorActivity.Saving || it is EditorActivity.Saved }

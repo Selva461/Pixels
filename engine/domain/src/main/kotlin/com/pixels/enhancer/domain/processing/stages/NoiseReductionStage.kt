@@ -2,6 +2,7 @@ package com.pixels.enhancer.domain.processing.stages
 
 import com.pixels.enhancer.domain.image.BoxBlur
 import com.pixels.enhancer.domain.image.PixelBuffer
+import com.pixels.enhancer.domain.processing.ImageFrame
 import com.pixels.enhancer.domain.processing.ProcessingContext
 import com.pixels.enhancer.domain.processing.ProcessingStage
 import com.pixels.enhancer.domain.processing.ops.GuidedFilter
@@ -20,6 +21,9 @@ class NoiseReductionStage : ProcessingStage {
     override val displayName = "Denoise"
 
     override fun isEnabled(context: ProcessingContext) = context.plan.noiseReduction.enabled
+
+    /** Guided filter = box then box again (2 × radius); chroma = two box passes. */
+    override fun margin(context: ProcessingContext, frame: ImageFrame) = 2 * maxOf(LUMA_RADIUS, CHROMA_RADIUS)
 
     override suspend fun execute(input: PixelBuffer, context: ProcessingContext): PixelBuffer {
         val amount = context.effectiveAmount(id, context.plan.noiseReduction).coerceIn(0f, 1f)

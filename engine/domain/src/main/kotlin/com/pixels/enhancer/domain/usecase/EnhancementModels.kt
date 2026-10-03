@@ -58,3 +58,5 @@ data class EnhancementOutcome(
     /** Full timing breakdown: decode, analysis, planning, each stage, validation. */
     val timings: TimingReport,
 )
+
+data class ExportResult(val saved: com.pixels.enhancer.domain.repository.SavedImage, val width: Int, val height: Int)

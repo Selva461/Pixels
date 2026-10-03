@@ -16,6 +16,12 @@ interface ProcessingStage {
     fun isEnabled(context: ProcessingContext): Boolean
 
     suspend fun execute(input: PixelBuffer, context: ProcessingContext): PixelBuffer
+
+    /**
+     * How far (in pixels) one output pixel can depend on its neighbours. Tiled processing adds
+     * this much overlap so tile seams are invisible. Pixel-wise stages keep the default 0.
+     */
+    fun margin(context: ProcessingContext, frame: ImageFrame): Int = 0
 }
 
 /** Per-stage developer override. [intensity] multiplies the planned amount. */

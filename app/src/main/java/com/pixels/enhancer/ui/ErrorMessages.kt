@@ -18,6 +18,8 @@ object ErrorMessages {
         ErrorCode.VALIDATION_FAILED -> R.string.error_validation_failed
         ErrorCode.OUTPUT_ENCODE_FAILED -> R.string.error_output_encode_failed
         ErrorCode.SAVE_FAILED -> R.string.error_save_failed
+        ErrorCode.INSUFFICIENT_STORAGE -> R.string.error_insufficient_storage
+        ErrorCode.PERMISSION_DENIED -> R.string.error_permission_denied
         ErrorCode.UNKNOWN -> R.string.error_unknown
     }
 }

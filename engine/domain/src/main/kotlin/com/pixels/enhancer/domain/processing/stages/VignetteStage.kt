@@ -20,12 +20,13 @@ class VignetteStage : ProcessingStage {
 
     override suspend fun execute(input: PixelBuffer, context: ProcessingContext): PixelBuffer {
         val amount = context.effectiveAmount(id, context.plan.vignette) * MAX_GAIN_CHANGE
-        val centerX = (input.width - 1) / 2f
-        val centerY = (input.height - 1) / 2f
+        val frame = context.frameOf(input)
+        val centerX = (frame.fullWidth - 1) / 2f
+        val centerY = (frame.fullHeight - 1) / 2f
         for (y in 0 until input.height) {
-            val dy = (y - centerY) / max(centerY, 1f)
+            val dy = (y + frame.offsetY - centerY) / max(centerY, 1f)
             for (x in 0 until input.width) {
-                val dx = (x - centerX) / max(centerX, 1f)
+                val dx = (x + frame.offsetX - centerX) / max(centerX, 1f)
                 // Elliptical distance: 1 at the edge midpoints, ~1.41 in the corners.
                 val distanceSquared = dx * dx + dy * dy
                 val falloff = smoothstep(INNER_RADIUS_SQUARED, OUTER_RADIUS_SQUARED, distanceSquared)
