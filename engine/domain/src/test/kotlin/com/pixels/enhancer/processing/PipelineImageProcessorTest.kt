@@ -76,7 +76,7 @@ class PipelineImageProcessorTest {
     fun `default stage order follows the spec - denoise before detail and sharpening`() {
         assertEquals(
             listOf(
-                StageIds.EXPOSURE, StageIds.WHITE_BALANCE, StageIds.DEHAZE, StageIds.TONE, StageIds.CURVES, StageIds.NOISE_REDUCTION,
+                StageIds.EXPOSURE, StageIds.WHITE_BALANCE, StageIds.DEHAZE, StageIds.FACE_EXPOSURE, StageIds.TONE, StageIds.CURVES, StageIds.NOISE_REDUCTION,
                 StageIds.DETAIL, StageIds.TEXTURE, StageIds.SHARPEN, StageIds.COLOR_FINISH, StageIds.COLOR_MIXER, StageIds.VIGNETTE, StageIds.GRAIN,
             ),
             DefaultPipeline.stages().map { it.id },
@@ -104,7 +104,7 @@ class PipelineImageProcessorTest {
         val context = contextFor(stageConfigs = mapOf(StageIds.NOISE_REDUCTION to StageConfig(enabled = false)), planOverride = ::everythingPlan)
         val result = PipelineImageProcessor(DefaultPipeline.stages()).process(TestImages.solid(120), context)
         assertTrue(StageIds.NOISE_REDUCTION !in result.executedStages)
-        assertEquals("Disabled in developer settings", result.skippedStages.single().reason)
+        assertEquals("Disabled in developer settings", result.skippedStages.single { it.stageId == StageIds.NOISE_REDUCTION }.reason)
     }
 
     @Test

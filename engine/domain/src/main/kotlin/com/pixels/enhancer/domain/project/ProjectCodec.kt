@@ -8,6 +8,9 @@ import com.pixels.enhancer.domain.export.ExportSize
 import com.pixels.enhancer.domain.export.MetadataPolicy
 import com.pixels.enhancer.domain.geometry.CropRect
 import com.pixels.enhancer.domain.geometry.Geometry
+import com.pixels.enhancer.domain.local.LocalAdjustment
+import com.pixels.enhancer.domain.local.LocalAdjustments
+import com.pixels.enhancer.domain.local.MaskShape
 import com.pixels.enhancer.domain.planning.ColorMixer
 import com.pixels.enhancer.domain.planning.CurveChannel
 import com.pixels.enhancer.domain.planning.CurvePoint
@@ -116,6 +119,7 @@ private data class EditFile(
     val sceneOverride: String? = null,
     /** Keyed by [CurveChannel] name; value = flattened [x0, y0, x1, y1, …]. */
     val curves: Map<String, List<Float>> = emptyMap(),
+    val local: List<LocalFile> = emptyList(),
 ) {
     fun toEdit(): EditState {
         val controls = manual.mapNotNull { (name, value) -> ManualControl.entries.firstOrNull { it.name == name }?.let { it to value } }
@@ -141,6 +145,7 @@ private data class EditFile(
                 if (channel == null || flat.size < 4 || flat.size % 2 != 0) acc
                 else acc.with(channel, CurvePoints.of(flat.chunked(2) { CurvePoint(it[0], it[1]) }))
             },
+            localAdjustments = LocalAdjustments(local.mapNotNull { it.toAdjustment() }.take(LocalAdjustments.MAX_ITEMS)),
         )
     }
 
@@ -160,7 +165,45 @@ private data class EditFile(
             colorMixer = edit.colorMixer.shifts.entries.associate { (band, shift) -> band.name to listOf(shift.hue, shift.saturation, shift.luminance) },
             sceneOverride = edit.sceneOverride?.name,
             curves = edit.toneCurves.curves.entries.associate { (channel, points) -> channel.name to points.points.flatMap { listOf(it.x, it.y) } },
+            local = edit.localAdjustments.items.map(LocalFile::from),
         )
+    }
+}
+
+/** A local adjustment; [shape] is "linear" (x0, y0, x1, y1) or "radial" (cx, cy, rx, ry, feather). */
+@Serializable
+private data class LocalFile(
+    val id: Int,
+    val shape: String,
+    val geometry: List<Float>,
+    val invert: Boolean = false,
+    val exposure: Float = 0f,
+    val contrast: Float = 0f,
+    val saturation: Float = 0f,
+    val temperature: Float = 0f,
+) {
+    fun toAdjustment(): LocalAdjustment? {
+        val mask = when {
+            shape == LINEAR && geometry.size == LINEAR_VALUES -> MaskShape.Linear(geometry[0], geometry[1], geometry[2], geometry[3])
+            shape == RADIAL && geometry.size == RADIAL_VALUES -> MaskShape.Radial(geometry[0], geometry[1], geometry[2], geometry[3], geometry[4])
+            else -> return null
+        }
+        return LocalAdjustment(id, mask, invert, exposure, contrast, saturation, temperature).clamped()
+    }
+
+    companion object {
+        private const val LINEAR = "linear"
+        private const val RADIAL = "radial"
+        private const val LINEAR_VALUES = 4
+        private const val RADIAL_VALUES = 5
+
+        fun from(item: LocalAdjustment): LocalFile {
+            val (shape, values) = when (val mask = item.shape) {
+                is MaskShape.Linear -> LINEAR to listOf(mask.startX, mask.startY, mask.endX, mask.endY)
+                is MaskShape.Radial -> RADIAL to listOf(mask.centerX, mask.centerY, mask.radiusX, mask.radiusY, mask.feather)
+            }
+            return LocalFile(item.id, shape, values, item.invert, item.exposure, item.contrast, item.saturation, item.temperature)
+        }
     }
 }
 

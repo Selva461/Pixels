@@ -21,6 +21,7 @@ import com.pixels.enhancer.data.storage.ThumbnailStore
 import com.pixels.enhancer.domain.editing.EditHistory
 import com.pixels.enhancer.domain.editing.EditState
 import com.pixels.enhancer.domain.export.ExportOptions
+import com.pixels.enhancer.domain.local.LocalAdjustment
 import com.pixels.enhancer.domain.project.Project
 import com.pixels.enhancer.domain.project.ProjectManager
 import com.pixels.enhancer.domain.geometry.CropMath
@@ -247,6 +248,24 @@ class EditorViewModel(
         onEditFinished()
     }
 
+    fun onAddLocal(radial: Boolean): Int {
+        val output = outcome?.output
+        val aspect = if (output == null) 1f else output.width.toFloat() / output.height
+        val id = current.localAdjustments.nextId()
+        val item = if (radial) LocalAdjustment.radialAt(id, 0.5f, 0.5f, aspect) else LocalAdjustment.linearTop(id)
+        edit(current.copy(localAdjustments = current.localAdjustments.with(item)))
+        onEditFinished()
+        return id
+    }
+
+    /** Live while dragging a mask handle or slider; [onEditFinished] records the undo step. */
+    fun onLocalChanged(item: LocalAdjustment) = edit(current.copy(localAdjustments = current.localAdjustments.with(item)))
+
+    fun onLocalRemoved(id: Int) {
+        edit(current.copy(localAdjustments = current.localAdjustments.without(id)))
+        onEditFinished()
+    }
+
     fun onResetColorMixer() {
         edit(current.copy(colorMixer = ColorMixer.NONE))
         onEditFinished()
@@ -439,6 +458,7 @@ class EditorViewModel(
         geometry = if (cropMode && target == RenderTarget.PREVIEW) current.geometry.withoutCrop() else current.geometry,
         colorMixer = current.colorMixer,
         toneCurves = current.toneCurves,
+        localAdjustments = current.localAdjustments,
         sceneOverride = current.sceneOverride,
         target = target,
         debugEnabled = isDebugBuild,

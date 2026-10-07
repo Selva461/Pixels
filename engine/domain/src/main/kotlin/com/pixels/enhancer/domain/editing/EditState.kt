@@ -2,6 +2,7 @@ package com.pixels.enhancer.domain.editing
 
 import com.pixels.enhancer.domain.analysis.SceneType
 import com.pixels.enhancer.domain.geometry.Geometry
+import com.pixels.enhancer.domain.local.LocalAdjustments
 import com.pixels.enhancer.domain.planning.ColorMixer
 import com.pixels.enhancer.domain.planning.EnhancementStrength
 import com.pixels.enhancer.domain.planning.Look
@@ -19,6 +20,7 @@ data class EditState(
     val geometry: Geometry = Geometry.NONE,
     val colorMixer: ColorMixer = ColorMixer.NONE,
     val toneCurves: ToneCurves = ToneCurves.NONE,
+    val localAdjustments: LocalAdjustments = LocalAdjustments.NONE,
     /** Overrides the detected scene for Auto Enhance; null = use detection. */
     val sceneOverride: SceneType? = null,
 ) {

@@ -3,6 +3,7 @@ package com.pixels.enhancer
 import android.app.Application
 import android.content.Context
 import com.pixels.enhancer.core.logging.LogcatLogger
+import com.pixels.enhancer.data.decoder.AndroidFaceLocator
 import com.pixels.enhancer.data.decoder.AndroidImageRepository
 import com.pixels.enhancer.data.preferences.SharedPreferencesSettingsRepository
 import com.pixels.enhancer.data.storage.MediaStoreImageSaver
@@ -57,5 +58,6 @@ class AppContainer(context: Context) {
         validator = NaturalOutputValidator(),
         saver = MediaStoreImageSaver(appContext.contentResolver, logger),
         logger = logger,
+        faceLocator = AndroidFaceLocator(),
     )
 }

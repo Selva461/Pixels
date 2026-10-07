@@ -35,6 +35,7 @@ class NaturalEnhancementPlanner : EnhancementPlanner {
             noiseReduction = noiseReduction,
             detail = planDetail(analysis, limits, exposure),
             sharpening = planSharpening(analysis, limits, noiseReduction),
+            faceExposure = planFaceExposure(analysis, limits, exposure),
             strength = EnhancementStrength.NOMINAL,
             presetId = preset.id,
         )
@@ -55,6 +56,10 @@ class NaturalEnhancementPlanner : EnhancementPlanner {
                     Adjustment.of(lift, "Image is underexposed (mean luma ${fmt(mean)} < ${fmt(limits.exposureTargetLow)})")
                 }
             }
+            mean > limits.exposureTargetHigh && analysis.faceLuma != null && analysis.faceLuma < limits.faceLumaTarget ->
+                Adjustment.none(
+                    "Bright background around a dark face (backlit; face luma ${fmt(analysis.faceLuma)}): not darkening the photo",
+                )
             mean > limits.exposureTargetHigh -> Adjustment.of(
                 max(evToReachTarget(mean, limits), -limits.maxExposureCutEv),
                 "Image is overexposed (mean luma ${fmt(mean)} > ${fmt(limits.exposureTargetHigh)})",
@@ -208,6 +213,21 @@ class NaturalEnhancementPlanner : EnhancementPlanner {
             return Adjustment.none("Local detail adequate (tonal spread ${fmt(spread)}, sharpness ${fmt(analysis.sharpnessScore)})")
         }
         return Adjustment.of(amount, "Local detail is weak (tonal spread ${fmt(spread)}, sharpness ${fmt(analysis.sharpnessScore)})")
+    }
+
+    private fun planFaceExposure(analysis: ImageAnalysis, limits: NaturalLimits, exposure: Adjustment): Adjustment {
+        val faceLuma = analysis.faceLuma ?: return Adjustment.none("No faces detected")
+        val afterExposure = if (exposure.enabled) ExposureCurve.applyEncoded(faceLuma, exposure.amount) else faceLuma
+        if (afterExposure >= limits.faceLumaTarget) {
+            return Adjustment.none("Faces are well exposed (face luma ${fmt(afterExposure)})")
+        }
+        val current = Srgb.decode(afterExposure.coerceAtLeast(MIN_MEASURABLE_LUMA))
+        val target = Srgb.decode(limits.faceLumaTarget)
+        val ev = (ln(target / current) / LN_2).toFloat() * limits.faceExposureDamping
+        return Adjustment.of(
+            min(ev, limits.maxFaceExposureLiftEv),
+            "Face is darker than the scene suggests (face luma ${fmt(afterExposure)}); gentle local lift",
+        )
     }
 
     private fun planSharpening(analysis: ImageAnalysis, limits: NaturalLimits, noiseReduction: Adjustment): Adjustment {

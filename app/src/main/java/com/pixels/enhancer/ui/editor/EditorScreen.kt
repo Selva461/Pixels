@@ -50,6 +50,10 @@ import com.pixels.enhancer.domain.planning.HueBand
 import com.pixels.enhancer.ui.adjust.AdjustPanel
 import com.pixels.enhancer.ui.adjust.ColorMixerPanel
 import com.pixels.enhancer.ui.adjust.CurvePanel
+import com.pixels.enhancer.domain.local.LocalAdjustment
+import com.pixels.enhancer.ui.local.LocalActions
+import com.pixels.enhancer.ui.local.LocalMaskEditor
+import com.pixels.enhancer.ui.local.LocalPanel
 import com.pixels.enhancer.domain.planning.CurveChannel
 import com.pixels.enhancer.domain.planning.CurvePoints
 import com.pixels.enhancer.domain.export.ExportOptions
@@ -77,6 +81,7 @@ private enum class EditorTab(val titleRes: Int) {
     ADJUST(R.string.editor_tab_adjust),
     COLOR(R.string.editor_tab_color),
     CURVE(R.string.editor_tab_curve),
+    LOCAL(R.string.editor_tab_local),
     CROP(R.string.editor_tab_crop),
 }
 
@@ -86,6 +91,13 @@ class ExportActions(
     val onConfirm: () -> Unit,
     val onDismiss: () -> Unit,
     val onCancel: () -> Unit,
+)
+
+/** Callbacks for the Local tab; onAdd returns the new mask's id so it can be selected. */
+class LocalEditorActions(
+    val onAdd: (radial: Boolean) -> Int,
+    val onChanged: (LocalAdjustment) -> Unit,
+    val onRemove: (Int) -> Unit,
 )
 
 /** Callbacks for scene choice and the colour mixer. */
@@ -132,6 +144,7 @@ fun EditorScreen(
     crop: CropActions,
     export: ExportActions,
     color: ColorActions,
+    local: LocalEditorActions,
     onOpenDebug: (() -> Unit)?,
     modifier: Modifier = Modifier,
 ) {
@@ -139,6 +152,8 @@ fun EditorScreen(
     var split by rememberSaveable { mutableStateOf(SplitOrientation.HORIZONTAL) }
     var tab by rememberSaveable { mutableStateOf(EditorTab.AUTO) }
     var viewResetKey by rememberSaveable { mutableIntStateOf(0) }
+    var selectedLocalId by rememberSaveable { mutableStateOf<Int?>(null) }
+    val selectedLocal = state.edit.localAdjustments.items.firstOrNull { it.id == selectedLocalId }
     val snackbarHostState = remember { SnackbarHostState() }
     BackHandler(onBack = onClose)
     ResultSnackbar(state.activity, snackbarHostState, onViewSaved)
@@ -159,7 +174,15 @@ fun EditorScreen(
     Box(modifier.fillMaxSize()) {
         Column(Modifier.fillMaxSize()) {
             TopBar(state, onClose, onUndo, onRedo, onShare, onSave, onOpenDebug)
-            if (tab == EditorTab.CROP && state.cropMode) {
+            if (tab == EditorTab.LOCAL) {
+                LocalMaskEditor(
+                    image = state.enhanced,
+                    selected = selectedLocal,
+                    onShapeChanged = { shape -> selectedLocal?.let { local.onChanged(it.copy(shape = shape)) } },
+                    onFinished = onEditFinished,
+                    modifier = Modifier.weight(1f).fillMaxWidth(),
+                )
+            } else if (tab == EditorTab.CROP && state.cropMode) {
                 CropEditor(
                     image = state.enhanced,
                     crop = state.edit.geometry.crop,
@@ -181,7 +204,7 @@ fun EditorScreen(
                 )
             }
             ActivityLine(state.activity, export.onCancel)
-            if (tab != EditorTab.CROP) ModeSelector(mode, split, onModeChange = { mode = it }, onSplitChange = { split = it })
+            if (tab != EditorTab.CROP && tab != EditorTab.LOCAL) ModeSelector(mode, split, onModeChange = { mode = it }, onSplitChange = { split = it })
             ScrollableTabRow(selectedTabIndex = tab.ordinal, edgePadding = 8.dp) {
                 EditorTab.entries.forEach { entry ->
                     Tab(selected = tab == entry, onClick = { tab = entry }, text = { Text(stringResource(entry.titleRes), maxLines = 1) })
@@ -197,6 +220,21 @@ fun EditorScreen(
                     EditorTab.ADJUST -> AdjustPanel(state.edit, state.histogram, onControlChanged, onEditFinished, onResetControl)
                     EditorTab.COLOR -> ColorMixerPanel(state.edit, color.onShiftChanged, onEditFinished, color.onResetAll)
                     EditorTab.CURVE -> CurvePanel(state.edit, state.histogram, color.onCurveChanged, onEditFinished, color.onCurveReset)
+                    EditorTab.LOCAL -> LocalPanel(
+                        adjustments = state.edit.localAdjustments,
+                        selectedId = selectedLocalId,
+                        actions = LocalActions(
+                            onAddRadial = { selectedLocalId = local.onAdd(true) },
+                            onAddLinear = { selectedLocalId = local.onAdd(false) },
+                            onChanged = local.onChanged,
+                            onRemove = { id ->
+                                local.onRemove(id)
+                                selectedLocalId = null
+                            },
+                            onSelect = { selectedLocalId = it },
+                        ),
+                        onEditFinished = onEditFinished,
+                    )
                     EditorTab.CROP -> CropPanel(state.edit, state.cropAspect, crop, onEditFinished)
                 }
             }

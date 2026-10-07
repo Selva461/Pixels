@@ -42,6 +42,7 @@ enum class AdjustmentKind(val label: String) {
     SHARPENING("Sharpen"),
     SHARPEN_MASKING("Sharpen masking"),
     COLOR_NOISE_REDUCTION("Color denoise"),
+    FACE_EXPOSURE("Face exposure"),
     VIGNETTE("Vignette"),
     GRAIN("Grain"),
 }
@@ -86,6 +87,8 @@ data class EnhancementPlan(
     val texture: Adjustment = Adjustment.MANUAL_ONLY,
     val sharpenMasking: Adjustment = Adjustment.MANUAL_ONLY,
     val colorNoiseReduction: Adjustment = Adjustment.MANUAL_ONLY,
+    /** EV applied softly around detected faces (portraits). */
+    val faceExposure: Adjustment = Adjustment.none("No faces detected"),
     /** Per-hue-band HSL shifts (manual only). */
     val colorMixer: ColorMixer = ColorMixer.NONE,
     /** User tone curves (manual only). */
@@ -105,6 +108,7 @@ data class EnhancementPlan(
         AdjustmentKind.TEXTURE -> texture
         AdjustmentKind.SHARPEN_MASKING -> sharpenMasking
         AdjustmentKind.COLOR_NOISE_REDUCTION -> colorNoiseReduction
+        AdjustmentKind.FACE_EXPOSURE -> faceExposure
         AdjustmentKind.DEHAZE -> dehaze
         AdjustmentKind.WHITE_BALANCE -> whiteBalance
         AdjustmentKind.TEMPERATURE -> temperature
@@ -133,6 +137,7 @@ data class EnhancementPlan(
         texture = transform(AdjustmentKind.TEXTURE, texture),
         sharpenMasking = transform(AdjustmentKind.SHARPEN_MASKING, sharpenMasking),
         colorNoiseReduction = transform(AdjustmentKind.COLOR_NOISE_REDUCTION, colorNoiseReduction),
+        faceExposure = transform(AdjustmentKind.FACE_EXPOSURE, faceExposure),
         dehaze = transform(AdjustmentKind.DEHAZE, dehaze),
         whiteBalance = transform(AdjustmentKind.WHITE_BALANCE, whiteBalance),
         temperature = transform(AdjustmentKind.TEMPERATURE, temperature),

@@ -38,6 +38,7 @@ object DebugReport {
                 row("Preview", "${session.preview.width}x${session.preview.height}"),
                 row("Preset", session.preset.displayName),
                 row("Scene", "${session.scene.scene.label} (${fmt(session.scene.confidence)})"),
+                row("Faces", session.analysis.faces.size.toString() + (session.analysis.faceLuma?.let { " (luma ${fmt(it)})" } ?: "")),
                 row("Scene scores", session.scene.scores.entries.sortedByDescending { it.value }.take(SCENE_SCORES_SHOWN)
                     .joinToString { "${it.key.label} ${fmt(it.value)}" }),
             ),
@@ -74,6 +75,7 @@ object DebugReport {
             row("Rendered", "${outcome.request.target} ${outcome.processed.image.width}x${outcome.processed.image.height}"),
             row("Manual", if (outcome.request.manual.isNeutral) "none" else "${outcome.request.manual.values.size} control(s)"),
             row("Geometry", geometryText(outcome)),
+            row("Local masks", outcome.request.localAdjustments.items.size.toString()),
             "",
         )
         val rows = plan.entries().map { (kind, adjustment) ->

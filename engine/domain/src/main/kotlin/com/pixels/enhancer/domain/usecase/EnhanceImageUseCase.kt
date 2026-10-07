@@ -14,7 +14,10 @@ import com.pixels.enhancer.core.timing.TimingReport
 import com.pixels.enhancer.core.timing.measure
 import com.pixels.enhancer.domain.analysis.ImageAnalysis
 import com.pixels.enhancer.domain.analysis.ImageAnalyzer
+import com.pixels.enhancer.domain.analysis.FaceLocator
+import com.pixels.enhancer.domain.analysis.FaceMetrics
 import com.pixels.enhancer.domain.analysis.SceneClassifier
+import com.pixels.enhancer.domain.local.LocalAdjustmentRenderer
 import com.pixels.enhancer.domain.export.ExportOptions
 import com.pixels.enhancer.domain.geometry.GeometryOps
 import com.pixels.enhancer.domain.image.PixelBuffer
@@ -58,6 +61,8 @@ class EnhanceImageUseCase(
     private val idGenerator: ProcessingIdGenerator = ProcessingIdGenerator(),
     private val clock: MonotonicClock = SystemMonotonicClock,
     private val dispatcher: CoroutineDispatcher = Dispatchers.Default,
+    /** Platform face detection for portrait exposure; none by default. */
+    private val faceLocator: FaceLocator = FaceLocator.NONE,
 ) {
     val stageIds: List<String> get() = processor.stageIds
 
@@ -86,7 +91,12 @@ class EnhanceImageUseCase(
 
             val analyzed = runControlled(ErrorCode.ANALYSIS_FAILED) { clock.measure { analyzer.analyze(working.value) } }
             if (analyzed is OperationResult.Failure) return@withContext logFailure("OPEN_FAILED", null, analyzed)
-            val analysis = (analyzed as OperationResult.Success).value
+            val measured = (analyzed as OperationResult.Success).value
+            val faces = runControlled(ErrorCode.ANALYSIS_FAILED) { faceLocator.locate(working.value) }
+                .let { if (it is OperationResult.Success) it.value else emptyList() }
+            val analysis = measured.copy(
+                value = measured.value.copy(faces = faces, faceLuma = FaceMetrics.meanLuma(working.value, faces)),
+            )
             logAnalysis(analysis.value)
             val scene = clock.measure { SceneClassifier.classify(working.value, analysis.value) }
             logger.event("SCENE_DETECTED", mapOf("scene" to scene.value.scene, "confidence" to scene.value.confidence))
@@ -179,7 +189,9 @@ class EnhanceImageUseCase(
 
         // Geometry runs after validation: validation compares same-sized images pixel for pixel.
         val geometry = clock.measure {
-            GeometryOps.apply(processed.image, request.geometry) to GeometryOps.apply(source, request.geometry)
+            // Local masks are drawn on the photo as the user sees it, so they apply after geometry.
+            LocalAdjustmentRenderer.apply(GeometryOps.apply(processed.image, request.geometry), request.localAdjustments) to
+                GeometryOps.apply(source, request.geometry)
         }
         val (output, originalView) = geometry.value
 
@@ -333,6 +345,7 @@ class EnhanceImageUseCase(
                 "cast" to analysis.colorCastScore,
                 "highlightClip" to analysis.highlightClipping,
                 "shadowClip" to analysis.shadowClipping,
+                "faces" to analysis.faces.size,
             ),
         )
     }

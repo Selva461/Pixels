@@ -57,6 +57,7 @@ enum class ManualControl(
     SHARPEN_MASKING("Sharpen masking", ControlGroup.DETAIL, AdjustmentKind.SHARPEN_MASKING, 0f, 1f, 1f, AmountRange(0f, 1f), "Higher limits sharpening to strong edges only", advanced = true),
     NOISE_REDUCTION("Noise reduction", ControlGroup.DETAIL, AdjustmentKind.NOISE_REDUCTION, 0f, 1f, 1f, AmountRange(0f, 1f), "Smooths brightness grain while keeping edges"),
     COLOR_NOISE_REDUCTION("Color noise reduction", ControlGroup.DETAIL, AdjustmentKind.COLOR_NOISE_REDUCTION, 0f, 1f, 1f, AmountRange(0f, 1f), "Removes coloured speckles; brightness detail is untouched", advanced = true),
+    FACE_EXPOSURE("Face exposure", ControlGroup.PORTRAIT, AdjustmentKind.FACE_EXPOSURE, -1f, 1f, 1f, AmountRange(-1.25f, 1.5f), "Brightens or darkens detected faces only, with a soft edge", format = ValueFormat.EV),
     VIGNETTE("Vignette", ControlGroup.EFFECTS, AdjustmentKind.VIGNETTE, -1f, 1f, 1f, AmountRange(-1f, 1f), "Darker or lighter corners"),
     GRAIN("Grain", ControlGroup.EFFECTS, AdjustmentKind.GRAIN, 0f, 1f, 1f, AmountRange(0f, 1f), "Film-like texture"),
     ;
@@ -77,6 +78,7 @@ enum class ControlGroup(val label: String) {
     LIGHT("Light"),
     COLOR("Color"),
     DETAIL("Detail"),
+    PORTRAIT("Portrait"),
     EFFECTS("Effects"),
 }
 

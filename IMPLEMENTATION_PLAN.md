@@ -22,24 +22,24 @@ in `app/` is compiled in CI but has not been run on a phone by the developer.
 | Area | Status | Notes |
 |---|---|---|
 | Import, validation, EXIF orientation | ✅ | Photo picker; type/size/decode checks; orientation baked in before analysis |
-| HEIC input | 🟡 | Rejected as unsupported today; decoder supports it on API 28+, needs allow-listing + test |
+| HEIC input | ✅ | image/heic and image/heif allow-listed (platform decoder, minSdk 29); device test ⬜ |
 | Colour profile handling | 🟡 | sRGB assumed throughout; wide-gamut/Display P3 sources are converted by the decoder, not managed |
 | Exposure, contrast, highlights, shadows | ✅ | Auto + manual |
 | Whites, blacks, midtones | ✅ | Manual; tone-curve terms with anchored end points |
-| Brightness, gamma, exposure compensation | ⬜ | Covered functionally by Exposure + Midtones; separate sliders not added |
+| Brightness, gamma, exposure compensation | ✅ | Exposure ±3 EV; brightness (mid-weighted), gamma and compensation under "More controls" |
 | White balance: auto, temperature, tint | ✅ | Grey-edge auto WB; manual temperature/tint are relative (−100..100), not Kelvin |
 | White balance eyedropper | ⬜ | |
 | Warm-scene protection | ✅ | Dim warm scenes and Night/Food scenes correct casts less |
 | Saturation, vibrance | ✅ | |
 | HSL colour mixer (8 bands × H/S/L) | ✅ | |
 | Per-channel RGB saturation, colour balance, global hue | ⬜ | |
-| Tone curves | ⬜ | Histogram is shown; curve editor not built |
+| Tone curves | ✅ | Master + R/G/B monotone-cubic curves over the histogram (tap add, drag, double-tap remove) |
 | Histogram | ✅ | Of the edited preview (Adjust tab) |
-| Clarity, dehaze, sharpening, noise reduction | ✅ | Single NR control (luma+chroma); separate colour NR, texture, sharpening radius/masking ⬜ |
-| Crop, rotate 90°, flip H, straighten, grid | ✅ | Presets Free/Original/1:1/4:5/3:2/16:9; 4:3 and 9:16 ⬜; flip vertical ⬜ (= rotate 180 + flip) |
+| Clarity, dehaze, sharpening, noise reduction | ✅ | Plus texture, colour NR and sharpening masking; sharpening radius ⬜ |
+| Crop, rotate 90°, flip H/V, straighten, grid | ✅ | Presets Free/Original/1:1/4:5/3:2/4:3/16:9/9:16 |
 | Lens distortion, CA, perspective | ⬜ | |
-| Selective adjustments / masks | ⬜ | |
-| Portrait-specific controls | 🟡 | Skin protection in vibrance/sharpening; Portrait scene limits; face detection ⬜ |
+| Selective adjustments / masks | 🟡 | Up to 8 radial/linear masks (exposure, contrast, saturation, temperature, feather, invert); brush, subject and sky masks ⬜ |
+| Portrait-specific controls | 🟡 | On-device face detection (android.media.FaceDetector) drives auto face exposure incl. backlit faces; manual Face exposure slider; red-eye ⬜ |
 | Auto Enhance (analysis-driven, not a preset) | ✅ | Per-image plan with reasons |
 | Scene-aware enhancement | ✅ | Heuristic classifier (11 scenes), user override, per-scene limits |
 | Enhancement Strength 0–100 % with true zero | ✅ | "Original (no edits)" button = zero state |
@@ -61,7 +61,7 @@ in `app/` is compiled in CI but has not been run on a phone by the developer.
 1. Audit and save defect — ✅
 2. Core image engine — ✅
 3. Auto Enhance (scene-aware, strength) — ✅
-4. Advanced editing — 🟡 (HSL, histogram, dehaze, crop/straighten done; curves, masks, lens, portrait ⬜)
+4. Advanced editing — 🟡 (HSL, histogram, dehaze, crop/straighten, curves, radial/linear masks, face exposure done; lens, brush/sky masks, eyedropper ⬜)
 5. Export and reliability — ✅ (device-verified); lifecycle interruption testing ⬜
 6. Quality and release — ⬜ (real-photo visual review and device benchmarks)
 

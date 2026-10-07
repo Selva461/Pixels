@@ -56,6 +56,12 @@ data class NaturalLimits(
     val maxSaturationBoost: Float = 0.08f,
     val maxSaturationReduction: Float = 0.12f,
 
+    // Faces — a face clearly darker than this (after the global exposure change) gets a gentle local lift.
+    val faceLumaTarget: Float = 0.42f,
+    val maxFaceExposureLiftEv: Float = 0.9f,
+    /** Only part of the gap is closed: a little shadow on a face is natural. */
+    val faceExposureDamping: Float = 0.6f,
+
     // Noise
     val noiseThreshold: Float = 0.22f,
     val noiseForFullReduction: Float = 0.75f,
@@ -94,6 +100,7 @@ data class NaturalLimits(
             AdjustmentKind.TEXTURE to AmountRange(0f, 0f),
             AdjustmentKind.SHARPEN_MASKING to AmountRange(0f, 0f),
             AdjustmentKind.COLOR_NOISE_REDUCTION to AmountRange(0f, 0f),
+            AdjustmentKind.FACE_EXPOSURE to AmountRange(0f, 1.25f),
             AdjustmentKind.DEHAZE to AmountRange(0f, 0f),
             AdjustmentKind.TINT to AmountRange(0f, 0f),
             AdjustmentKind.GLOBAL_SATURATION to AmountRange(0f, 0f),

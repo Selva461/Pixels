@@ -31,6 +31,7 @@ import com.pixels.enhancer.ui.debug.DebugScreen
 import com.pixels.enhancer.ui.editor.ColorActions
 import com.pixels.enhancer.ui.editor.CropActions
 import com.pixels.enhancer.ui.editor.ExportActions
+import com.pixels.enhancer.ui.editor.LocalEditorActions
 import com.pixels.enhancer.ui.editor.EditorEvent
 import com.pixels.enhancer.ui.editor.EditorScreen
 import com.pixels.enhancer.ui.editor.EditorUiState
@@ -152,6 +153,11 @@ private fun PixelsApp(viewModel: EditorViewModel, onPickImage: () -> Unit, modif
                         onSceneSelected = viewModel::onSceneSelected,
                         onCurveChanged = viewModel::onCurveChanged,
                         onCurveReset = viewModel::onResetCurve,
+                    ),
+                    local = LocalEditorActions(
+                        onAdd = viewModel::onAddLocal,
+                        onChanged = viewModel::onLocalChanged,
+                        onRemove = viewModel::onLocalRemoved,
                     ),
                     export = ExportActions(
                         onOptionsChanged = viewModel::onExportOptionsChanged,

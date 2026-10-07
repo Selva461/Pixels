@@ -5,11 +5,13 @@
 ```
 engine/domain  (pure Kotlin/JVM — no Android classes; unit-tested on the JVM)
   core/        errors (ErrorCode, OperationResult), logging, timing, ids, algorithm version
-  analysis/    ImageAnalyzer (exposure, contrast, colour cast, noise, sharpness), SceneClassifier, Histogram
+  analysis/    ImageAnalyzer (exposure, contrast, colour cast, noise, sharpness), SceneClassifier, Histogram,
+               FaceLocator contract + FaceMetrics (platform supplies detection)
   planning/    EnhancementPlanner (decision layer), NaturalLimits, QualityPreset (per scene),
-               ManualAdjustments + merger, Looks, ColorMixer
+               ManualAdjustments + merger, Looks, ColorMixer, ToneCurves (monotone cubic)
   processing/  PipelineImageProcessor (+ tiling), ProcessingStage contract, stages/, ops/
   geometry/    Geometry, GeometryOps (rotate/flip/straighten/crop), CropMath
+  local/       LocalAdjustments (radial/linear masks), LocalAdjustmentRenderer (runs after geometry)
   editing/     EditState (the nondestructive edit), EditHistory (undo/redo)
   project/     Project, ProjectCodec (versioned JSON), FileProjectStore, ProjectManager
   export/      ExportOptions (format, quality, size, metadata)
@@ -19,7 +21,8 @@ engine/domain  (pure Kotlin/JVM — no Android classes; unit-tested on the JVM)
 engine/harness Desktop CLI running the real engine on image files
 
 app/  (Android)
-  data/decoder   AndroidImageRepository (bounds-first decode, subsampling, EXIF orientation)
+  data/decoder   AndroidImageRepository (bounds-first decode, subsampling, EXIF orientation),
+                 AndroidFaceLocator (android.media.FaceDetector, on device)
   data/exif      ExifNormalizer, MetadataCopier
   data/storage   MediaStoreImageSaver (verified export), ShareCache, ThumbnailStore
   data/preferences SharedPreferencesSettingsRepository

@@ -6,6 +6,7 @@ object StageIds {
     const val EXPOSURE = "exposure"
     const val WHITE_BALANCE = "white_balance"
     const val DEHAZE = "dehaze"
+    const val FACE_EXPOSURE = "face_exposure"
     const val TONE = "tone"
     const val CURVES = "curves"
     const val NOISE_REDUCTION = "noise_reduction"
@@ -28,6 +29,7 @@ object DefaultPipeline {
         ExposureStage(),
         WhiteBalanceStage(),
         DehazeStage(),
+        FaceExposureStage(),
         ToneStage(),
         CurvesStage(),
         NoiseReductionStage(),

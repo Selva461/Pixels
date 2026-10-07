@@ -1,31 +1,47 @@
 # HANDOFF
 
-_Last updated: 2026-10-03 · algorithm version 1.1_
+_Last updated: 2026-10-07 · algorithm version 1.1_
 
-## Current status (2026-10-03)
+## Current status (2026-10-07)
 
-- Engine: `./gradlew -p engine build` — 149 tests pass, no warnings.
-- Last green CI (APK + 3 device tests): commit 91a359a (crop/rotate).
-- **CI has been blocked since commit 39fe15c** by a GitHub billing error on the repository owner's
-  account ("recent account payments have failed or your spending limit needs to be increased").
-  Therefore everything in `app/` added since 91a359a — export dialog, projects/Home, redo,
-  press-and-hold, leave prompt, grouped Adjust panel, Color tab, scene chips, and the 3 new device
-  tests — has **not been compiled or run**. Expect possible compile fixes on the next CI run.
+- Engine: `./gradlew -p engine build` — 170 tests pass.
+- Last green CI (APK + device tests): commit 91a359a (crop/rotate). CI runs again now that the
+  repository is public, but **pushes to `claude/new-session-2v9neb` are refused by the repository
+  ruleset** (pull request with code-owner review + required status checks on the default branch).
+  Commits since d307608 are local only until the owner adds a bypass or relaxes the rule.
+- Everything in `app/` added since 91a359a has **not been compiled** (no Google Maven in the dev
+  container). Expect compile fixes on the next CI run.
 
 ## Known issues
 
-- See IMPLEMENTATION_PLAN.md for unimplemented requirements (curves, masks, lens/perspective,
-  portrait face tools, eyedropper, HEIC, colour profiles, Kelvin temperature, settings/help).
+- See IMPLEMENTATION_PLAN.md for unimplemented requirements (lens/perspective, brush/subject/sky
+  masks, red-eye, eyedropper, Kelvin temperature, RGB saturation, global hue, colour balance,
+  sharpening radius, colour-profile and HEIC export, settings screen).
+- Face detection uses the legacy `android.media.FaceDetector` (upright faces, eyes visible). It is
+  only used to place a soft exposure region; no face is reshaped or retouched.
 - Scene classifier and all thresholds are tuned on synthetic images only.
 - Preview renders on every slider move at 1280 px; not yet benchmarked on a phone.
 
 ## Next single action
 
-Restore GitHub Actions (fix billing or make the repository public), let CI build commit HEAD, fix
-any compile errors in `app/`, and confirm the 6 device tests pass. Then review real photos with the
-debug report to calibrate the scene classifier.
+Allow the push (ruleset bypass for the repository admin / Claude app, or turn enforcement off),
+let CI build HEAD, fix any compile errors in `app/`, and confirm the device tests pass.
 
 ## What changed
+
+### 2026-10-07 — remaining editing requirements
+
+- Controls: exposure ±3 EV, brightness, gamma, exposure compensation, midtones, texture, colour
+  noise reduction and sharpening masking ("More controls" reveals the advanced ones).
+- Geometry: flip vertical, 4:3 and 9:16 crops. HEIC/HEIF accepted on import.
+- Tone curves (`planning/ToneCurves.kt`, `CurvesStage`, `ui/adjust/CurvePanel.kt`): master and
+  R/G/B, monotone cubic so curves never overshoot; stored in projects.
+- Local adjustments (`domain/local/`, `ui/local/LocalPanel.kt`): radial and linear masks with
+  exposure, contrast, saturation, temperature, feather and invert, drawn on the photo with drag
+  handles; rendered after geometry; stored in projects.
+- Face exposure (`analysis/Faces.kt`, `FaceExposureStage`, `AndroidFaceLocator`): faces found on
+  device lift toward a natural target (max +0.9 EV auto); backlit faces are not darkened by the
+  global exposure cut. Manual "Face exposure" slider in the Portrait group.
 
 ### 2026-10-03 — design pass against a "looks auto-generated" checklist
 
