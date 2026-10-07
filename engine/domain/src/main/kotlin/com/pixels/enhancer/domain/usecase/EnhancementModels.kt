@@ -12,6 +12,8 @@ import com.pixels.enhancer.domain.planning.ColorMixer
 import com.pixels.enhancer.domain.planning.EnhancementPlan
 import com.pixels.enhancer.domain.planning.ManualAdjustments
 import com.pixels.enhancer.domain.planning.ToneCurves
+import com.pixels.enhancer.domain.planning.ColorGrading
+import com.pixels.enhancer.domain.retouch.Retouch
 import com.pixels.enhancer.domain.planning.QualityPreset
 import com.pixels.enhancer.domain.processing.ProcessedImage
 import com.pixels.enhancer.domain.processing.StageConfig
@@ -42,6 +44,9 @@ data class EnhanceRequest(
     val toneCurves: ToneCurves = ToneCurves.NONE,
     /** Masked adjustments, applied after geometry in output coordinates. */
     val localAdjustments: LocalAdjustments = LocalAdjustments.NONE,
+    val colorGrading: ColorGrading = ColorGrading.NONE,
+    /** Heal/clone spots, applied after geometry and before local masks. */
+    val retouch: Retouch = Retouch.NONE,
     /** User's scene choice; null uses the detected scene. */
     val sceneOverride: SceneType? = null,
     val target: RenderTarget = RenderTarget.FULL,
@@ -51,7 +56,7 @@ data class EnhanceRequest(
 )
 
 /** True when the user asked for creative changes, so validation only checks for broken output. */
-val EnhanceRequest.hasManualEdits: Boolean get() = !manual.isNeutral || !colorMixer.isNeutral || !toneCurves.isIdentity || !localAdjustments.isNeutral
+val EnhanceRequest.hasManualEdits: Boolean get() = !manual.isNeutral || !colorMixer.isNeutral || !toneCurves.isIdentity || !localAdjustments.isNeutral || !colorGrading.isNeutral || !retouch.isEmpty
 
 enum class RenderTarget {
     /** Small image for live slider feedback. */

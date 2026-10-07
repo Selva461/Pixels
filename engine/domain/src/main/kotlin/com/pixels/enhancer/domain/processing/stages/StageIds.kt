@@ -15,6 +15,7 @@ object StageIds {
     const val SHARPEN = "sharpen"
     const val COLOR_FINISH = "color_finish"
     const val COLOR_MIXER = "color_mixer"
+    const val COLOR_GRADING = "color_grading"
     const val VIGNETTE = "vignette"
     const val GRAIN = "grain"
 }
@@ -38,6 +39,7 @@ object DefaultPipeline {
         SharpenStage(),
         ColorFinishStage(),
         ColorMixerStage(),
+        ColorGradingStage(),
         VignetteStage(),
         GrainStage(),
     )

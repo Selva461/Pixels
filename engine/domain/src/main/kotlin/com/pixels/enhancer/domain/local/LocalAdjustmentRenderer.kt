@@ -1,20 +1,24 @@
 package com.pixels.enhancer.domain.local
 
 import com.pixels.enhancer.domain.image.Argb
+import com.pixels.enhancer.domain.image.BoxBlur
 import com.pixels.enhancer.domain.image.Luma
+import com.pixels.enhancer.domain.image.LumaPlane
 import com.pixels.enhancer.domain.image.PixelBuffer
 import com.pixels.enhancer.domain.image.Srgb
-import com.pixels.enhancer.domain.processing.ops.ChromaOps
 import com.pixels.enhancer.domain.processing.ops.ChannelGains
+import com.pixels.enhancer.domain.processing.ops.ChromaOps
 import com.pixels.enhancer.domain.processing.ops.ToneCurve
 import com.pixels.enhancer.domain.processing.ops.WhiteBalanceGains
 import kotlin.math.max
+import kotlin.math.min
 import kotlin.math.pow
 
 /**
- * Applies local adjustments to an edited image, after geometry. Per pixel and per mask: exposure
- * and temperature as linear-light gains, then contrast on luma, then saturation — all scaled by the
- * mask weight so edges blend smoothly. Pixel-wise, so it needs no tiling at any resolution.
+ * Applies local adjustments to an edited image, after geometry. Per mask: a weight map (shape,
+ * brush, inversion, range), then per pixel exposure and white balance as linear-light gains, the
+ * tone curve (contrast, highlights, shadows) on luma, clarity and sharpness as local contrast, and
+ * saturation — all scaled by the weight so edges blend smoothly.
  */
 object LocalAdjustmentRenderer {
     private const val MIN_WEIGHT = 0.002f
@@ -23,50 +27,97 @@ object LocalAdjustmentRenderer {
         val active = adjustments.items.filterNot { it.isNeutral }
         if (active.isEmpty()) return image
         val out = image.copy()
-        val aspect = image.width.toFloat() / image.height
-        active.forEach { applyOne(out, it, aspect) }
+        active.forEach { applyOne(out, it) }
         return out
     }
 
-    private fun applyOne(image: PixelBuffer, adjustment: LocalAdjustment, aspect: Float) {
-        val contrastCurve = ToneCurve.build(contrast = adjustment.contrast * LocalAdjustment.MAX_CONTRAST, highlights = 0f, shadows = 0f)
-        val temperatureGains = WhiteBalanceGains.withCreativeShift(ChannelGains.IDENTITY, adjustment.temperature, 0f)
+    /** The final weight map of one adjustment on [image] — also used by the editor's mask overlay. */
+    fun maskOf(image: PixelBuffer, adjustment: LocalAdjustment): FloatArray {
+        val weights = MaskRaster.weights(adjustment, image.width, image.height)
+        val range = adjustment.range ?: return weights
+        for (i in weights.indices) {
+            if (weights[i] >= MIN_WEIGHT) weights[i] *= range.weightFor(image.pixels[i])
+        }
+        return weights
+    }
+
+    private fun applyOne(image: PixelBuffer, adjustment: LocalAdjustment) {
+        val weights = maskOf(image, adjustment)
+        val tone = ToneCurve.build(
+            contrast = adjustment.contrast * LocalAdjustment.MAX_CONTRAST,
+            highlights = adjustment.highlights * LocalAdjustment.MAX_TONE,
+            shadows = adjustment.shadows * LocalAdjustment.MAX_TONE,
+        )
+        val hasTone = adjustment.contrast != 0f || adjustment.highlights != 0f || adjustment.shadows != 0f
+        val balance = WhiteBalanceGains.withCreativeShift(ChannelGains.IDENTITY, adjustment.temperature, adjustment.tint)
+        val hasGain = adjustment.exposure != 0f || adjustment.temperature != 0f || adjustment.tint != 0f
         val fullGain = 2f.pow(adjustment.exposure * LocalAdjustment.MAX_EXPOSURE_EV)
-        for (y in 0 until image.height) {
-            val ny = (y + 0.5f) / image.height
-            for (x in 0 until image.width) {
-                val weight = adjustment.weightAt((x + 0.5f) / image.width, ny, aspect)
-                if (weight < MIN_WEIGHT) continue
-                val index = y * image.width + x
-                image.pixels[index] = adjustPixel(image.pixels[index], weight, fullGain, temperatureGains, contrastCurve, adjustment)
+        val detail = if (adjustment.needsNeighbourhood) LocalDetail.of(image, adjustment) else null
+
+        for (i in 0 until image.pixelCount) {
+            val weight = weights[i]
+            if (weight < MIN_WEIGHT) continue
+            var color = image.pixels[i]
+            if (hasGain) color = gain(color, weight, fullGain, balance)
+            if (hasTone || detail != null) {
+                val luma = Luma.ofPixel(color)
+                var target = if (hasTone) tone.map(luma) else luma
+                if (detail != null) target += detail.delta(i)
+                target = target.coerceIn(0f, 1f)
+                color = ChromaOps.withLuma(color, luma, luma + (target - luma) * weight)
             }
+            if (adjustment.saturation != 0f) color = ChromaOps.scaleChroma(color, (1f + adjustment.saturation * weight).coerceAtLeast(0f))
+            image.pixels[i] = color
         }
     }
 
-    @Suppress("LongParameterList")
-    private fun adjustPixel(color: Int, weight: Float, fullGain: Float, temperature: ChannelGains, contrast: ToneCurve, adjustment: LocalAdjustment): Int {
-        var result = color
-        if (adjustment.exposure != 0f || adjustment.temperature != 0f) {
-            val gain = 1f + (fullGain - 1f) * weight
-            var red = Srgb.toLinear(Argb.red(result)) * gain * (1f + (temperature.red - 1f) * weight)
-            var green = Srgb.toLinear(Argb.green(result)) * gain * (1f + (temperature.green - 1f) * weight)
-            var blue = Srgb.toLinear(Argb.blue(result)) * gain * (1f + (temperature.blue - 1f) * weight)
-            val brightest = max(red, max(green, blue))
-            // Scale back as a whole rather than clipping one channel, which would shift hue.
-            if (brightest > 1f) {
-                red /= brightest
-                green /= brightest
-                blue /= brightest
+    private fun gain(color: Int, weight: Float, fullGain: Float, balance: ChannelGains): Int {
+        val gain = 1f + (fullGain - 1f) * weight
+        var red = Srgb.toLinear(Argb.red(color)) * gain * (1f + (balance.red - 1f) * weight)
+        var green = Srgb.toLinear(Argb.green(color)) * gain * (1f + (balance.green - 1f) * weight)
+        var blue = Srgb.toLinear(Argb.blue(color)) * gain * (1f + (balance.blue - 1f) * weight)
+        val brightest = max(red, max(green, blue))
+        // Scale back as a whole rather than clipping one channel, which would shift hue.
+        if (brightest > 1f) {
+            red /= brightest
+            green /= brightest
+            blue /= brightest
+        }
+        return Argb.pack(Argb.alpha(color), Srgb.toSrgb8(red), Srgb.toSrgb8(green), Srgb.toSrgb8(blue))
+    }
+
+    /** Clarity (large-radius) and sharpness (small-radius) luma deltas, computed once per mask. */
+    private class LocalDetail(private val luma: FloatArray, private val wide: FloatArray?, private val fine: FloatArray?, private val clarity: Float, private val sharpness: Float) {
+        fun delta(i: Int): Float {
+            var d = 0f
+            if (wide != null) d += (luma[i] - wide[i]) * clarity * CLARITY_GAIN
+            if (fine != null) d += (luma[i] - fine[i]) * sharpness * (if (sharpness > 0f) SHARPEN_GAIN else SOFTEN_GAIN)
+            return d.coerceIn(-MAX_DELTA, MAX_DELTA)
+        }
+
+        companion object {
+            fun of(image: PixelBuffer, adjustment: LocalAdjustment): LocalDetail {
+                val luma = LumaPlane.extract(image)
+                val scratch = FloatArray(image.pixelCount)
+                val wide = if (adjustment.clarity != 0f) {
+                    val radius = max(2, (min(image.width, image.height) * CLARITY_RADIUS_FRACTION).toInt())
+                    FloatArray(image.pixelCount).also { BoxBlur.blur(luma, it, image.width, image.height, radius, scratch) }
+                } else {
+                    null
+                }
+                val fine = if (adjustment.sharpness != 0f) {
+                    FloatArray(image.pixelCount).also { BoxBlur.blur(luma, it, image.width, image.height, 1, scratch) }
+                } else {
+                    null
+                }
+                return LocalDetail(luma, wide, fine, adjustment.clarity, adjustment.sharpness)
             }
-            result = Argb.pack(Argb.alpha(result), Srgb.toSrgb8(red), Srgb.toSrgb8(green), Srgb.toSrgb8(blue))
+
+            const val CLARITY_RADIUS_FRACTION = 0.012f
+            const val CLARITY_GAIN = 0.6f
+            const val SHARPEN_GAIN = 1.5f
+            const val SOFTEN_GAIN = 1f
+            const val MAX_DELTA = 0.15f
         }
-        if (adjustment.contrast != 0f) {
-            val luma = Luma.ofPixel(result)
-            result = ChromaOps.withLuma(result, luma, luma + (contrast.map(luma) - luma) * weight)
-        }
-        if (adjustment.saturation != 0f) {
-            result = ChromaOps.scaleChroma(result, (1f + adjustment.saturation * weight).coerceAtLeast(0f))
-        }
-        return result
     }
 }

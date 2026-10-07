@@ -18,6 +18,7 @@ import com.pixels.enhancer.domain.analysis.FaceLocator
 import com.pixels.enhancer.domain.analysis.FaceMetrics
 import com.pixels.enhancer.domain.analysis.SceneClassifier
 import com.pixels.enhancer.domain.local.LocalAdjustmentRenderer
+import com.pixels.enhancer.domain.retouch.RetouchRenderer
 import com.pixels.enhancer.domain.export.ExportOptions
 import com.pixels.enhancer.domain.geometry.GeometryOps
 import com.pixels.enhancer.domain.image.PixelBuffer
@@ -151,7 +152,7 @@ class EnhanceImageUseCase(
 
         val planned = clock.measure {
             ManualAdjustmentMerger.merge(planner.createPlan(session.analysis, request.strength, presetFor(session, request)), request.manual)
-                .copy(colorMixer = request.colorMixer, toneCurves = request.toneCurves)
+                .copy(colorMixer = request.colorMixer, toneCurves = request.toneCurves, colorGrading = request.colorGrading)
         }
         logPlan(processingId, planned.value)
 
@@ -189,8 +190,10 @@ class EnhanceImageUseCase(
 
         // Geometry runs after validation: validation compares same-sized images pixel for pixel.
         val geometry = clock.measure {
-            // Local masks are drawn on the photo as the user sees it, so they apply after geometry.
-            LocalAdjustmentRenderer.apply(GeometryOps.apply(processed.image, request.geometry), request.localAdjustments) to
+            // Retouch spots and local masks are placed on the photo as the user sees it, so they apply
+            // after geometry: first repairs, then masked adjustments on the repaired picture.
+            val shaped = GeometryOps.apply(processed.image, request.geometry)
+            LocalAdjustmentRenderer.apply(RetouchRenderer.apply(shaped, request.retouch), request.localAdjustments) to
                 GeometryOps.apply(source, request.geometry)
         }
         val (output, originalView) = geometry.value

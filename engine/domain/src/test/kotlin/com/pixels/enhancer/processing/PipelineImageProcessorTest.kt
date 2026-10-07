@@ -77,7 +77,7 @@ class PipelineImageProcessorTest {
         assertEquals(
             listOf(
                 StageIds.EXPOSURE, StageIds.WHITE_BALANCE, StageIds.DEHAZE, StageIds.FACE_EXPOSURE, StageIds.TONE, StageIds.CURVES, StageIds.NOISE_REDUCTION,
-                StageIds.DETAIL, StageIds.TEXTURE, StageIds.SHARPEN, StageIds.COLOR_FINISH, StageIds.COLOR_MIXER, StageIds.VIGNETTE, StageIds.GRAIN,
+                StageIds.DETAIL, StageIds.TEXTURE, StageIds.SHARPEN, StageIds.COLOR_FINISH, StageIds.COLOR_MIXER, StageIds.COLOR_GRADING, StageIds.VIGNETTE, StageIds.GRAIN,
             ),
             DefaultPipeline.stages().map { it.id },
         )

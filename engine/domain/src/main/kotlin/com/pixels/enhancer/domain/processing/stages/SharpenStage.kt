@@ -24,19 +24,30 @@ class SharpenStage : ProcessingStage {
     override fun isEnabled(context: ProcessingContext) = context.plan.sharpening.enabled
 
     /** Box blur radius plus the 3×3 overshoot clamp. */
-    override fun margin(context: ProcessingContext, frame: ImageFrame) = RADIUS + 1
+    override fun margin(context: ProcessingContext, frame: ImageFrame) = radiusFor(context) + 1
+
+    /** Box radius 1..3 px from the Sharpen radius slider. */
+    private fun radiusFor(context: ProcessingContext): Int {
+        val radius = context.plan.sharpenRadius.takeIf { it.enabled }?.amount ?: 0f
+        return RADIUS + (radius.coerceIn(0f, 1f) * EXTRA_RADIUS + 0.5f).toInt()
+    }
 
     override suspend fun execute(input: PixelBuffer, context: ProcessingContext): PixelBuffer {
         val amount = context.effectiveAmount(id, context.plan.sharpening) * SHARPEN_GAIN
         // Masking raises the threshold so only clear edges are sharpened (flat areas and fine texture untouched).
         val masking = context.effectiveAmount(id, context.plan.sharpenMasking).coerceIn(0f, 1f)
-        val threshold = max(MIN_THRESHOLD, THRESHOLD_SIGMA_MULTIPLIER * residualNoiseSigma(context)) + masking * MAX_MASKING_THRESHOLD
+        // Detail lowers the threshold and allows more overshoot, so fine texture is sharpened too.
+        val detail = (context.plan.sharpenDetail.takeIf { it.enabled }?.amount ?: 0f).coerceIn(0f, 1f)
+        val threshold = max(MIN_THRESHOLD, THRESHOLD_SIGMA_MULTIPLIER * residualNoiseSigma(context)) * (1f - DETAIL_THRESHOLD_CUT * detail) +
+            masking * MAX_MASKING_THRESHOLD
+        val overshoot = OVERSHOOT * (1f + DETAIL_OVERSHOOT * detail)
+        val radius = radiusFor(context)
         val width = input.width
         val height = input.height
         val luma = LumaPlane.extract(input)
         val blurred = FloatArray(input.pixelCount)
         val edited = FloatArray(input.pixelCount)
-        BoxBlur.blur(luma, blurred, width, height, RADIUS, edited)
+        BoxBlur.blur(luma, blurred, width, height, radius, edited)
 
         for (y in 0 until height) {
             for (x in 0 until width) {
@@ -46,14 +57,14 @@ class SharpenStage : ProcessingStage {
                 val edgeWeight = smoothstep(threshold, threshold * 2f, abs(highFrequency))
                 val skinWeight = if (SkinToneDetector.isLikelySkin(input.pixels[index])) SKIN_PROTECTION else 1f
                 val sharpened = value + amount * edgeWeight * skinWeight * highFrequency
-                edited[index] = clampToNeighbourhood(luma, width, height, x, y, sharpened)
+                edited[index] = clampToNeighbourhood(luma, width, height, x, y, sharpened, overshoot)
             }
         }
         LumaPlane.applyDelta(input, luma, edited)
         return input
     }
 
-    private fun clampToNeighbourhood(luma: FloatArray, width: Int, height: Int, x: Int, y: Int, value: Float): Float {
+    private fun clampToNeighbourhood(luma: FloatArray, width: Int, height: Int, x: Int, y: Int, value: Float, overshoot: Float): Float {
         var lowest = Float.MAX_VALUE
         var highest = -Float.MAX_VALUE
         for (ny in max(0, y - 1)..min(height - 1, y + 1)) {
@@ -63,7 +74,7 @@ class SharpenStage : ProcessingStage {
                 highest = max(highest, neighbour)
             }
         }
-        return value.coerceIn(lowest - OVERSHOOT, highest + OVERSHOOT)
+        return value.coerceIn(lowest - overshoot, highest + overshoot)
     }
 
     private fun residualNoiseSigma(context: ProcessingContext): Float {
@@ -73,6 +84,9 @@ class SharpenStage : ProcessingStage {
 
     companion object {
         const val RADIUS = 1
+        const val EXTRA_RADIUS = 2f
+        const val DETAIL_THRESHOLD_CUT = 0.5f
+        const val DETAIL_OVERSHOOT = 2f
         const val SHARPEN_GAIN = 2.5f
         const val SKIN_PROTECTION = 0.5f
 

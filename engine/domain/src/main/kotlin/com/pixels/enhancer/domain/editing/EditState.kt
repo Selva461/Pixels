@@ -8,6 +8,8 @@ import com.pixels.enhancer.domain.planning.EnhancementStrength
 import com.pixels.enhancer.domain.planning.Look
 import com.pixels.enhancer.domain.planning.ManualAdjustments
 import com.pixels.enhancer.domain.planning.ToneCurves
+import com.pixels.enhancer.domain.planning.ColorGrading
+import com.pixels.enhancer.domain.retouch.Retouch
 
 /**
  * Everything the user controls for one photo — the nondestructive edit. The original pixels are
@@ -21,6 +23,8 @@ data class EditState(
     val colorMixer: ColorMixer = ColorMixer.NONE,
     val toneCurves: ToneCurves = ToneCurves.NONE,
     val localAdjustments: LocalAdjustments = LocalAdjustments.NONE,
+    val colorGrading: ColorGrading = ColorGrading.NONE,
+    val retouch: Retouch = Retouch.NONE,
     /** Overrides the detected scene for Auto Enhance; null = use detection. */
     val sceneOverride: SceneType? = null,
 ) {

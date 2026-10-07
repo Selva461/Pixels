@@ -45,6 +45,13 @@ enum class AdjustmentKind(val label: String) {
     FACE_EXPOSURE("Face exposure"),
     VIGNETTE("Vignette"),
     GRAIN("Grain"),
+    SHARPEN_RADIUS("Sharpen radius"),
+    SHARPEN_DETAIL("Sharpen detail"),
+    VIGNETTE_MIDPOINT("Vignette midpoint"),
+    VIGNETTE_FEATHER("Vignette feather"),
+    VIGNETTE_ROUNDNESS("Vignette roundness"),
+    GRAIN_SIZE("Grain size"),
+    GRAIN_ROUGHNESS("Grain roughness"),
 }
 
 /**
@@ -89,8 +96,17 @@ data class EnhancementPlan(
     val colorNoiseReduction: Adjustment = Adjustment.MANUAL_ONLY,
     /** EV applied softly around detected faces (portraits). */
     val faceExposure: Adjustment = Adjustment.none("No faces detected"),
+    val sharpenRadius: Adjustment = Adjustment.MANUAL_ONLY,
+    val sharpenDetail: Adjustment = Adjustment.MANUAL_ONLY,
+    val vignetteMidpoint: Adjustment = Adjustment.MANUAL_ONLY,
+    val vignetteFeather: Adjustment = Adjustment.MANUAL_ONLY,
+    val vignetteRoundness: Adjustment = Adjustment.MANUAL_ONLY,
+    val grainSize: Adjustment = Adjustment.MANUAL_ONLY,
+    val grainRoughness: Adjustment = Adjustment.MANUAL_ONLY,
     /** Per-hue-band HSL shifts (manual only). */
     val colorMixer: ColorMixer = ColorMixer.NONE,
+    /** Colour grading wheels and black-and-white treatment (manual only). */
+    val colorGrading: ColorGrading = ColorGrading.NONE,
     /** User tone curves (manual only). */
     val toneCurves: ToneCurves = ToneCurves.NONE,
     val algorithmVersion: String = ENHANCEMENT_ALGORITHM_VERSION,
@@ -120,6 +136,13 @@ data class EnhancementPlan(
         AdjustmentKind.SHARPENING -> sharpening
         AdjustmentKind.VIGNETTE -> vignette
         AdjustmentKind.GRAIN -> grain
+        AdjustmentKind.SHARPEN_RADIUS -> sharpenRadius
+        AdjustmentKind.SHARPEN_DETAIL -> sharpenDetail
+        AdjustmentKind.VIGNETTE_MIDPOINT -> vignetteMidpoint
+        AdjustmentKind.VIGNETTE_FEATHER -> vignetteFeather
+        AdjustmentKind.VIGNETTE_ROUNDNESS -> vignetteRoundness
+        AdjustmentKind.GRAIN_SIZE -> grainSize
+        AdjustmentKind.GRAIN_ROUGHNESS -> grainRoughness
     }
 
     fun entries(): List<Pair<AdjustmentKind, Adjustment>> = AdjustmentKind.entries.map { it to get(it) }
@@ -149,7 +172,14 @@ data class EnhancementPlan(
         sharpening = transform(AdjustmentKind.SHARPENING, sharpening),
         vignette = transform(AdjustmentKind.VIGNETTE, vignette),
         grain = transform(AdjustmentKind.GRAIN, grain),
+        sharpenRadius = transform(AdjustmentKind.SHARPEN_RADIUS, sharpenRadius),
+        sharpenDetail = transform(AdjustmentKind.SHARPEN_DETAIL, sharpenDetail),
+        vignetteMidpoint = transform(AdjustmentKind.VIGNETTE_MIDPOINT, vignetteMidpoint),
+        vignetteFeather = transform(AdjustmentKind.VIGNETTE_FEATHER, vignetteFeather),
+        vignetteRoundness = transform(AdjustmentKind.VIGNETTE_ROUNDNESS, vignetteRoundness),
+        grainSize = transform(AdjustmentKind.GRAIN_SIZE, grainSize),
+        grainRoughness = transform(AdjustmentKind.GRAIN_ROUGHNESS, grainRoughness),
     )
 
-    val hasAnyCorrection: Boolean get() = AdjustmentKind.entries.any { get(it).enabled } || !colorMixer.isNeutral || !toneCurves.isIdentity
+    val hasAnyCorrection: Boolean get() = AdjustmentKind.entries.any { get(it).enabled } || !colorMixer.isNeutral || !toneCurves.isIdentity || !colorGrading.isNeutral
 }

@@ -55,11 +55,18 @@ enum class ManualControl(
     DEHAZE("Dehaze", ControlGroup.DETAIL, AdjustmentKind.DEHAZE, -1f, 1f, 0.8f, AmountRange(-0.8f, 0.8f), "Removes (or adds) atmospheric haze"),
     SHARPNESS("Sharpness", ControlGroup.DETAIL, AdjustmentKind.SHARPENING, 0f, 1f, 0.6f, AmountRange(0f, 0.8f), "Edge definition; cannot restore missing detail"),
     SHARPEN_MASKING("Sharpen masking", ControlGroup.DETAIL, AdjustmentKind.SHARPEN_MASKING, 0f, 1f, 1f, AmountRange(0f, 1f), "Higher limits sharpening to strong edges only", advanced = true),
+    SHARPEN_RADIUS("Sharpen radius", ControlGroup.DETAIL, AdjustmentKind.SHARPEN_RADIUS, 0f, 1f, 1f, AmountRange(0f, 1f), "Width of sharpened edges, 0.5 to 3 px", advanced = true),
+    SHARPEN_DETAIL("Sharpen detail", ControlGroup.DETAIL, AdjustmentKind.SHARPEN_DETAIL, 0f, 1f, 1f, AmountRange(0f, 1f), "Higher sharpens fine detail more; lower keeps halos down", advanced = true),
     NOISE_REDUCTION("Noise reduction", ControlGroup.DETAIL, AdjustmentKind.NOISE_REDUCTION, 0f, 1f, 1f, AmountRange(0f, 1f), "Smooths brightness grain while keeping edges"),
     COLOR_NOISE_REDUCTION("Color noise reduction", ControlGroup.DETAIL, AdjustmentKind.COLOR_NOISE_REDUCTION, 0f, 1f, 1f, AmountRange(0f, 1f), "Removes coloured speckles; brightness detail is untouched", advanced = true),
     FACE_EXPOSURE("Face exposure", ControlGroup.PORTRAIT, AdjustmentKind.FACE_EXPOSURE, -1f, 1f, 1f, AmountRange(-1.25f, 1.5f), "Brightens or darkens detected faces only, with a soft edge", format = ValueFormat.EV),
     VIGNETTE("Vignette", ControlGroup.EFFECTS, AdjustmentKind.VIGNETTE, -1f, 1f, 1f, AmountRange(-1f, 1f), "Darker or lighter corners"),
+    VIGNETTE_MIDPOINT("Vignette midpoint", ControlGroup.EFFECTS, AdjustmentKind.VIGNETTE_MIDPOINT, -1f, 1f, 1f, AmountRange(-1f, 1f), "How far the vignette reaches toward the centre", advanced = true),
+    VIGNETTE_FEATHER("Vignette feather", ControlGroup.EFFECTS, AdjustmentKind.VIGNETTE_FEATHER, -1f, 1f, 1f, AmountRange(-1f, 1f), "Softness of the vignette edge", advanced = true),
+    VIGNETTE_ROUNDNESS("Vignette roundness", ControlGroup.EFFECTS, AdjustmentKind.VIGNETTE_ROUNDNESS, -1f, 1f, 1f, AmountRange(-1f, 1f), "Oval (follows the frame) to circular", advanced = true),
     GRAIN("Grain", ControlGroup.EFFECTS, AdjustmentKind.GRAIN, 0f, 1f, 1f, AmountRange(0f, 1f), "Film-like texture"),
+    GRAIN_SIZE("Grain size", ControlGroup.EFFECTS, AdjustmentKind.GRAIN_SIZE, 0f, 1f, 1f, AmountRange(0f, 1f), "Fine to coarse grain", advanced = true),
+    GRAIN_ROUGHNESS("Grain roughness", ControlGroup.EFFECTS, AdjustmentKind.GRAIN_ROUGHNESS, 0f, 1f, 1f, AmountRange(0f, 1f), "Even to clumpy grain", advanced = true),
     ;
 
     /** The value as the user reads it, e.g. "+25", "−1.5 EV" or "γ 1.41". */

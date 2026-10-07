@@ -19,6 +19,7 @@ object GeometryOps {
     fun apply(image: PixelBuffer, geometry: Geometry): PixelBuffer {
         var result = rotateQuarterTurns(image, geometry.quarterTurns)
         if (geometry.flipHorizontal) result = flipHorizontal(result)
+        result = OpticsWarp.apply(result, geometry.lens, geometry.perspective)
         if (geometry.straightenDegrees != 0f) result = straighten(result, geometry.straightenDegrees)
         if (!geometry.crop.isFull) result = crop(result, geometry.crop)
         return result
