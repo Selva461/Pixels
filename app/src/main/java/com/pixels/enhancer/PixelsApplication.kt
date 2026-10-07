@@ -11,6 +11,8 @@ import com.pixels.enhancer.data.storage.ShareCache
 import com.pixels.enhancer.data.storage.ThumbnailStore
 import com.pixels.enhancer.domain.project.FileProjectStore
 import com.pixels.enhancer.domain.project.ProjectManager
+import com.pixels.enhancer.domain.presets.FilePresetStore
+import com.pixels.enhancer.domain.presets.PresetStore
 import java.io.File
 import com.pixels.enhancer.domain.analysis.StatisticalImageAnalyzer
 import com.pixels.enhancer.domain.planning.NaturalEnhancementPlanner
@@ -49,6 +51,8 @@ class AppContainer(context: Context) {
     val projectManager = ProjectManager(FileProjectStore(File(appContext.filesDir, "projects"), logger))
 
     val thumbnails = ThumbnailStore(File(appContext.filesDir, "thumbnails"))
+
+    val presetStore: PresetStore = FilePresetStore(File(appContext.filesDir, "presets"), logger)
 
     val enhanceImageUseCase = EnhanceImageUseCase(
         imageRepository = AndroidImageRepository(appContext.contentResolver),

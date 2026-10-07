@@ -36,6 +36,9 @@ class ProjectManager(
     suspend fun recordExport(project: Project, options: ExportOptions, exported: EditState): Project =
         save(project.copy(exportOptions = options, lastExportedEdit = exported))
 
+    /** Replaces the project's named versions. */
+    suspend fun recordVersions(project: Project, versions: List<EditVersion>): Project = save(project.copy(versions = versions))
+
     suspend fun recent(): List<Project> = store.list()
 
     suspend fun load(id: String): Project? = store.load(id)

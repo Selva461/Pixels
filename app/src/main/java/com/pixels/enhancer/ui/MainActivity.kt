@@ -4,6 +4,7 @@ import android.content.ClipData
 import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.PickVisualMediaRequest
@@ -28,10 +29,6 @@ import com.pixels.enhancer.R
 import com.pixels.enhancer.ui.about.AboutScreen
 import com.pixels.enhancer.ui.components.EditorSkeleton
 import com.pixels.enhancer.ui.debug.DebugScreen
-import com.pixels.enhancer.ui.editor.ColorActions
-import com.pixels.enhancer.ui.editor.CropActions
-import com.pixels.enhancer.ui.editor.ExportActions
-import com.pixels.enhancer.ui.editor.LocalEditorActions
 import com.pixels.enhancer.ui.editor.EditorEvent
 import com.pixels.enhancer.ui.editor.EditorScreen
 import com.pixels.enhancer.ui.editor.EditorUiState
@@ -67,7 +64,11 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        enableEdgeToEdge()
+        // The app is always dark, so system bar icons are always light.
+        enableEdgeToEdge(
+            statusBarStyle = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT),
+            navigationBarStyle = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT),
+        )
         setContent {
             PixelsTheme {
                 Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
@@ -120,51 +121,7 @@ private fun PixelsApp(viewModel: EditorViewModel, onPickImage: () -> Unit, modif
             } else {
                 EditorScreen(
                     state = current,
-                    onClose = viewModel::onCloseRequested,
-                    onConfirmLeave = viewModel::onClose,
-                    onDismissLeave = viewModel::onLeaveDismissed,
-                    onRedo = viewModel::onRedo,
-                    onShowOriginalEdit = viewModel::onShowOriginalEdit,
-                    onStrengthChanged = viewModel::onStrengthChanged,
-                    onControlChanged = viewModel::onControlChanged,
-                    onEditFinished = viewModel::onEditFinished,
-                    onLookSelected = viewModel::onLookSelected,
-                    onResetControl = viewModel::onResetControl,
-                    onResetAll = viewModel::onResetAll,
-                    onUndo = viewModel::onUndo,
-                    onSave = viewModel::onSave,
-                    onShare = viewModel::onShare,
-                    onViewSaved = viewModel::onViewSaved,
-                    crop = CropActions(
-                        onRotateClockwise = viewModel::onRotateClockwise,
-                        onRotateCounterClockwise = viewModel::onRotateCounterClockwise,
-                        onFlip = viewModel::onFlip,
-                        onFlipVertical = viewModel::onFlipVertical,
-                        onStraightenChanged = viewModel::onStraightenChanged,
-                        onCropChanged = viewModel::onCropChanged,
-                        onAspectSelected = viewModel::onCropAspectSelected,
-                        onReset = viewModel::onResetGeometry,
-                        onCropModeChanged = viewModel::onCropModeChanged,
-                        ratioFor = viewModel::aspectRatioFor,
-                    ),
-                    color = ColorActions(
-                        onShiftChanged = viewModel::onColorMixerChanged,
-                        onResetAll = viewModel::onResetColorMixer,
-                        onSceneSelected = viewModel::onSceneSelected,
-                        onCurveChanged = viewModel::onCurveChanged,
-                        onCurveReset = viewModel::onResetCurve,
-                    ),
-                    local = LocalEditorActions(
-                        onAdd = viewModel::onAddLocal,
-                        onChanged = viewModel::onLocalChanged,
-                        onRemove = viewModel::onLocalRemoved,
-                    ),
-                    export = ExportActions(
-                        onOptionsChanged = viewModel::onExportOptionsChanged,
-                        onConfirm = viewModel::onExportConfirmed,
-                        onDismiss = viewModel::onExportDismissed,
-                        onCancel = viewModel::onCancelExport,
-                    ),
+                    actions = viewModel,
                     onOpenDebug = if (debug != null) ({ showDebug = true }) else null,
                     modifier = modifier,
                 )

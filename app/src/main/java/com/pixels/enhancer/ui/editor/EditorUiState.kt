@@ -8,6 +8,10 @@ import com.pixels.enhancer.domain.analysis.SceneType
 import com.pixels.enhancer.domain.debug.DebugSection
 import com.pixels.enhancer.domain.editing.EditState
 import com.pixels.enhancer.domain.export.ExportOptions
+import com.pixels.enhancer.domain.presets.Preset
+import com.pixels.enhancer.domain.project.EditVersion
+import com.pixels.enhancer.domain.retouch.RetouchMode
+import com.pixels.enhancer.domain.retouch.RetouchSpot
 
 /** Single state model for the whole flow — no independent isLoading / hasError flags. */
 sealed interface EditorUiState {
@@ -41,6 +45,18 @@ sealed interface EditorUiState {
         val activity: EditorActivity,
         /** Present only in developer builds. */
         val debug: DebugInfo?,
+        val userPresets: List<Preset> = emptyList(),
+        /** Preset applied last, with its amount slider (0..2). */
+        val appliedPreset: AppliedPreset? = null,
+        val versions: List<EditVersion> = emptyList(),
+        /** True once settings were copied and can be pasted. */
+        val canPaste: Boolean = false,
+        val selectedMaskId: Int? = null,
+        /** Red overlay showing where the selected mask applies, when switched on. */
+        val maskOverlay: ImageBitmap? = null,
+        val showMaskOverlay: Boolean = false,
+        val selectedSpotId: Int? = null,
+        val healSettings: HealSettings = HealSettings(),
     ) : EditorUiState
 
     data class Error(val code: ErrorCode) : EditorUiState
@@ -54,6 +70,14 @@ sealed interface EditorActivity {
     data class Saved(val displayName: String, val uri: Uri, val width: Int, val height: Int) : EditorActivity
     data class Failed(val code: ErrorCode) : EditorActivity
 }
+
+data class AppliedPreset(val preset: Preset, val amount: Float)
+
+/** Brush for new heal/clone spots. */
+data class HealSettings(val mode: RetouchMode = RetouchMode.HEAL, val radius: Float = RetouchSpot.DEFAULT_RADIUS, val feather: Float = RetouchSpot.DEFAULT_FEATHER)
+
+/** Kinds of mask the user can add. */
+enum class MaskKind { BRUSH, LINEAR, RADIAL, LUMINANCE, COLOR }
 
 data class ExportDialogState(val options: ExportOptions, val width: Int, val height: Int)
 

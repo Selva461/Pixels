@@ -22,6 +22,21 @@ import com.pixels.enhancer.domain.editing.EditHistory
 import com.pixels.enhancer.domain.editing.EditState
 import com.pixels.enhancer.domain.export.ExportOptions
 import com.pixels.enhancer.domain.local.LocalAdjustment
+import com.pixels.enhancer.domain.geometry.LensCorrection
+import com.pixels.enhancer.domain.geometry.Perspective
+import com.pixels.enhancer.domain.local.BrushStroke
+import com.pixels.enhancer.domain.local.LocalAdjustmentRenderer
+import com.pixels.enhancer.domain.local.LocalAdjustments
+import com.pixels.enhancer.domain.local.RangeMask
+import com.pixels.enhancer.domain.planning.ColorGrading
+import com.pixels.enhancer.domain.presets.Preset
+import com.pixels.enhancer.domain.presets.PresetMath
+import com.pixels.enhancer.domain.presets.PresetStore
+import com.pixels.enhancer.domain.presets.SettingsGroup
+import com.pixels.enhancer.domain.project.EditVersion
+import com.pixels.enhancer.domain.retouch.RetouchSourceFinder
+import com.pixels.enhancer.domain.retouch.RetouchSpot
+import java.util.UUID
 import com.pixels.enhancer.domain.project.Project
 import com.pixels.enhancer.domain.project.ProjectManager
 import com.pixels.enhancer.domain.geometry.CropMath
@@ -78,8 +93,9 @@ class EditorViewModel(
     private val shareCache: ShareCache,
     private val projectManager: ProjectManager,
     private val thumbnails: ThumbnailStore,
+    private val presetStore: PresetStore,
     private val isDebugBuild: Boolean,
-) : ViewModel() {
+) : ViewModel(), EditorActions {
 
     private val _uiState = MutableStateFlow<EditorUiState>(EditorUiState.Idle())
     val uiState: StateFlow<EditorUiState> = _uiState.asStateFlow()
@@ -105,6 +121,18 @@ class EditorViewModel(
     /** Autosaves run one at a time so two quick edits never race on the same file. */
     private val saveMutex = Mutex()
 
+    private var userPresets: List<Preset> = emptyList()
+
+    /** The edit before the last preset was applied, so its amount slider can re-apply from scratch. */
+    private var presetBase: EditState? = null
+    private var appliedPreset: AppliedPreset? = null
+    private var copiedSettings: EditState? = null
+    private var selectedMaskId: Int? = null
+    private var showMaskOverlay = false
+    private var maskOverlay: ImageBitmap? = null
+    private var selectedSpotId: Int? = null
+    private var healSettings = HealSettings()
+
     private var disabledStages: Set<String> = emptySet()
     private var runUntilStageId: String? = null
     private var openJob: Job? = null
@@ -116,6 +144,7 @@ class EditorViewModel(
     init {
         startPreviewRenderer()
         refreshRecent()
+        viewModelScope.launch { userPresets = runCatching { presetStore.list() }.getOrDefault(emptyList()) }
     }
 
     fun onImagePicked(uri: Uri) = openSource(uri.toString(), projectId = null)
@@ -165,12 +194,12 @@ class EditorViewModel(
         }
     }
 
-    fun onStrengthChanged(value: Float) = edit(current.copy(strength = value))
+    override fun onStrengthChanged(value: Float) = edit(current.copy(strength = value))
 
-    fun onControlChanged(control: ManualControl, value: Float) = edit(current.copy(manual = current.manual.with(control, value)))
+    override fun onControlChanged(control: ManualControl, value: Float) = edit(current.copy(manual = current.manual.with(control, value)))
 
     /** Called when a slider drag ends: records an undo step and remembers the strength. */
-    fun onEditFinished() {
+    override fun onEditFinished() {
         if (!history.commit(current)) return
         autosave()
         if (settings.strength != current.strength) {
@@ -180,24 +209,24 @@ class EditorViewModel(
         publishEdit()
     }
 
-    fun onRotateClockwise() = commitGeometry(current.geometry.rotatedClockwise())
+    override fun onRotateClockwise() = commitGeometry(current.geometry.rotatedClockwise())
 
-    fun onRotateCounterClockwise() = commitGeometry(current.geometry.rotatedCounterClockwise())
+    override fun onRotateCounterClockwise() = commitGeometry(current.geometry.rotatedCounterClockwise())
 
-    fun onFlip() = commitGeometry(current.geometry.flipped())
+    override fun onFlip() = commitGeometry(current.geometry.flipped())
 
-    fun onFlipVertical() = commitGeometry(current.geometry.flippedVertically())
+    override fun onFlipVertical() = commitGeometry(current.geometry.flippedVertically())
 
     /** Live while dragging; [onEditFinished] records the undo step. */
-    fun onStraightenChanged(degrees: Float) = edit(current.copy(geometry = current.geometry.straightened(degrees)))
+    override fun onStraightenChanged(degrees: Float) = edit(current.copy(geometry = current.geometry.straightened(degrees)))
 
     /**
      * The crop frame moves on top of an uncropped preview, so dragging it needs no re-render;
      * the crop is applied when the user leaves the Crop tab.
      */
-    fun onCropChanged(crop: CropRect) = edit(current.copy(geometry = current.geometry.copy(crop = crop)), render = !cropMode)
+    override fun onCropChanged(crop: CropRect) = edit(current.copy(geometry = current.geometry.copy(crop = crop)), render = !cropMode)
 
-    fun onCropAspectSelected(aspect: CropAspect) {
+    override fun onCropAspectSelected(aspect: CropAspect) {
         cropAspect = aspect
         val ratio = aspectRatioFor(aspect)
         if (ratio != null) onCropChanged(CropMath.largestCentered(current.geometry.crop, ratio, frameAspect()))
@@ -205,19 +234,19 @@ class EditorViewModel(
         _uiState.update { state -> if (state is EditorUiState.Success) state.copy(cropAspect = aspect) else state }
     }
 
-    fun onResetGeometry() {
+    override fun onResetGeometry() {
         cropAspect = CropAspect.FREE
         commitGeometry(Geometry.NONE)
     }
 
-    fun onCropModeChanged(enabled: Boolean) {
+    override fun onCropModeChanged(enabled: Boolean) {
         if (cropMode == enabled) return
         cropMode = enabled
         requestPreview()
     }
 
     /** Pixel width/height ratio a [CropAspect] asks for; ORIGINAL means the unrotated photo's shape. */
-    fun aspectRatioFor(aspect: CropAspect): Float? {
+    override fun aspectRatioFor(aspect: CropAspect): Float? {
         if (aspect != CropAspect.ORIGINAL) return aspect.ratio
         val source = session?.original ?: return null
         val ratio = source.width.toFloat() / source.height
@@ -237,13 +266,13 @@ class EditorViewModel(
     }
 
     /** Live while dragging a colour-mixer slider; [onEditFinished] records the undo step. */
-    fun onColorMixerChanged(band: HueBand, shift: HslShift) = edit(current.copy(colorMixer = current.colorMixer.with(band, shift)))
+    override fun onColorMixerChanged(band: HueBand, shift: HslShift) = edit(current.copy(colorMixer = current.colorMixer.with(band, shift)))
 
     /** Live while dragging a curve point; [onEditFinished] records the undo step. */
-    fun onCurveChanged(channel: CurveChannel, points: CurvePoints) =
+    override fun onCurveChanged(channel: CurveChannel, points: CurvePoints) =
         edit(current.copy(toneCurves = current.toneCurves.with(channel, points)))
 
-    fun onResetCurve(channel: CurveChannel) {
+    override fun onResetCurve(channel: CurveChannel) {
         edit(current.copy(toneCurves = current.toneCurves.with(channel, CurvePoints.IDENTITY)))
         onEditFinished()
     }
@@ -259,20 +288,254 @@ class EditorViewModel(
     }
 
     /** Live while dragging a mask handle or slider; [onEditFinished] records the undo step. */
-    fun onLocalChanged(item: LocalAdjustment) = edit(current.copy(localAdjustments = current.localAdjustments.with(item)))
+    override fun onLocalChanged(item: LocalAdjustment) = edit(current.copy(localAdjustments = current.localAdjustments.with(item)))
 
     fun onLocalRemoved(id: Int) {
         edit(current.copy(localAdjustments = current.localAdjustments.without(id)))
         onEditFinished()
     }
 
-    fun onResetColorMixer() {
+    // --- Presets, copy/paste, versions ---
+
+    override fun onPresetApplied(preset: Preset) {
+        val base = if (appliedPreset != null) presetBase ?: current else current
+        presetBase = base
+        appliedPreset = AppliedPreset(preset, 1f)
+        edit(PresetMath.apply(base, preset, 1f))
+        onEditFinished()
+    }
+
+    /** Live while dragging the preset amount; [onEditFinished] records the undo step. */
+    override fun onPresetAmountChanged(amount: Float) {
+        val applied = appliedPreset ?: return
+        val base = presetBase ?: return
+        appliedPreset = applied.copy(amount = amount)
+        edit(PresetMath.apply(base, applied.preset, amount))
+    }
+
+    override fun onSavePreset(name: String) {
+        val trimmed = name.trim().ifEmpty { return }
+        val preset = Preset("user-${UUID.randomUUID()}", trimmed, USER_PRESET_CATEGORY, PresetMath.settingsOf(current), builtIn = false)
+        viewModelScope.launch {
+            runCatching { presetStore.save(preset) }.onSuccess {
+                userPresets = presetStore.list()
+                publishEdit()
+            }.onFailure { setActivity(EditorActivity.Failed(ErrorCode.UNKNOWN)) }
+        }
+    }
+
+    override fun onDeletePreset(preset: Preset) {
+        if (preset.builtIn) return
+        viewModelScope.launch {
+            runCatching { presetStore.delete(preset.id) }
+            userPresets = runCatching { presetStore.list() }.getOrDefault(userPresets - preset)
+            publishEdit()
+        }
+    }
+
+    override fun onCopySettings() {
+        copiedSettings = current
+        publishEdit()
+    }
+
+    override fun onPasteSettings(groups: Set<SettingsGroup>) {
+        val copied = copiedSettings ?: return
+        edit(PresetMath.paste(copied, current, groups))
+        onEditFinished()
+    }
+
+    override fun onSaveVersion(name: String) {
+        val saved = project ?: return
+        val version = EditVersion(name.trim().ifEmpty { "Version ${saved.versions.size + 1}" }, System.currentTimeMillis(), current)
+        updateVersions(saved, saved.versions + version)
+    }
+
+    override fun onApplyVersion(version: EditVersion) {
+        edit(version.edit)
+        onEditFinished()
+    }
+
+    override fun onDeleteVersion(version: EditVersion) {
+        val saved = project ?: return
+        updateVersions(saved, saved.versions - version)
+    }
+
+    private fun updateVersions(saved: Project, versions: List<EditVersion>) {
+        project = saved.copy(versions = versions)
+        publishEdit()
+        viewModelScope.launch {
+            saveMutex.withLock {
+                runCatching { projectManager.recordVersions(project ?: saved, versions) }.onSuccess { updated -> if (project?.id == updated.id) project = updated }
+            }
+        }
+    }
+
+    // --- Colour grading, optics, geometry ---
+
+    /** Live while dragging; [onEditFinished] records the undo step. */
+    override fun onGradingChanged(grading: ColorGrading) = edit(current.copy(colorGrading = grading.clamped()))
+
+    override fun onMonochromeChanged(enabled: Boolean) {
+        edit(current.copy(colorGrading = current.colorGrading.copy(monochrome = enabled)))
+        onEditFinished()
+    }
+
+    override fun onResetGrading() {
+        edit(current.copy(colorGrading = ColorGrading.NONE.copy(monochrome = current.colorGrading.monochrome)))
+        onEditFinished()
+    }
+
+    override fun onLensChanged(lens: LensCorrection) = edit(current.copy(geometry = current.geometry.withLens(lens)))
+
+    override fun onPerspectiveChanged(perspective: Perspective) = edit(current.copy(geometry = current.geometry.withPerspective(perspective)))
+
+    override fun onResetLens() = commitGeometry(current.geometry.withLens(LensCorrection.NONE))
+
+    override fun onResetPerspective() = commitGeometry(current.geometry.withPerspective(Perspective.NONE))
+
+    // --- Masks ---
+
+    override fun onAddMask(kind: MaskKind) {
+        if (current.localAdjustments.items.size >= LocalAdjustments.MAX_ITEMS) return
+        val output = outcome?.output
+        val aspect = if (output == null) 1f else output.width.toFloat() / output.height
+        val id = current.localAdjustments.nextId()
+        val item = when (kind) {
+            MaskKind.BRUSH -> LocalAdjustment.brush(id)
+            MaskKind.LINEAR -> LocalAdjustment.linearTop(id)
+            MaskKind.RADIAL -> LocalAdjustment.radialAt(id, 0.5f, 0.5f, aspect)
+            MaskKind.LUMINANCE -> LocalAdjustment.luminanceRange(id)
+            // Starts from the photo's centre colour; tapping the photo picks another.
+            MaskKind.COLOR -> sampleColor(0.5f, 0.5f).let { (r, g, b) -> LocalAdjustment.colorRange(id, r, g, b) }
+        }
+        selectedMaskId = id
+        edit(current.copy(localAdjustments = current.localAdjustments.with(item)))
+        onEditFinished()
+        refreshMaskOverlay()
+    }
+
+    override fun onSelectMask(id: Int?) {
+        selectedMaskId = id
+        publishEdit()
+        refreshMaskOverlay()
+    }
+
+    override fun onMaskOverlayChanged(show: Boolean) {
+        showMaskOverlay = show
+        publishEdit()
+        refreshMaskOverlay()
+    }
+
+    /** One finished brush stroke on the selected mask (one undo step). */
+    override fun onBrushStroke(stroke: BrushStroke) {
+        val item = current.localAdjustments.byId(selectedMaskId ?: return) ?: return
+        edit(current.copy(localAdjustments = current.localAdjustments.with(item.withStroke(stroke))))
+        onEditFinished()
+    }
+
+    /** Colour-range masks pick their colour from where the user taps on the photo. */
+    override fun onSampleMaskColor(x: Float, y: Float) {
+        val item = current.localAdjustments.byId(selectedMaskId ?: return) ?: return
+        val range = item.range as? RangeMask.Color ?: return
+        val (r, g, b) = sampleColor(x, y)
+        edit(current.copy(localAdjustments = current.localAdjustments.with(item.copy(range = range.copy(red = r, green = g, blue = b)))))
+        onEditFinished()
+    }
+
+    override fun onMaskRemoved(id: Int) {
+        if (selectedMaskId == id) selectedMaskId = null
+        onLocalRemoved(id)
+    }
+
+    private fun sampleColor(x: Float, y: Float): Triple<Int, Int, Int> {
+        val output = outcome?.output ?: return Triple(128, 128, 128)
+        val px = (x * output.width).toInt().coerceIn(0, output.width - 1)
+        val py = (y * output.height).toInt().coerceIn(0, output.height - 1)
+        // Average a small neighbourhood so noise doesn't decide the colour.
+        var r = 0
+        var g = 0
+        var b = 0
+        var n = 0
+        for (yy in (py - 2).coerceAtLeast(0)..(py + 2).coerceAtMost(output.height - 1)) {
+            for (xx in (px - 2).coerceAtLeast(0)..(px + 2).coerceAtMost(output.width - 1)) {
+                val c = output.pixels[yy * output.width + xx]
+                r += (c shr 16) and 0xFF
+                g += (c shr 8) and 0xFF
+                b += c and 0xFF
+                n++
+            }
+        }
+        return Triple(r / n, g / n, b / n)
+    }
+
+    private var overlayJob: Job? = null
+
+    private fun refreshMaskOverlay() {
+        overlayJob?.cancel()
+        val output = outcome?.output
+        val item = selectedMaskId?.let { current.localAdjustments.byId(it) }
+        if (!showMaskOverlay || output == null || item == null) {
+            if (maskOverlay != null) {
+                maskOverlay = null
+                publishEdit()
+            }
+            return
+        }
+        overlayJob = viewModelScope.launch {
+            maskOverlay = withContext(Dispatchers.Default) {
+                val weights = LocalAdjustmentRenderer.maskOf(output, item)
+                val pixels = IntArray(weights.size) { i -> ((weights[i] * OVERLAY_ALPHA).toInt() shl 24) or OVERLAY_RGB }
+                BitmapConversions.toBitmap(PixelBuffer(output.width, output.height, pixels)).asImageBitmap()
+            }
+            publishEdit()
+        }
+    }
+
+    // --- Healing ---
+
+    /** Tap on the photo: a new spot there, with a source chosen automatically. */
+    override fun onAddSpot(x: Float, y: Float) {
+        val output = outcome?.output ?: return
+        val (sx, sy) = RetouchSourceFinder.find(output, x, y, healSettings.radius)
+        val id = current.retouch.nextId()
+        val spot = RetouchSpot(id, x, y, sx, sy, healSettings.radius, healSettings.feather, mode = healSettings.mode)
+        selectedSpotId = id
+        edit(current.copy(retouch = current.retouch.with(spot)))
+        onEditFinished()
+    }
+
+    /** Live while dragging a spot's handles or sliders; [onEditFinished] records the undo step. */
+    override fun onSpotChanged(spot: RetouchSpot) = edit(current.copy(retouch = current.retouch.with(spot)))
+
+    override fun onSelectSpot(id: Int?) {
+        selectedSpotId = id
+        publishEdit()
+    }
+
+    override fun onSpotRemoved(id: Int) {
+        if (selectedSpotId == id) selectedSpotId = null
+        edit(current.copy(retouch = current.retouch.without(id)))
+        onEditFinished()
+    }
+
+    override fun onHealSettingsChanged(settings: HealSettings) {
+        healSettings = settings
+        // Size and mode also apply to the selected spot, as in other editors.
+        val spot = current.retouch.spots.firstOrNull { it.id == selectedSpotId }
+        if (spot != null) {
+            edit(current.copy(retouch = current.retouch.with(spot.copy(radius = settings.radius, feather = settings.feather, mode = settings.mode))))
+        } else {
+            publishEdit()
+        }
+    }
+
+    override fun onResetColorMixer() {
         edit(current.copy(colorMixer = ColorMixer.NONE))
         onEditFinished()
     }
 
     /** null returns to the detected scene. */
-    fun onSceneSelected(scene: SceneType?) {
+    override fun onSceneSelected(scene: SceneType?) {
         edit(current.copy(sceneOverride = scene))
         onEditFinished()
     }
@@ -282,13 +545,15 @@ class EditorViewModel(
         onEditFinished()
     }
 
-    fun onResetControl(control: ManualControl) {
+    override fun onResetControl(control: ManualControl) {
         edit(current.copy(manual = current.manual.with(control, 0f)))
         onEditFinished()
     }
 
     /** Back to the automatic correction at the default strength. */
-    fun onResetAll() {
+    override fun onResetAll() {
+        appliedPreset = null
+        presetBase = null
         disabledStages = emptySet()
         runUntilStageId = null
         edit(EditState(EnhancementStrength.DEFAULT))
@@ -296,17 +561,19 @@ class EditorViewModel(
     }
 
     /** The true zero state: no enhancement, no adjustments, no crop — the original appearance. */
-    fun onShowOriginalEdit() {
+    override fun onShowOriginalEdit() {
         edit(EditState.ORIGINAL)
         onEditFinished()
     }
 
-    fun onUndo() = restore(history.undo())
+    override fun onUndo() = restore(history.undo())
 
-    fun onRedo() = restore(history.redo())
+    override fun onRedo() = restore(history.redo())
 
     private fun restore(state: EditState?) {
         current = state ?: return
+        appliedPreset = null
+        presetBase = null
         autosave()
         publishEdit()
         requestPreview()
@@ -327,19 +594,19 @@ class EditorViewModel(
     }
 
     /** Save opens the export dialog with the last-used options. */
-    fun onSave() {
+    override fun onSave() {
         val state = _uiState.value as? EditorUiState.Success ?: return
         if (state.activity is EditorActivity.Saving) return
         showExportDialog(project?.exportOptions ?: settings.export)
     }
 
-    fun onExportOptionsChanged(options: ExportOptions) = showExportDialog(options)
+    override fun onExportOptionsChanged(options: ExportOptions) = showExportDialog(options)
 
-    fun onExportDismissed() {
+    override fun onExportDismissed() {
         _uiState.update { state -> if (state is EditorUiState.Success) state.copy(exportDialog = null) else state }
     }
 
-    fun onExportConfirmed() {
+    override fun onExportConfirmed() {
         val currentSession = session ?: return
         val options = (_uiState.value as? EditorUiState.Success)?.exportDialog?.options ?: return
         settings = settings.copy(export = options)
@@ -361,7 +628,7 @@ class EditorViewModel(
     }
 
     /** The saver deletes any partial file when cancelled, so nothing half-written reaches the gallery. */
-    fun onCancelExport() {
+    override fun onCancelExport() {
         exportJob?.cancel()
         exportJob = null
         setActivity(EditorActivity.None)
@@ -375,11 +642,11 @@ class EditorViewModel(
         }
     }
 
-    fun onViewSaved(uri: Uri) {
+    override fun onViewSaved(uri: Uri) {
         viewModelScope.launch { _events.send(EditorEvent.ViewImage(uri)) }
     }
 
-    fun onShare() {
+    override fun onShare() {
         val currentSession = session ?: return
         setActivity(EditorActivity.Saving(0f))
         exportJob = viewModelScope.launch {
@@ -414,7 +681,7 @@ class EditorViewModel(
     }
 
     /** Close asks first when the current edit has never been exported. */
-    fun onCloseRequested() {
+    override fun onCloseRequested() {
         if (project?.hasUnexportedChanges == true) {
             _uiState.update { state -> if (state is EditorUiState.Success) state.copy(confirmLeave = true) else state }
         } else {
@@ -422,11 +689,11 @@ class EditorViewModel(
         }
     }
 
-    fun onLeaveDismissed() {
+    override fun onLeaveDismissed() {
         _uiState.update { state -> if (state is EditorUiState.Success) state.copy(confirmLeave = false) else state }
     }
 
-    fun onClose() {
+    override fun onClose() {
         openJob?.cancel()
         exportJob?.cancel()
         clearSession()
@@ -443,9 +710,22 @@ class EditorViewModel(
     /** Moves the sliders immediately; the image follows when the preview render finishes. */
     private fun publishEdit() {
         _uiState.update { state ->
-            if (state is EditorUiState.Success) state.copy(edit = current, canUndo = history.canUndo, canRedo = history.canRedo) else state
+            if (state is EditorUiState.Success) state.copy(edit = current, canUndo = history.canUndo, canRedo = history.canRedo).withExtras() else state
         }
     }
+
+    /** Editor-only state that lives in the view model, copied into every published state. */
+    private fun EditorUiState.Success.withExtras() = copy(
+        userPresets = userPresets,
+        appliedPreset = appliedPreset,
+        versions = project?.versions.orEmpty(),
+        canPaste = copiedSettings != null,
+        selectedMaskId = selectedMaskId?.takeIf { id -> current.localAdjustments.byId(id) != null },
+        maskOverlay = if (showMaskOverlay) maskOverlay else null,
+        showMaskOverlay = showMaskOverlay,
+        selectedSpotId = selectedSpotId?.takeIf { id -> current.retouch.spots.any { it.id == id } },
+        healSettings = healSettings,
+    )
 
     private fun requestPreview() {
         if (session == null) return
@@ -459,6 +739,8 @@ class EditorViewModel(
         colorMixer = current.colorMixer,
         toneCurves = current.toneCurves,
         localAdjustments = current.localAdjustments,
+        colorGrading = current.colorGrading,
+        retouch = current.retouch,
         sceneOverride = current.sceneOverride,
         target = target,
         debugEnabled = isDebugBuild,
@@ -504,8 +786,9 @@ class EditorViewModel(
                             ?.takeIf { it is EditorActivity.Saving || it is EditorActivity.Saved }
                             ?: EditorActivity.None,
                         debug = debugInfo(currentSession, result.value),
-                    )
+                    ).withExtras()
                 }
+                refreshMaskOverlay()
             }
         }
     }
@@ -554,6 +837,12 @@ class EditorViewModel(
         current = EditState(settings.strength)
         history = EditHistory(current)
         project = null
+        presetBase = null
+        appliedPreset = null
+        selectedMaskId = null
+        showMaskOverlay = false
+        maskOverlay = null
+        selectedSpotId = null
         disabledStages = emptySet()
         runUntilStageId = null
     }
@@ -561,6 +850,9 @@ class EditorViewModel(
     companion object {
         /** Coalesces rapid slider movement into one render. */
         private const val PREVIEW_DEBOUNCE_MS = 60L
+        private const val USER_PRESET_CATEGORY = "Yours"
+        private const val OVERLAY_ALPHA = 150f
+        private const val OVERLAY_RGB = 0xE5484D
 
         fun factory(container: AppContainer): ViewModelProvider.Factory = viewModelFactory {
             initializer {
@@ -570,6 +862,7 @@ class EditorViewModel(
                     shareCache = container.shareCache,
                     projectManager = container.projectManager,
                     thumbnails = container.thumbnails,
+                    presetStore = container.presetStore,
                     isDebugBuild = container.isDebugBuild,
                 )
             }
