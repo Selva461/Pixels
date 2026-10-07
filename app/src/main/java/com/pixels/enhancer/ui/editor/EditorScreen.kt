@@ -26,7 +26,7 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Tab
-import androidx.compose.material3.TabRow
+import androidx.compose.material3.ScrollableTabRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -49,6 +49,9 @@ import com.pixels.enhancer.domain.planning.HslShift
 import com.pixels.enhancer.domain.planning.HueBand
 import com.pixels.enhancer.ui.adjust.AdjustPanel
 import com.pixels.enhancer.ui.adjust.ColorMixerPanel
+import com.pixels.enhancer.ui.adjust.CurvePanel
+import com.pixels.enhancer.domain.planning.CurveChannel
+import com.pixels.enhancer.domain.planning.CurvePoints
 import com.pixels.enhancer.domain.export.ExportOptions
 import com.pixels.enhancer.domain.geometry.CropRect
 import com.pixels.enhancer.domain.geometry.Geometry
@@ -73,6 +76,7 @@ private enum class EditorTab(val titleRes: Int) {
     LOOKS(R.string.editor_tab_looks),
     ADJUST(R.string.editor_tab_adjust),
     COLOR(R.string.editor_tab_color),
+    CURVE(R.string.editor_tab_curve),
     CROP(R.string.editor_tab_crop),
 }
 
@@ -89,6 +93,8 @@ class ColorActions(
     val onShiftChanged: (HueBand, HslShift) -> Unit,
     val onResetAll: () -> Unit,
     val onSceneSelected: (SceneType?) -> Unit,
+    val onCurveChanged: (CurveChannel, CurvePoints) -> Unit,
+    val onCurveReset: (CurveChannel) -> Unit,
 )
 
 /** Callbacks for the Crop tab, grouped to keep EditorScreen's signature readable. */
@@ -176,7 +182,7 @@ fun EditorScreen(
             }
             ActivityLine(state.activity, export.onCancel)
             if (tab != EditorTab.CROP) ModeSelector(mode, split, onModeChange = { mode = it }, onSplitChange = { split = it })
-            TabRow(selectedTabIndex = tab.ordinal) {
+            ScrollableTabRow(selectedTabIndex = tab.ordinal, edgePadding = 8.dp) {
                 EditorTab.entries.forEach { entry ->
                     Tab(selected = tab == entry, onClick = { tab = entry }, text = { Text(stringResource(entry.titleRes), maxLines = 1) })
                 }
@@ -190,6 +196,7 @@ fun EditorScreen(
                     EditorTab.LOOKS -> LooksPanel(state.edit.lookId, onLookSelected)
                     EditorTab.ADJUST -> AdjustPanel(state.edit, state.histogram, onControlChanged, onEditFinished, onResetControl)
                     EditorTab.COLOR -> ColorMixerPanel(state.edit, color.onShiftChanged, onEditFinished, color.onResetAll)
+                    EditorTab.CURVE -> CurvePanel(state.edit, state.histogram, color.onCurveChanged, onEditFinished, color.onCurveReset)
                     EditorTab.CROP -> CropPanel(state.edit, state.cropAspect, crop, onEditFinished)
                 }
             }

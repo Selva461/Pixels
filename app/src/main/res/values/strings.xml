@@ -64,6 +64,9 @@
     <string name="editor_tab_adjust">Adjust</string>
     <string name="editor_tab_crop">Crop</string>
     <string name="editor_tab_color">Color</string>
+    <string name="editor_tab_curve">Curve</string>
+    <string name="curve_hint">Tap to add a point, drag to move it, double-tap to remove it.</string>
+    <string name="curve_reset">Reset this curve</string>
     <string name="editor_scene">Scene: %1$s (detected: %2$s)</string>
     <string name="editor_scene_auto">Auto-detect</string>
     <string name="adjust_more_controls">More controls</string>

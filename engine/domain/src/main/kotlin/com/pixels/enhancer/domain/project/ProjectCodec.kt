@@ -9,6 +9,10 @@ import com.pixels.enhancer.domain.export.MetadataPolicy
 import com.pixels.enhancer.domain.geometry.CropRect
 import com.pixels.enhancer.domain.geometry.Geometry
 import com.pixels.enhancer.domain.planning.ColorMixer
+import com.pixels.enhancer.domain.planning.CurveChannel
+import com.pixels.enhancer.domain.planning.CurvePoint
+import com.pixels.enhancer.domain.planning.CurvePoints
+import com.pixels.enhancer.domain.planning.ToneCurves
 import com.pixels.enhancer.domain.planning.HslShift
 import com.pixels.enhancer.domain.planning.HueBand
 import com.pixels.enhancer.domain.planning.ManualAdjustments
@@ -110,6 +114,8 @@ private data class EditFile(
     /** Keyed by [HueBand] name, value = [hue, saturation, luminance]. Added without a schema bump (defaults to none). */
     val colorMixer: Map<String, List<Float>> = emptyMap(),
     val sceneOverride: String? = null,
+    /** Keyed by [CurveChannel] name; value = flattened [x0, y0, x1, y1, …]. */
+    val curves: Map<String, List<Float>> = emptyMap(),
 ) {
     fun toEdit(): EditState {
         val controls = manual.mapNotNull { (name, value) -> ManualControl.entries.firstOrNull { it.name == name }?.let { it to value } }
@@ -130,6 +136,11 @@ private data class EditFile(
                 if (band == null || values.size != HSL_VALUES) mixer else mixer.with(band, HslShift(values[0], values[1], values[2]))
             },
             sceneOverride = SceneType.entries.firstOrNull { it.name == sceneOverride },
+            toneCurves = curves.entries.fold(ToneCurves.NONE) { acc, (name, flat) ->
+                val channel = CurveChannel.entries.firstOrNull { it.name == name }
+                if (channel == null || flat.size < 4 || flat.size % 2 != 0) acc
+                else acc.with(channel, CurvePoints.of(flat.chunked(2) { CurvePoint(it[0], it[1]) }))
+            },
         )
     }
 
@@ -148,6 +159,7 @@ private data class EditFile(
             crop = with(edit.geometry.crop) { listOf(left, top, right, bottom) },
             colorMixer = edit.colorMixer.shifts.entries.associate { (band, shift) -> band.name to listOf(shift.hue, shift.saturation, shift.luminance) },
             sceneOverride = edit.sceneOverride?.name,
+            curves = edit.toneCurves.curves.entries.associate { (channel, points) -> channel.name to points.points.flatMap { listOf(it.x, it.y) } },
         )
     }
 }

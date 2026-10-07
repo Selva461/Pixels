@@ -150,6 +150,8 @@ private fun PixelsApp(viewModel: EditorViewModel, onPickImage: () -> Unit, modif
                         onShiftChanged = viewModel::onColorMixerChanged,
                         onResetAll = viewModel::onResetColorMixer,
                         onSceneSelected = viewModel::onSceneSelected,
+                        onCurveChanged = viewModel::onCurveChanged,
+                        onCurveReset = viewModel::onResetCurve,
                     ),
                     export = ExportActions(
                         onOptionsChanged = viewModel::onExportOptionsChanged,

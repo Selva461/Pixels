@@ -10,6 +10,7 @@ import com.pixels.enhancer.domain.model.ImageSource
 import com.pixels.enhancer.domain.planning.ColorMixer
 import com.pixels.enhancer.domain.planning.EnhancementPlan
 import com.pixels.enhancer.domain.planning.ManualAdjustments
+import com.pixels.enhancer.domain.planning.ToneCurves
 import com.pixels.enhancer.domain.planning.QualityPreset
 import com.pixels.enhancer.domain.processing.ProcessedImage
 import com.pixels.enhancer.domain.processing.StageConfig
@@ -37,6 +38,7 @@ data class EnhanceRequest(
     val manual: ManualAdjustments = ManualAdjustments.NONE,
     val geometry: Geometry = Geometry.NONE,
     val colorMixer: ColorMixer = ColorMixer.NONE,
+    val toneCurves: ToneCurves = ToneCurves.NONE,
     /** User's scene choice; null uses the detected scene. */
     val sceneOverride: SceneType? = null,
     val target: RenderTarget = RenderTarget.FULL,
@@ -46,7 +48,7 @@ data class EnhanceRequest(
 )
 
 /** True when the user asked for creative changes, so validation only checks for broken output. */
-val EnhanceRequest.hasManualEdits: Boolean get() = !manual.isNeutral || !colorMixer.isNeutral
+val EnhanceRequest.hasManualEdits: Boolean get() = !manual.isNeutral || !colorMixer.isNeutral || !toneCurves.isIdentity
 
 enum class RenderTarget {
     /** Small image for live slider feedback. */

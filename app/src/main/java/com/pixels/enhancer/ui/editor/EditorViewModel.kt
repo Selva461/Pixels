@@ -30,6 +30,8 @@ import com.pixels.enhancer.domain.geometry.GeometryOps
 import com.pixels.enhancer.domain.image.PixelBuffer
 import com.pixels.enhancer.domain.model.OutputNaming
 import com.pixels.enhancer.domain.planning.ColorMixer
+import com.pixels.enhancer.domain.planning.CurveChannel
+import com.pixels.enhancer.domain.planning.CurvePoints
 import com.pixels.enhancer.domain.planning.EnhancementStrength
 import com.pixels.enhancer.domain.planning.HslShift
 import com.pixels.enhancer.domain.planning.HueBand
@@ -236,6 +238,15 @@ class EditorViewModel(
     /** Live while dragging a colour-mixer slider; [onEditFinished] records the undo step. */
     fun onColorMixerChanged(band: HueBand, shift: HslShift) = edit(current.copy(colorMixer = current.colorMixer.with(band, shift)))
 
+    /** Live while dragging a curve point; [onEditFinished] records the undo step. */
+    fun onCurveChanged(channel: CurveChannel, points: CurvePoints) =
+        edit(current.copy(toneCurves = current.toneCurves.with(channel, points)))
+
+    fun onResetCurve(channel: CurveChannel) {
+        edit(current.copy(toneCurves = current.toneCurves.with(channel, CurvePoints.IDENTITY)))
+        onEditFinished()
+    }
+
     fun onResetColorMixer() {
         edit(current.copy(colorMixer = ColorMixer.NONE))
         onEditFinished()
@@ -427,6 +438,7 @@ class EditorViewModel(
         manual = current.manual,
         geometry = if (cropMode && target == RenderTarget.PREVIEW) current.geometry.withoutCrop() else current.geometry,
         colorMixer = current.colorMixer,
+        toneCurves = current.toneCurves,
         sceneOverride = current.sceneOverride,
         target = target,
         debugEnabled = isDebugBuild,

@@ -141,7 +141,7 @@ class EnhanceImageUseCase(
 
         val planned = clock.measure {
             ManualAdjustmentMerger.merge(planner.createPlan(session.analysis, request.strength, presetFor(session, request)), request.manual)
-                .copy(colorMixer = request.colorMixer)
+                .copy(colorMixer = request.colorMixer, toneCurves = request.toneCurves)
         }
         logPlan(processingId, planned.value)
 

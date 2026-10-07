@@ -7,6 +7,7 @@ object StageIds {
     const val WHITE_BALANCE = "white_balance"
     const val DEHAZE = "dehaze"
     const val TONE = "tone"
+    const val CURVES = "curves"
     const val NOISE_REDUCTION = "noise_reduction"
     const val DETAIL = "detail"
     const val TEXTURE = "texture"
@@ -28,6 +29,7 @@ object DefaultPipeline {
         WhiteBalanceStage(),
         DehazeStage(),
         ToneStage(),
+        CurvesStage(),
         NoiseReductionStage(),
         DetailStage(),
         TextureStage(),

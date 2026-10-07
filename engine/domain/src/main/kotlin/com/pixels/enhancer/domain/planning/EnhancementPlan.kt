@@ -88,6 +88,8 @@ data class EnhancementPlan(
     val colorNoiseReduction: Adjustment = Adjustment.MANUAL_ONLY,
     /** Per-hue-band HSL shifts (manual only). */
     val colorMixer: ColorMixer = ColorMixer.NONE,
+    /** User tone curves (manual only). */
+    val toneCurves: ToneCurves = ToneCurves.NONE,
     val algorithmVersion: String = ENHANCEMENT_ALGORITHM_VERSION,
 ) {
     operator fun get(kind: AdjustmentKind): Adjustment = when (kind) {
@@ -144,5 +146,5 @@ data class EnhancementPlan(
         grain = transform(AdjustmentKind.GRAIN, grain),
     )
 
-    val hasAnyCorrection: Boolean get() = AdjustmentKind.entries.any { get(it).enabled } || !colorMixer.isNeutral
+    val hasAnyCorrection: Boolean get() = AdjustmentKind.entries.any { get(it).enabled } || !colorMixer.isNeutral || !toneCurves.isIdentity
 }
