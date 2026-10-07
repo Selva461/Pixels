@@ -13,8 +13,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.RotateLeft
-import androidx.compose.material.icons.automirrored.outlined.RotateRight
+import androidx.compose.material.icons.outlined.RotateLeft
+import androidx.compose.material.icons.outlined.RotateRight
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Flip
 import androidx.compose.material3.FilterChip
@@ -277,8 +277,8 @@ fun CropPanel(edit: EditState, aspect: CropAspect, actions: EditorActions) {
             horizontalArrangement = Arrangement.SpaceEvenly,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            ToolIconButton(Icons.AutoMirrored.Outlined.RotateLeft, stringResource(R.string.crop_rotate_left), actions::onRotateCounterClockwise)
-            ToolIconButton(Icons.AutoMirrored.Outlined.RotateRight, stringResource(R.string.crop_rotate_right), actions::onRotateClockwise)
+            ToolIconButton(Icons.Outlined.RotateLeft, stringResource(R.string.crop_rotate_left), actions::onRotateCounterClockwise)
+            ToolIconButton(Icons.Outlined.RotateRight, stringResource(R.string.crop_rotate_right), actions::onRotateClockwise)
             ToolIconButton(Icons.Outlined.Flip, stringResource(R.string.crop_flip), actions::onFlip)
             ToolIconButton(Icons.Outlined.Flip, stringResource(R.string.crop_flip_vertical), actions::onFlipVertical, Modifier.rotate(90f))
             TextButton(onClick = actions::onResetGeometry) { Text(stringResource(R.string.crop_reset)) }
