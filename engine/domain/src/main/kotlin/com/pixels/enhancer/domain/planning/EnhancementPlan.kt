@@ -52,6 +52,7 @@ enum class AdjustmentKind(val label: String) {
     VIGNETTE_ROUNDNESS("Vignette roundness"),
     GRAIN_SIZE("Grain size"),
     GRAIN_ROUGHNESS("Grain roughness"),
+    GLOBAL_HUE("Hue"),
 }
 
 /**
@@ -103,6 +104,8 @@ data class EnhancementPlan(
     val vignetteRoundness: Adjustment = Adjustment.MANUAL_ONLY,
     val grainSize: Adjustment = Adjustment.MANUAL_ONLY,
     val grainRoughness: Adjustment = Adjustment.MANUAL_ONLY,
+    /** Rotates every hue; −1..1 = ±30°. */
+    val globalHue: Adjustment = Adjustment.MANUAL_ONLY,
     /** Per-hue-band HSL shifts (manual only). */
     val colorMixer: ColorMixer = ColorMixer.NONE,
     /** Colour grading wheels and black-and-white treatment (manual only). */
@@ -143,6 +146,7 @@ data class EnhancementPlan(
         AdjustmentKind.VIGNETTE_ROUNDNESS -> vignetteRoundness
         AdjustmentKind.GRAIN_SIZE -> grainSize
         AdjustmentKind.GRAIN_ROUGHNESS -> grainRoughness
+        AdjustmentKind.GLOBAL_HUE -> globalHue
     }
 
     fun entries(): List<Pair<AdjustmentKind, Adjustment>> = AdjustmentKind.entries.map { it to get(it) }
@@ -179,6 +183,7 @@ data class EnhancementPlan(
         vignetteRoundness = transform(AdjustmentKind.VIGNETTE_ROUNDNESS, vignetteRoundness),
         grainSize = transform(AdjustmentKind.GRAIN_SIZE, grainSize),
         grainRoughness = transform(AdjustmentKind.GRAIN_ROUGHNESS, grainRoughness),
+        globalHue = transform(AdjustmentKind.GLOBAL_HUE, globalHue),
     )
 
     val hasAnyCorrection: Boolean get() = AdjustmentKind.entries.any { get(it).enabled } || !colorMixer.isNeutral || !toneCurves.isIdentity || !colorGrading.isNeutral

@@ -2,7 +2,16 @@ package com.pixels.enhancer.ui.editor
 
 import android.net.Uri
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.ContentScale
+import com.pixels.enhancer.ui.theme.OnPhotoCanvas
+import com.pixels.enhancer.ui.theme.PhotoCanvas
+import kotlin.math.min
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -106,6 +115,7 @@ fun EditorScreen(
     var brush by remember { mutableStateOf(BrushSettings()) }
     var namePrompt by remember { mutableStateOf<NamePrompt?>(null) }
     var pasteDialog by remember { mutableStateOf(false) }
+    var pickingWhiteBalance by remember { mutableStateOf(false) }
     val snackbarHostState = remember { SnackbarHostState() }
 
     BackHandler(onBack = actions::onCloseRequested)
@@ -113,6 +123,7 @@ fun EditorScreen(
     LaunchedEffect(tool) {
         actions.onCropModeChanged(tool == EditorTool.CROP)
         if (tool != EditorTool.MASKING) brush = brush.copy(mode = com.pixels.enhancer.ui.local.BrushMode.OFF)
+        if (tool != EditorTool.COLOR) pickingWhiteBalance = false
     }
     Dialogs(state, actions, namePrompt, onNameDone = { namePrompt = null }, pasteDialog, onPasteDone = { pasteDialog = false })
 
@@ -130,11 +141,29 @@ fun EditorScreen(
                 onPaste = { pasteDialog = true },
                 onOpenDebug = onOpenDebug,
             )
-            PhotoArea(state, tool, compare, viewResetKey, brush, actions, Modifier.weight(1f).fillMaxWidth())
+            if (pickingWhiteBalance) {
+                TapToPick(
+                    image = state.enhanced,
+                    hint = stringResource(R.string.color_pick_wb_hint),
+                    onPick = { x, y ->
+                        actions.onPickWhiteBalance(x, y)
+                        pickingWhiteBalance = false
+                    },
+                    modifier = Modifier.weight(1f).fillMaxWidth(),
+                )
+            } else {
+                PhotoArea(state, tool, compare, viewResetKey, brush, actions, Modifier.weight(1f).fillMaxWidth())
+            }
             ActivityLine(state.activity, actions::onCancelExport)
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
             Box(Modifier.fillMaxWidth().height(PANEL_HEIGHT).background(MaterialTheme.colorScheme.surfaceContainer)) {
-                ToolPanel(state, tool, brush, onBrushChanged = { brush = it }, actions, onSavePreset = { namePrompt = NamePrompt.PRESET }, onSaveVersion = { namePrompt = NamePrompt.VERSION })
+                ToolPanel(
+                    state, tool, brush, onBrushChanged = { brush = it }, actions,
+                    onSavePreset = { namePrompt = NamePrompt.PRESET },
+                    onSaveVersion = { namePrompt = NamePrompt.VERSION },
+                    pickingWhiteBalance = pickingWhiteBalance,
+                    onPickWhiteBalance = { pickingWhiteBalance = !pickingWhiteBalance },
+                )
             }
             ToolStrip(tool, state) { tool = it }
         }
@@ -186,6 +215,36 @@ private fun PhotoArea(
     }
 }
 
+/** The edited photo, fitted; one tap reports the normalised position on the photo. */
+@Composable
+private fun TapToPick(image: ImageBitmap, hint: String, onPick: (Float, Float) -> Unit, modifier: Modifier) {
+    BoxWithConstraints(modifier.background(PhotoCanvas)) {
+        val boxWidth = constraints.maxWidth.toFloat()
+        val boxHeight = constraints.maxHeight.toFloat()
+        val scale = min(boxWidth / image.width, boxHeight / image.height)
+        val left = (boxWidth - image.width * scale) / 2f
+        val top = (boxHeight - image.height * scale) / 2f
+        Image(
+            image,
+            contentDescription = null,
+            contentScale = ContentScale.Fit,
+            modifier = Modifier.fillMaxSize().pointerInput(image) {
+                detectTapGestures { position ->
+                    val x = (position.x - left) / (image.width * scale)
+                    val y = (position.y - top) / (image.height * scale)
+                    if (x in 0f..1f && y in 0f..1f) onPick(x, y)
+                }
+            },
+        )
+        Text(
+            hint,
+            style = MaterialTheme.typography.labelLarge,
+            color = OnPhotoCanvas,
+            modifier = Modifier.align(Alignment.TopCenter).background(Color.Black.copy(alpha = 0.55f), MaterialTheme.shapes.small).padding(horizontal = 12.dp, vertical = 6.dp),
+        )
+    }
+}
+
 /** Thirds plus a fine grid, to judge straight lines while correcting perspective and lens distortion. */
 @Composable
 private fun GridOverlay(modifier: Modifier) {
@@ -216,14 +275,16 @@ private fun ToolPanel(
     actions: EditorActions,
     onSavePreset: () -> Unit,
     onSaveVersion: () -> Unit,
+    pickingWhiteBalance: Boolean,
+    onPickWhiteBalance: () -> Unit,
 ) {
     val edit = state.edit
     when (tool) {
         EditorTool.PRESETS -> PresetsPanel(state.userPresets, state.appliedPreset, actions, onSavePreset)
         EditorTool.AUTO -> AutoPanel(edit, state.detectedScene, actions)
         EditorTool.CROP -> CropPanel(edit, state.cropAspect, actions)
-        EditorTool.LIGHT -> LightPanel(edit, state.histogram, actions)
-        EditorTool.COLOR -> ColorPanel(edit, actions)
+        EditorTool.LIGHT -> LightPanel(edit, state.histogram, state.showClipping, actions)
+        EditorTool.COLOR -> ColorPanel(edit, pickingWhiteBalance, onPickWhiteBalance, actions)
         EditorTool.EFFECTS -> EffectsPanel(edit, actions)
         EditorTool.DETAIL -> DetailPanel(edit, actions)
         EditorTool.OPTICS -> OpticsPanel(edit.geometry, actions)

@@ -4,7 +4,7 @@ _Last updated: 2026-10-07 (pro editor) · algorithm version 1.1_
 
 ## Current status (2026-10-07)
 
-- Engine: `./gradlew -p engine build` — 190 tests pass.
+- Engine: `./gradlew -p engine build` — 196 tests pass.
 - Last green CI (APK + device tests): commit 91a359a (crop/rotate). CI runs again now that the
   repository is public, but **pushes to `claude/new-session-2v9neb` are refused by the repository
   ruleset** (pull request with code-owner review + required status checks on the default branch).
@@ -28,6 +28,13 @@ Allow the push (ruleset bypass for the repository admin / Claude app, or turn en
 let CI build HEAD, fix any compile errors in `app/`, and confirm the device tests pass.
 
 ## What changed
+
+### 2026-10-07 — extra tools and guides
+
+White-balance picker, Auto straighten / Auto upright (`geometry/AutoGeometry.kt`: Sobel edge
+angles; level = histogram peak, upright = 1-D searches on a 256 px copy), red-eye retouch mode,
+global Hue slider, clipping warnings, and an offline in-app Guide (Home > Guide). A user guide
+was also written as a shareable doc.
 
 ### 2026-10-07 — pro editor (Premium-level tools, no AI)
 

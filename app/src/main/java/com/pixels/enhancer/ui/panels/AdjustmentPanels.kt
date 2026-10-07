@@ -15,6 +15,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.RotateLeft
 import androidx.compose.material.icons.outlined.RotateRight
+import androidx.compose.material.icons.outlined.Colorize
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Flip
 import androidx.compose.material3.FilterChip
@@ -78,6 +79,7 @@ fun ControlSlider(control: ManualControl, edit: EditState, actions: EditorAction
         track = when (control) {
             ManualControl.TEMPERATURE -> Tracks.temperature
             ManualControl.TINT -> Tracks.tint
+            ManualControl.HUE -> Tracks.hue
             else -> null
         },
     )
@@ -107,7 +109,7 @@ fun <T> SegmentRow(options: List<T>, selected: T, label: @Composable (T) -> Stri
 private enum class LightView { SLIDERS, CURVE }
 
 @Composable
-fun LightPanel(edit: EditState, histogram: Histogram?, actions: EditorActions) {
+fun LightPanel(edit: EditState, histogram: Histogram?, showClipping: Boolean, actions: EditorActions) {
     var view by rememberSaveable { mutableStateOf(LightView.SLIDERS) }
     Column(Modifier.fillMaxSize()) {
         SegmentRow(LightView.entries, view, { stringResource(if (it == LightView.SLIDERS) R.string.panel_adjust else R.string.panel_curve) }) { view = it }
@@ -115,6 +117,13 @@ fun LightPanel(edit: EditState, histogram: Histogram?, actions: EditorActions) {
             LightView.CURVE -> CurvePanel(edit, histogram, actions::onCurveChanged, actions::onEditFinished, actions::onResetCurve)
             LightView.SLIDERS -> PanelColumn {
                 histogram?.let { HistogramView(it, Modifier.fillMaxWidth().height(44.dp).padding(horizontal = 20.dp)) }
+                Row(Modifier.padding(horizontal = 16.dp)) {
+                    FilterChip(
+                        selected = showClipping,
+                        onClick = { actions.onShowClippingChanged(!showClipping) },
+                        label = { Text(stringResource(R.string.light_show_clipping)) },
+                    )
+                }
                 listOf(
                     ManualControl.EXPOSURE, ManualControl.CONTRAST, ManualControl.HIGHLIGHTS, ManualControl.SHADOWS,
                     ManualControl.WHITES, ManualControl.BLACKS,
@@ -132,7 +141,7 @@ fun LightPanel(edit: EditState, histogram: Histogram?, actions: EditorActions) {
 private enum class ColorView { ADJUST, MIXER, GRADING }
 
 @Composable
-fun ColorPanel(edit: EditState, actions: EditorActions) {
+fun ColorPanel(edit: EditState, picking: Boolean, onPick: () -> Unit, actions: EditorActions) {
     var view by rememberSaveable { mutableStateOf(ColorView.ADJUST) }
     Column(Modifier.fillMaxSize()) {
         SegmentRow(ColorView.entries, view, {
@@ -149,8 +158,14 @@ fun ColorPanel(edit: EditState, actions: EditorActions) {
                 Row(Modifier.padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     FilterChip(!edit.colorGrading.monochrome, { actions.onMonochromeChanged(false) }, { Text(stringResource(R.string.color_treatment_color)) })
                     FilterChip(edit.colorGrading.monochrome, { actions.onMonochromeChanged(true) }, { Text(stringResource(R.string.color_treatment_bw)) })
+                    FilterChip(
+                        selected = picking,
+                        onClick = onPick,
+                        leadingIcon = { Icon(Icons.Outlined.Colorize, contentDescription = null) },
+                        label = { Text(stringResource(R.string.color_pick_wb)) },
+                    )
                 }
-                listOf(ManualControl.TEMPERATURE, ManualControl.TINT, ManualControl.VIBRANCE, ManualControl.SATURATION)
+                listOf(ManualControl.TEMPERATURE, ManualControl.TINT, ManualControl.VIBRANCE, ManualControl.SATURATION, ManualControl.HUE)
                     .forEach { ControlSlider(it, edit, actions) }
                 if (edit.colorGrading.monochrome) {
                     Text(
@@ -223,6 +238,9 @@ fun GeometryPanel(geometry: Geometry, actions: EditorActions) {
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(horizontal = 20.dp, vertical = 6.dp),
         )
+        Row(Modifier.padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedButton(onClick = actions::onAutoUpright, shape = MaterialTheme.shapes.small) { Text(stringResource(R.string.geometry_auto)) }
+        }
         ProSlider(stringResource(R.string.geometry_vertical), p.vertical, percentText(p.vertical), { set(p.copy(vertical = it)) }, actions::onEditFinished)
         ProSlider(stringResource(R.string.geometry_horizontal), p.horizontal, percentText(p.horizontal), { set(p.copy(horizontal = it)) }, actions::onEditFinished)
         ProSlider(
@@ -281,6 +299,7 @@ fun CropPanel(edit: EditState, aspect: CropAspect, actions: EditorActions) {
             ToolIconButton(Icons.Outlined.RotateRight, stringResource(R.string.crop_rotate_right), actions::onRotateClockwise)
             ToolIconButton(Icons.Outlined.Flip, stringResource(R.string.crop_flip), actions::onFlip)
             ToolIconButton(Icons.Outlined.Flip, stringResource(R.string.crop_flip_vertical), actions::onFlipVertical, Modifier.rotate(90f))
+            TextButton(onClick = actions::onAutoStraighten) { Text(stringResource(R.string.crop_auto_straighten)) }
             TextButton(onClick = actions::onResetGeometry) { Text(stringResource(R.string.crop_reset)) }
         }
         ProSlider(

@@ -23,6 +23,11 @@ import com.pixels.enhancer.domain.editing.EditState
 import com.pixels.enhancer.domain.export.ExportOptions
 import com.pixels.enhancer.domain.local.LocalAdjustment
 import com.pixels.enhancer.domain.geometry.LensCorrection
+import com.pixels.enhancer.domain.geometry.AutoGeometry
+import com.pixels.enhancer.domain.geometry.OpticsWarp
+import com.pixels.enhancer.domain.image.PixelResampler
+import com.pixels.enhancer.domain.processing.ops.WhiteBalanceGains
+import com.pixels.enhancer.domain.retouch.RetouchMode
 import com.pixels.enhancer.domain.geometry.Perspective
 import com.pixels.enhancer.domain.local.BrushStroke
 import com.pixels.enhancer.domain.local.LocalAdjustmentRenderer
@@ -132,6 +137,7 @@ class EditorViewModel(
     private var maskOverlay: ImageBitmap? = null
     private var selectedSpotId: Int? = null
     private var healSettings = HealSettings()
+    private var showClipping = false
 
     private var disabledStages: Set<String> = emptySet()
     private var runUntilStageId: String? = null
@@ -491,12 +497,87 @@ class EditorViewModel(
         }
     }
 
+    // --- Automatic tools and clipping ---
+
+    /** Sets temperature and tint so the tapped spot (normalised x, y on the edited photo) turns neutral grey. */
+    override fun onPickWhiteBalance(x: Float, y: Float) {
+        val (r, g, b) = sampleColor(x, y)
+        val (temperature, tint) = WhiteBalanceGains.neutralizingShift(r, g, b) ?: run {
+            setActivity(EditorActivity.Failed(ErrorCode.ANALYSIS_FAILED))
+            return
+        }
+        val manual = current.manual
+            .with(ManualControl.TEMPERATURE, (current.manual[ManualControl.TEMPERATURE] + temperature).coerceIn(-1f, 1f))
+            .with(ManualControl.TINT, (current.manual[ManualControl.TINT] + tint).coerceIn(-1f, 1f))
+        edit(current.copy(manual = manual))
+        onEditFinished()
+    }
+
+    /** Levels the photo from its own straight edges (after turns, flips and lens correction). */
+    override fun onAutoStraighten() {
+        val source = session?.original ?: return
+        viewModelScope.launch {
+            val degrees = withContext(Dispatchers.Default) {
+                val small = PixelResampler.downscaleToFit(source, AUTO_ANALYSIS_EDGE)
+                AutoGeometry.levelDegrees(GeometryOps.apply(small, current.geometry.copy(straightenDegrees = 0f, crop = CropRect.FULL, perspective = Perspective.NONE)))
+            }
+            commitGeometry(current.geometry.straightened(degrees))
+        }
+    }
+
+    /** Level plus vertical and horizontal perspective, found from the photo's straight edges. */
+    override fun onAutoUpright() {
+        val source = session?.original ?: return
+        viewModelScope.launch {
+            val perspective = withContext(Dispatchers.Default) {
+                val small = PixelResampler.downscaleToFit(source, AUTO_ANALYSIS_EDGE)
+                val base = GeometryOps.apply(small, current.geometry.copy(straightenDegrees = 0f, crop = CropRect.FULL, lens = LensCorrection.NONE, perspective = Perspective.NONE))
+                val rotate = AutoGeometry.levelDegrees(OpticsWarp.apply(base, current.geometry.lens, Perspective.NONE))
+                    .coerceIn(-Perspective.MAX_ROTATE_DEGREES, Perspective.MAX_ROTATE_DEGREES)
+                AutoGeometry.upright(base, current.geometry.lens, rotate)
+            }
+            // Upright includes levelling, so a manual straighten would rotate twice.
+            commitGeometry(current.geometry.withPerspective(perspective).straightened(0f))
+        }
+    }
+
+    override fun onShowClippingChanged(show: Boolean) {
+        showClipping = show
+        publishEdit()
+        val output = outcome?.output ?: return
+        viewModelScope.launch {
+            val bitmap = displayBitmap(output)
+            _uiState.update { state -> if (state is EditorUiState.Success) state.copy(enhanced = bitmap).withExtras() else state }
+        }
+    }
+
+    /** The preview as shown: with clipped highlights red and clipped shadows blue when clipping is on. */
+    private suspend fun displayBitmap(output: PixelBuffer): ImageBitmap {
+        if (!showClipping) return toImageBitmap(output)
+        val marked = withContext(Dispatchers.Default) {
+            val pixels = IntArray(output.pixelCount) { i ->
+                val c = output.pixels[i]
+                val r = (c shr 16) and 0xFF
+                val g = (c shr 8) and 0xFF
+                val b = c and 0xFF
+                when {
+                    r >= CLIP_HIGH || g >= CLIP_HIGH || b >= CLIP_HIGH -> CLIP_HIGH_COLOR
+                    r <= CLIP_LOW && g <= CLIP_LOW && b <= CLIP_LOW -> CLIP_LOW_COLOR
+                    else -> c
+                }
+            }
+            PixelBuffer(output.width, output.height, pixels)
+        }
+        return toImageBitmap(marked)
+    }
+
     // --- Healing ---
 
     /** Tap on the photo: a new spot there, with a source chosen automatically. */
     override fun onAddSpot(x: Float, y: Float) {
         val output = outcome?.output ?: return
-        val (sx, sy) = RetouchSourceFinder.find(output, x, y, healSettings.radius)
+        // Red-eye works in place; heal and clone need a source.
+        val (sx, sy) = if (healSettings.mode == RetouchMode.RED_EYE) x to y else RetouchSourceFinder.find(output, x, y, healSettings.radius)
         val id = current.retouch.nextId()
         val spot = RetouchSpot(id, x, y, sx, sy, healSettings.radius, healSettings.feather, mode = healSettings.mode)
         selectedSpotId = id
@@ -725,6 +806,7 @@ class EditorViewModel(
         showMaskOverlay = showMaskOverlay,
         selectedSpotId = selectedSpotId?.takeIf { id -> current.retouch.spots.any { it.id == id } },
         healSettings = healSettings,
+        showClipping = showClipping,
     )
 
     private fun requestPreview() {
@@ -765,7 +847,7 @@ class EditorViewModel(
             is OperationResult.Failure -> showFailure(result.code)
             is OperationResult.Success -> {
                 outcome = result.value
-                val enhanced = toImageBitmap(result.value.output)
+                val enhanced = displayBitmap(result.value.output)
                 val original = toImageBitmap(result.value.originalView)
                 val histogram = withContext(Dispatchers.Default) { Histogram.compute(result.value.output) }
                 _uiState.update { state ->
@@ -853,6 +935,11 @@ class EditorViewModel(
         private const val USER_PRESET_CATEGORY = "Yours"
         private const val OVERLAY_ALPHA = 150f
         private const val OVERLAY_RGB = 0xE5484D
+        private const val AUTO_ANALYSIS_EDGE = 800
+        private const val CLIP_HIGH = 254
+        private const val CLIP_LOW = 1
+        private const val CLIP_HIGH_COLOR = 0xFFFF2D2D.toInt()
+        private const val CLIP_LOW_COLOR = 0xFF2D6BFF.toInt()
 
         fun factory(container: AppContainer): ViewModelProvider.Factory = viewModelFactory {
             initializer {

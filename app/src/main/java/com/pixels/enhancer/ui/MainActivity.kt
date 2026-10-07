@@ -27,6 +27,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.pixels.enhancer.PixelsApplication
 import com.pixels.enhancer.R
 import com.pixels.enhancer.ui.about.AboutScreen
+import com.pixels.enhancer.ui.guide.GuideScreen
 import com.pixels.enhancer.ui.components.EditorSkeleton
 import com.pixels.enhancer.ui.debug.DebugScreen
 import com.pixels.enhancer.ui.editor.EditorEvent
@@ -88,17 +89,21 @@ private fun PixelsApp(viewModel: EditorViewModel, onPickImage: () -> Unit, modif
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     var showDebug by rememberSaveable { mutableStateOf(false) }
     var showAbout by rememberSaveable { mutableStateOf(false) }
+    var showGuide by rememberSaveable { mutableStateOf(false) }
     ShareEvents(viewModel)
 
     when (val current = state) {
         is EditorUiState.Idle -> if (showAbout) {
             AboutScreen(onBack = { showAbout = false }, modifier = modifier)
+        } else if (showGuide) {
+            GuideScreen(onBack = { showGuide = false }, modifier = modifier)
         } else {
             HomeScreen(
                 recent = current.recent,
                 recentLoaded = current.recentLoaded,
                 onPickImage = onPickImage,
                 onOpenAbout = { showAbout = true },
+                onOpenGuide = { showGuide = true },
                 onOpenProject = viewModel::onOpenProject,
                 onDeleteProject = viewModel::onDeleteProject,
                 modifier = modifier,

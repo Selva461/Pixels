@@ -90,6 +90,11 @@ interface EditorActions {
     fun onSpotRemoved(id: Int)
     fun onHealSettingsChanged(settings: HealSettings)
 
+    fun onPickWhiteBalance(x: Float, y: Float)
+    fun onAutoStraighten()
+    fun onAutoUpright()
+    fun onShowClippingChanged(show: Boolean)
+
     fun onExportOptionsChanged(options: ExportOptions)
     fun onExportConfirmed()
     fun onExportDismissed()

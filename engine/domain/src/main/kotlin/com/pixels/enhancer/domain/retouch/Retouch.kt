@@ -17,6 +17,9 @@ enum class RetouchMode {
 
     /** Copies the source exactly. */
     CLONE,
+
+    /** Removes red-eye inside the circle: strongly red pixels become a dark neutral pupil. The source is unused. */
+    RED_EYE,
 }
 
 /**
@@ -87,6 +90,7 @@ object RetouchRenderer {
     }
 
     private fun applySpot(image: PixelBuffer, spot: RetouchSpot) {
+        if (spot.mode == RetouchMode.RED_EYE) return fixRedEye(image, spot)
         val width = image.width
         val height = image.height
         val radius = max(1f, spot.radius * width)
@@ -132,6 +136,49 @@ object RetouchRenderer {
             }
         }
     }
+
+    /**
+     * Only pixels where red clearly dominates are changed, so iris, skin and eyelashes inside the
+     * circle are left alone; red is replaced by the mean of green and blue (a dark neutral pupil
+     * that keeps its catch-light), weighted by how red the pixel is and the circle's feather.
+     */
+    private fun fixRedEye(image: PixelBuffer, spot: RetouchSpot) {
+        val width = image.width
+        val height = image.height
+        val radius = max(1f, spot.radius * width)
+        val tx = spot.targetX * width
+        val ty = spot.targetY * height
+        val inner = radius * (1f - spot.feather)
+        for (y in max(0, (ty - radius).toInt())..min(height - 1, (ty + radius).toInt() + 1)) {
+            for (x in max(0, (tx - radius).toInt())..min(width - 1, (tx + radius).toInt() + 1)) {
+                val ox = x + 0.5f - tx
+                val oy = y + 0.5f - ty
+                val distance = sqrt(ox * ox + oy * oy)
+                if (distance > radius) continue
+                val color = image.pixels[y * width + x]
+                val red = Argb.red(color)
+                val green = Argb.green(color)
+                val blue = Argb.blue(color)
+                val others = max(green, blue).coerceAtLeast(1)
+                val redness = smoothstep(RED_EYE_RATIO_START, RED_EYE_RATIO_FULL, red.toFloat() / others) * smoothstep(RED_EYE_MIN_RED, RED_EYE_MIN_RED + RED_EYE_RAMP, red.toFloat())
+                val alpha = redness * spot.opacity * (1f - smoothstep(inner, radius, distance))
+                if (alpha <= 0f) continue
+                val neutral = (green + blue) / 2f * RED_EYE_DARKEN
+                image.pixels[y * width + x] = Argb.pack(
+                    Argb.alpha(color),
+                    mix(red, neutral, alpha),
+                    mix(green, green * RED_EYE_DARKEN, alpha),
+                    mix(blue, blue * RED_EYE_DARKEN, alpha),
+                )
+            }
+        }
+    }
+
+    private const val RED_EYE_RATIO_START = 1.6f
+    private const val RED_EYE_RATIO_FULL = 2.4f
+    private const val RED_EYE_MIN_RED = 50f
+    private const val RED_EYE_RAMP = 30f
+    private const val RED_EYE_DARKEN = 0.85f
 
     private fun mix(base: Int, value: Float, alpha: Float): Int = (base + (value - base) * alpha).roundToInt()
 

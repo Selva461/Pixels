@@ -57,6 +57,8 @@ sealed interface EditorUiState {
         val showMaskOverlay: Boolean = false,
         val selectedSpotId: Int? = null,
         val healSettings: HealSettings = HealSettings(),
+        /** Clipped highlights/shadows are marked on [enhanced]. */
+        val showClipping: Boolean = false,
     ) : EditorUiState
 
     data class Error(val code: ErrorCode) : EditorUiState

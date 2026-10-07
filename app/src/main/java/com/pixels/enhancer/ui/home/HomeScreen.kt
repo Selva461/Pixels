@@ -46,6 +46,7 @@ fun HomeScreen(
     recentLoaded: Boolean,
     onPickImage: () -> Unit,
     onOpenAbout: () -> Unit,
+    onOpenGuide: () -> Unit,
     onOpenProject: (String) -> Unit,
     onDeleteProject: (String) -> Unit,
     modifier: Modifier = Modifier,
@@ -75,7 +76,10 @@ fun HomeScreen(
             }
             else -> Spacer(Modifier.weight(1f))
         }
-        TextButton(onClick = onOpenAbout, modifier = Modifier.padding(vertical = 8.dp)) { Text(stringResource(R.string.home_about)) }
+        Row(Modifier.padding(vertical = 8.dp)) {
+            TextButton(onClick = onOpenGuide) { Text(stringResource(R.string.home_guide)) }
+            TextButton(onClick = onOpenAbout) { Text(stringResource(R.string.home_about)) }
+        }
     }
 }
 

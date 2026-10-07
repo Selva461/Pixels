@@ -5,7 +5,9 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -58,21 +60,21 @@ private val SELECTED_COLOR = Color(0xFFE39A72)
 fun HealingPanel(retouch: Retouch, selectedId: Int?, settings: HealSettings, actions: EditorActions) {
     val selected = retouch.spots.firstOrNull { it.id == selectedId }
     PanelColumn {
-        Row(Modifier.padding(horizontal = 16.dp, vertical = 6.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 6.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
             FilterChip(settings.mode == RetouchMode.HEAL, { actions.onHealSettingsChanged(settings.copy(mode = RetouchMode.HEAL)); actions.onEditFinished() }, { Text(stringResource(R.string.heal_mode_heal)) })
             FilterChip(settings.mode == RetouchMode.CLONE, { actions.onHealSettingsChanged(settings.copy(mode = RetouchMode.CLONE)); actions.onEditFinished() }, { Text(stringResource(R.string.heal_mode_clone)) })
+            FilterChip(settings.mode == RetouchMode.RED_EYE, { actions.onHealSettingsChanged(settings.copy(mode = RetouchMode.RED_EYE)); actions.onEditFinished() }, { Text(stringResource(R.string.heal_mode_red_eye)) })
             Text(
                 stringResource(R.string.heal_count, retouch.spots.size),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.weight(1f),
             )
             if (selected != null) {
                 IconButton(onClick = { actions.onSpotRemoved(selected.id) }) { Icon(Icons.Outlined.Delete, contentDescription = stringResource(R.string.delete)) }
             }
         }
         Text(
-            stringResource(R.string.heal_hint),
+            stringResource(if (settings.mode == RetouchMode.RED_EYE) R.string.heal_red_eye_hint else R.string.heal_hint),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(horizontal = 20.dp),
@@ -179,7 +181,7 @@ fun HealCanvas(image: ImageBitmap, retouch: Retouch, selectedId: Int?, actions: 
                 val color = if (isSelected) SELECTED_COLOR else SPOT_COLOR
                 drawCircle(Color.Black.copy(alpha = 0.35f), radius, target, style = Stroke(3.dp.toPx()))
                 drawCircle(color, radius, target, style = Stroke(1.5.dp.toPx()))
-                if (isSelected) {
+                if (isSelected && spot.mode != RetouchMode.RED_EYE) {
                     val source = screen(spot.sourceX, spot.sourceY)
                     drawCircle(SOURCE_COLOR, radius, source, style = Stroke(1.5.dp.toPx(), pathEffect = dash))
                     drawLine(SOURCE_COLOR, source, target, strokeWidth = 1.dp.toPx(), pathEffect = dash)

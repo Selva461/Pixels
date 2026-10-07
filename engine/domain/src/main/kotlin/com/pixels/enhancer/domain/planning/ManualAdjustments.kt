@@ -49,6 +49,7 @@ enum class ManualControl(
     TEMPERATURE("Temperature", ControlGroup.COLOR, AdjustmentKind.TEMPERATURE, -1f, 1f, 1f, AmountRange(-1f, 1f), "Cooler (blue) to warmer (yellow)"),
     TINT("Tint", ControlGroup.COLOR, AdjustmentKind.TINT, -1f, 1f, 1f, AmountRange(-1f, 1f), "Green to magenta"),
     VIBRANCE("Vibrance", ControlGroup.COLOR, AdjustmentKind.SATURATION, -1f, 1f, 0.35f, AmountRange(-0.4f, 0.4f), "Boosts muted colours more than vivid ones and spares skin"),
+    HUE("Hue", ControlGroup.COLOR, AdjustmentKind.GLOBAL_HUE, -1f, 1f, 1f, AmountRange(-1f, 1f), "Shifts every colour around the colour wheel, up to 30°", advanced = true),
     SATURATION("Saturation", ControlGroup.COLOR, AdjustmentKind.GLOBAL_SATURATION, -1f, 1f, 1f, AmountRange(-1f, 1f), "All colours equally; −100 is black and white"),
     CLARITY("Clarity", ControlGroup.DETAIL, AdjustmentKind.DETAIL, -1f, 1f, 0.25f, AmountRange(-0.25f, 0.35f), "Local contrast in midtones"),
     TEXTURE("Texture", ControlGroup.DETAIL, AdjustmentKind.TEXTURE, -1f, 1f, 0.5f, AmountRange(-0.5f, 0.5f), "Fine surface detail such as fabric, bark or skin pores", advanced = true),

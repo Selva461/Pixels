@@ -13,7 +13,7 @@
 CI: `.github/workflows/android.yml` runs engine tests, builds the debug APK (artifact
 `pixels-debug-apk`) and runs the instrumented tests on an emulator for every push.
 
-## Coverage (190 engine tests, 6 instrumented tests)
+## Coverage (196 engine tests, 6 instrumented tests)
 
 | Category | Where |
 |---|---|
@@ -39,6 +39,8 @@ CI: `.github/workflows/android.yml` runs engine tests, builds the debug APK (art
 - Healing: tap a spot, drag source/target, switch heal/clone, delete.
 - Optics/Geometry: distortion and vertical perspective on a building photo; no empty edges.
 - Versions: save, apply, delete; copy settings on one photo and paste on another.
+- Pick white balance on a grey card or white wall; Auto straighten a tilted horizon; Auto upright a building.
+- Red eye on a flash portrait; Show clipping on an overexposed sky; Hue slider; Home > Guide opens offline.
 - Portrait/backlit photo: auto lifts the face without darkening it; Face exposure slider works;
   photos without faces are unchanged by it.
 - Crop: rotate, flip, straighten, aspect presets, drag frame; result after leaving the tab.
