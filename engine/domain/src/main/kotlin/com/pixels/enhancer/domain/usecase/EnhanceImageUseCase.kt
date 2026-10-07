@@ -18,7 +18,10 @@ import com.pixels.enhancer.domain.analysis.FaceLocator
 import com.pixels.enhancer.domain.analysis.FaceMetrics
 import com.pixels.enhancer.domain.analysis.SceneClassifier
 import com.pixels.enhancer.domain.local.LocalAdjustmentRenderer
+import com.pixels.enhancer.domain.planning.Adjustment
 import com.pixels.enhancer.domain.retouch.RetouchRenderer
+import com.pixels.enhancer.domain.export.BorderOps
+import com.pixels.enhancer.domain.export.ExportDecorator
 import com.pixels.enhancer.domain.export.ExportOptions
 import com.pixels.enhancer.domain.geometry.GeometryOps
 import com.pixels.enhancer.domain.image.PixelBuffer
@@ -64,6 +67,8 @@ class EnhanceImageUseCase(
     private val dispatcher: CoroutineDispatcher = Dispatchers.Default,
     /** Platform face detection for portrait exposure; none by default. */
     private val faceLocator: FaceLocator = FaceLocator.NONE,
+    /** Platform drawing on finished exports (watermark text); none by default. */
+    private val exportDecorator: ExportDecorator = ExportDecorator.NONE,
 ) {
     val stageIds: List<String> get() = processor.stageIds
 
@@ -152,7 +157,8 @@ class EnhanceImageUseCase(
 
         val planned = clock.measure {
             ManualAdjustmentMerger.merge(planner.createPlan(session.analysis, request.strength, presetFor(session, request)), request.manual)
-                .copy(colorMixer = request.colorMixer, toneCurves = request.toneCurves, colorGrading = request.colorGrading)
+                .copy(colorMixer = request.colorMixer, toneCurves = request.toneCurves, colorGrading = request.colorGrading, calibration = request.calibration)
+                .let { plan -> if (request.autoWhiteBalance) plan else plan.copy(whiteBalance = Adjustment.none(AS_SHOT_REASON)) }
         }
         logPlan(processingId, planned.value)
 
@@ -237,7 +243,10 @@ class EnhanceImageUseCase(
                 is OperationResult.Success -> inner.value
             }
         }
-        val image = options.size.longEdge?.let { PixelResampler.downscaleToFit(outcome.output, it) } ?: outcome.output
+        val image = when (val finished = runControlled(ErrorCode.PROCESSING_FAILED) { finishExport(outcome.output, options) }) {
+            is OperationResult.Failure -> return@withContext logFailure("EXPORT_FAILED", outcome.processingId, finished)
+            is OperationResult.Success -> finished.value
+        }
         val saveRequest = SaveRequest(
             displayName = OutputNaming.enhancedName(session.source.displayName, options.format.extension),
             mimeType = options.format.mimeType,
@@ -263,6 +272,19 @@ class EnhanceImageUseCase(
         }
     }
 
+    /**
+     * Size, frame and decoration, in that order: a sized export is scaled so photo + border reach
+     * exactly the requested long edge; the watermark is drawn last so its size is relative to the
+     * final picture.
+     */
+    private fun finishExport(output: PixelBuffer, options: ExportOptions): PixelBuffer {
+        val border = options.border.clamped()
+        val sized = options.size.longEdge?.let { PixelResampler.downscaleToFit(output, BorderOps.contentLongEdge(it, border)) } ?: output
+        val framed = BorderOps.apply(sized, border)
+        val watermark = options.watermark.clamped()
+        return if (watermark.isNone) framed else exportDecorator.decorate(framed, options.copy(border = border, watermark = watermark))
+    }
+
     /** Output dimensions [export] will produce, without rendering — shown in the export dialog. */
     fun estimateExportSize(session: EnhancementSession, request: EnhanceRequest, options: ExportOptions): Pair<Int, Int> {
         val working = session.original
@@ -274,7 +296,12 @@ class EnhanceImageUseCase(
             (working.height * scale).roundToInt(),
             request.geometry,
         )
-        return options.size.longEdge?.let { PixelResampler.fitWithin(it, width, height) } ?: (width to height)
+        val border = options.border.clamped()
+        val (contentWidth, contentHeight) = options.size.longEdge
+            ?.let { PixelResampler.fitWithin(BorderOps.contentLongEdge(it, border), width, height) }
+            ?: (width to height)
+        val frame = 2 * BorderOps.widthFor(maxOf(contentWidth, contentHeight), border)
+        return (contentWidth + frame) to (contentHeight + frame)
     }
 
     /** Saves at full resolution with default options. */
@@ -367,5 +394,6 @@ class EnhanceImageUseCase(
     private companion object {
         /** Long edge of the live-preview image; small enough that a slider move re-renders quickly on a phone. */
         const val PREVIEW_LONG_EDGE = 1280
+        const val AS_SHOT_REASON = "As shot: automatic white balance is off"
     }
 }

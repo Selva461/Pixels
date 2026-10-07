@@ -114,6 +114,8 @@ data class NaturalLimits(
             AdjustmentKind.GRAIN_SIZE to AmountRange(0f, 0f),
             AdjustmentKind.GRAIN_ROUGHNESS to AmountRange(0f, 0f),
             AdjustmentKind.GLOBAL_HUE to AmountRange(0f, 0f),
+            AdjustmentKind.DEFRINGE_PURPLE to AmountRange(0f, 0f),
+            AdjustmentKind.DEFRINGE_GREEN to AmountRange(0f, 0f),
             AdjustmentKind.SATURATION to AmountRange(-0.2f, 0.12f),
             AdjustmentKind.NOISE_REDUCTION to AmountRange(0f, 1f),
             AdjustmentKind.DETAIL to AmountRange(0f, 0.18f),

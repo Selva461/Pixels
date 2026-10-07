@@ -193,8 +193,21 @@ data class LocalAdjustments(val items: List<LocalAdjustment> = emptyList()) {
 
     fun byId(id: Int): LocalAdjustment? = items.firstOrNull { it.id == id }
 
+    /** A copy of mask [id] placed right after it, with a new id; unchanged when full or missing. */
+    fun duplicate(id: Int): LocalAdjustments {
+        val index = items.indexOfFirst { it.id == id }
+        if (index < 0 || items.size >= MAX_ITEMS) return this
+        val original = items[index]
+        val copy = original.copy(id = nextId(), name = (original.name.ifEmpty { "Mask ${index + 1}" } + " copy").take(MAX_NAME_LENGTH))
+        return LocalAdjustments(items.toMutableList().apply { add(index + 1, copy) })
+    }
+
+    fun renamed(id: Int, name: String): LocalAdjustments =
+        LocalAdjustments(items.map { if (it.id == id) it.copy(name = name.filterNot(Char::isISOControl).trim().take(MAX_NAME_LENGTH)) else it })
+
     companion object {
         val NONE = LocalAdjustments()
         const val MAX_ITEMS = 12
+        const val MAX_NAME_LENGTH = 40
     }
 }

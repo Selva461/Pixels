@@ -68,6 +68,21 @@ fun everythingPlan(plan: com.pixels.enhancer.domain.planning.EnhancementPlan) = 
         com.pixels.enhancer.domain.planning.HueBand.GREEN,
         com.pixels.enhancer.domain.planning.HslShift(0.2f, -0.3f, 0.1f),
     ),
+    sharpenRadius = Adjustment.of(0.6f, "test"),
+    sharpenDetail = Adjustment.of(0.4f, "test"),
+    vignetteMidpoint = Adjustment.of(0.3f, "test"),
+    vignetteFeather = Adjustment.of(-0.2f, "test"),
+    vignetteRoundness = Adjustment.of(-0.4f, "test"),
+    grainSize = Adjustment.of(0.5f, "test"),
+    grainRoughness = Adjustment.of(0.3f, "test"),
+    globalHue = Adjustment.of(0.1f, "test"),
+    defringePurple = Adjustment.of(0.8f, "test"),
+    defringeGreen = Adjustment.of(0.5f, "test"),
+    calibration = com.pixels.enhancer.domain.planning.Calibration(redHue = 0.3f, blueSaturation = -0.2f, shadowsTint = 0.2f),
+    colorGrading = com.pixels.enhancer.domain.planning.ColorGrading(
+        shadows = com.pixels.enhancer.domain.planning.GradeWheel(210f, 0.3f),
+        highlights = com.pixels.enhancer.domain.planning.GradeWheel(40f, 0.2f, 0.1f),
+    ),
 )
 
 class PipelineImageProcessorTest {
@@ -76,7 +91,7 @@ class PipelineImageProcessorTest {
     fun `default stage order follows the spec - denoise before detail and sharpening`() {
         assertEquals(
             listOf(
-                StageIds.EXPOSURE, StageIds.WHITE_BALANCE, StageIds.DEHAZE, StageIds.FACE_EXPOSURE, StageIds.TONE, StageIds.CURVES, StageIds.NOISE_REDUCTION,
+                StageIds.EXPOSURE, StageIds.WHITE_BALANCE, StageIds.CALIBRATION, StageIds.DEFRINGE, StageIds.DEHAZE, StageIds.FACE_EXPOSURE, StageIds.TONE, StageIds.CURVES, StageIds.NOISE_REDUCTION,
                 StageIds.DETAIL, StageIds.TEXTURE, StageIds.SHARPEN, StageIds.COLOR_FINISH, StageIds.COLOR_MIXER, StageIds.COLOR_GRADING, StageIds.VIGNETTE, StageIds.GRAIN,
             ),
             DefaultPipeline.stages().map { it.id },
@@ -112,7 +127,10 @@ class PipelineImageProcessorTest {
         val result = PipelineImageProcessor(DefaultPipeline.stages())
             .process(TestImages.solid(120), contextFor(planOverride = ::everythingPlan), runUntilStageId = StageIds.NOISE_REDUCTION)
         assertEquals(
-            listOf(StageIds.EXPOSURE, StageIds.WHITE_BALANCE, StageIds.DEHAZE, StageIds.TONE, StageIds.CURVES, StageIds.NOISE_REDUCTION),
+            listOf(
+                StageIds.EXPOSURE, StageIds.WHITE_BALANCE, StageIds.CALIBRATION, StageIds.DEFRINGE, StageIds.DEHAZE, StageIds.TONE,
+                StageIds.CURVES, StageIds.NOISE_REDUCTION,
+            ),
             result.executedStages,
         )
     }

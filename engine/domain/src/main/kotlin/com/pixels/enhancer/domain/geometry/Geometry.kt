@@ -76,7 +76,7 @@ data class Geometry(
     /** Mirroring a straightened image reverses the tilt, so the angle is negated to keep the picture level. */
     fun flipped(): Geometry = copy(
         flipHorizontal = !flipHorizontal,
-        straightenDegrees = -straightenDegrees,
+        straightenDegrees = negate(straightenDegrees),
         crop = crop.flippedHorizontally(),
         perspective = perspective.mirrored(),
     )

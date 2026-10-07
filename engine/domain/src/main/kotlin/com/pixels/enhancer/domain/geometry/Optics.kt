@@ -74,10 +74,10 @@ data class Perspective(
      * The same on-screen correction after the picture is turned 90° clockwise: a left-right
      * keystone becomes a top-bottom one, and offsets and aspect swap axes.
      */
-    fun rotatedClockwise() = copy(vertical = horizontal, horizontal = -vertical, aspect = -aspect, offsetX = -offsetY, offsetY = offsetX)
+    fun rotatedClockwise() = copy(vertical = horizontal, horizontal = negate(vertical), aspect = negate(aspect), offsetX = negate(offsetY), offsetY = offsetX)
 
     /** The same on-screen correction after a horizontal mirror. */
-    fun mirrored() = copy(horizontal = -horizontal, rotate = -rotate, offsetX = -offsetX)
+    fun mirrored() = copy(horizontal = negate(horizontal), rotate = negate(rotate), offsetX = negate(offsetX))
 
     companion object {
         val NONE = Perspective()
@@ -90,3 +90,9 @@ data class Perspective(
         const val MAX_OFFSET = 0.25f
     }
 }
+
+/**
+ * −x without producing −0.0: Kotlin data classes compare floats with equals(), where −0.0 ≠ 0.0,
+ * so a negated zero would make "rotated four times" differ from "never rotated".
+ */
+internal fun negate(value: Float): Float = -value + 0f

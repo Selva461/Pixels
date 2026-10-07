@@ -53,6 +53,8 @@ enum class AdjustmentKind(val label: String) {
     GRAIN_SIZE("Grain size"),
     GRAIN_ROUGHNESS("Grain roughness"),
     GLOBAL_HUE("Hue"),
+    DEFRINGE_PURPLE("Defringe purple"),
+    DEFRINGE_GREEN("Defringe green"),
 }
 
 /**
@@ -106,10 +108,14 @@ data class EnhancementPlan(
     val grainRoughness: Adjustment = Adjustment.MANUAL_ONLY,
     /** Rotates every hue; −1..1 = ±30°. */
     val globalHue: Adjustment = Adjustment.MANUAL_ONLY,
+    val defringePurple: Adjustment = Adjustment.MANUAL_ONLY,
+    val defringeGreen: Adjustment = Adjustment.MANUAL_ONLY,
     /** Per-hue-band HSL shifts (manual only). */
     val colorMixer: ColorMixer = ColorMixer.NONE,
     /** Colour grading wheels and black-and-white treatment (manual only). */
     val colorGrading: ColorGrading = ColorGrading.NONE,
+    /** Primary hue/saturation and shadows tint (manual only). */
+    val calibration: Calibration = Calibration.NONE,
     /** User tone curves (manual only). */
     val toneCurves: ToneCurves = ToneCurves.NONE,
     val algorithmVersion: String = ENHANCEMENT_ALGORITHM_VERSION,
@@ -147,6 +153,8 @@ data class EnhancementPlan(
         AdjustmentKind.GRAIN_SIZE -> grainSize
         AdjustmentKind.GRAIN_ROUGHNESS -> grainRoughness
         AdjustmentKind.GLOBAL_HUE -> globalHue
+        AdjustmentKind.DEFRINGE_PURPLE -> defringePurple
+        AdjustmentKind.DEFRINGE_GREEN -> defringeGreen
     }
 
     fun entries(): List<Pair<AdjustmentKind, Adjustment>> = AdjustmentKind.entries.map { it to get(it) }
@@ -184,7 +192,9 @@ data class EnhancementPlan(
         grainSize = transform(AdjustmentKind.GRAIN_SIZE, grainSize),
         grainRoughness = transform(AdjustmentKind.GRAIN_ROUGHNESS, grainRoughness),
         globalHue = transform(AdjustmentKind.GLOBAL_HUE, globalHue),
+        defringePurple = transform(AdjustmentKind.DEFRINGE_PURPLE, defringePurple),
+        defringeGreen = transform(AdjustmentKind.DEFRINGE_GREEN, defringeGreen),
     )
 
-    val hasAnyCorrection: Boolean get() = AdjustmentKind.entries.any { get(it).enabled } || !colorMixer.isNeutral || !toneCurves.isIdentity || !colorGrading.isNeutral
+    val hasAnyCorrection: Boolean get() = AdjustmentKind.entries.any { get(it).enabled } || !colorMixer.isNeutral || !toneCurves.isIdentity || !colorGrading.isNeutral || !calibration.isNeutral
 }

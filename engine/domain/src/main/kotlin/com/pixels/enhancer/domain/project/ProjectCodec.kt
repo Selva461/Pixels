@@ -2,7 +2,11 @@ package com.pixels.enhancer.domain.project
 
 import com.pixels.enhancer.domain.analysis.SceneType
 import com.pixels.enhancer.domain.editing.EditState
+import com.pixels.enhancer.domain.export.Border
 import com.pixels.enhancer.domain.export.ExportFormat
+import com.pixels.enhancer.domain.export.Watermark
+import com.pixels.enhancer.domain.export.WatermarkPosition
+import com.pixels.enhancer.domain.planning.Calibration
 import com.pixels.enhancer.domain.export.ExportOptions
 import com.pixels.enhancer.domain.export.ExportSize
 import com.pixels.enhancer.domain.export.MetadataPolicy
@@ -154,6 +158,9 @@ internal data class EditFile(
     val perspective: List<Float> = emptyList(),
     val grading: GradingFile? = null,
     val retouch: List<RetouchFile> = emptyList(),
+    /** [redHue, redSaturation, greenHue, greenSaturation, blueHue, blueSaturation, shadowsTint]. */
+    val calibration: List<Float> = emptyList(),
+    val autoWhiteBalance: Boolean = true,
 ) {
     fun toEdit(): EditState {
         val controls = manual.mapNotNull { (name, value) -> ManualControl.entries.firstOrNull { it.name == name }?.let { it to value } }
@@ -188,6 +195,12 @@ internal data class EditFile(
             localAdjustments = LocalAdjustments(local.mapNotNull { it.toAdjustment() }.take(LocalAdjustments.MAX_ITEMS)),
             colorGrading = grading?.toGrading() ?: ColorGrading.NONE,
             retouch = Retouch(retouch.mapNotNull { it.toSpot() }.take(Retouch.MAX_SPOTS)),
+            calibration = if (calibration.size == CALIBRATION_VALUES) {
+                Calibration(calibration[0], calibration[1], calibration[2], calibration[3], calibration[4], calibration[5], calibration[6]).clamped()
+            } else {
+                Calibration.NONE
+            },
+            autoWhiteBalance = autoWhiteBalance,
         )
     }
 
@@ -197,6 +210,7 @@ internal data class EditFile(
         private const val QUARTER_TURNS = 4
         private const val LENS_VALUES = 3
         private const val PERSPECTIVE_VALUES = 7
+        private const val CALIBRATION_VALUES = 7
 
         fun from(edit: EditState) = EditFile(
             strength = edit.strength,
@@ -214,8 +228,13 @@ internal data class EditFile(
             perspective = with(edit.geometry.perspective) {
                 if (isIdentity) emptyList() else listOf(vertical, horizontal, rotate, aspect, scale, offsetX, offsetY)
             },
-            grading = edit.colorGrading.takeUnless { it.isNeutral }?.let(GradingFile::from),
+            // Stored whenever anything differs from the default, so blending and balance survive even with no wheel set.
+            grading = edit.colorGrading.takeUnless { it == ColorGrading.NONE }?.let(GradingFile::from),
             retouch = edit.retouch.spots.map(RetouchFile::from),
+            calibration = with(edit.calibration) {
+                if (isNeutral) emptyList() else listOf(redHue, redSaturation, greenHue, greenSaturation, blueHue, blueSaturation, shadowsTint)
+            },
+            autoWhiteBalance = edit.autoWhiteBalance,
         )
     }
 }
@@ -320,7 +339,7 @@ internal data class GradingFile(
     private fun wheel(values: List<Float>) = if (values.size == 3) GradeWheel(values[0], values[1], values[2]) else GradeWheel.NONE
 
     companion object {
-        private fun list(w: GradeWheel) = if (w.isNeutral) emptyList() else listOf(w.hue, w.saturation, w.luminance)
+        private fun list(w: GradeWheel) = if (w == GradeWheel.NONE) emptyList() else listOf(w.hue, w.saturation, w.luminance)
 
         fun from(g: ColorGrading) = GradingFile(list(g.shadows), list(g.midtones), list(g.highlights), list(g.global), g.blending, g.balance, g.monochrome)
     }
@@ -348,21 +367,56 @@ internal data class RetouchFile(
     }
 }
 
+/** Export choices; also used by the app's settings store, so it is not private. */
 @Serializable
-private data class ExportFile(
+internal data class ExportFile(
     val format: String = ExportFormat.JPEG.name,
     val quality: Int = ExportOptions.DEFAULT_QUALITY,
     val size: String = ExportSize.FULL.name,
     val metadata: String = MetadataPolicy.REMOVE_LOCATION.name,
+    val borderWidth: Float = 0f,
+    val borderColor: Int = Border.WHITE,
+    val watermarkText: String = "",
+    val watermarkPosition: String = WatermarkPosition.BOTTOM_RIGHT.name,
+    val watermarkSize: Float = Watermark.DEFAULT_SIZE,
+    val watermarkOpacity: Float = Watermark.DEFAULT_OPACITY,
 ) {
     fun toOptions() = ExportOptions(
         format = ExportFormat.entries.firstOrNull { it.name == format } ?: ExportFormat.JPEG,
         quality = quality.coerceIn(ExportOptions.MIN_QUALITY, ExportOptions.MAX_QUALITY),
         size = ExportSize.entries.firstOrNull { it.name == size } ?: ExportSize.FULL,
         metadata = MetadataPolicy.entries.firstOrNull { it.name == metadata } ?: MetadataPolicy.REMOVE_LOCATION,
+        border = Border(borderWidth, borderColor).clamped(),
+        watermark = Watermark(
+            text = watermarkText,
+            position = WatermarkPosition.entries.firstOrNull { it.name == watermarkPosition } ?: WatermarkPosition.BOTTOM_RIGHT,
+            size = watermarkSize,
+            opacity = watermarkOpacity,
+        ).clamped(),
     )
 
     companion object {
-        fun from(options: ExportOptions) = ExportFile(options.format.name, options.quality, options.size.name, options.metadata.name)
+        fun from(options: ExportOptions) = ExportFile(
+            format = options.format.name,
+            quality = options.quality,
+            size = options.size.name,
+            metadata = options.metadata.name,
+            borderWidth = options.border.widthFraction,
+            borderColor = options.border.color,
+            watermarkText = options.watermark.text,
+            watermarkPosition = options.watermark.position.name,
+            watermarkSize = options.watermark.size,
+            watermarkOpacity = options.watermark.opacity,
+        )
     }
+}
+
+/** JSON for [ExportOptions] on its own (the app's remembered export choices). */
+object ExportOptionsCodec {
+    private val json = Json { ignoreUnknownKeys = true }
+
+    fun encode(options: ExportOptions): String = json.encodeToString(ExportFile.serializer(), ExportFile.from(options))
+
+    /** Unknown or damaged input falls back to the defaults rather than failing. */
+    fun decode(text: String?): ExportOptions = text?.let { runCatching { json.decodeFromString(ExportFile.serializer(), it).toOptions() }.getOrNull() } ?: ExportOptions()
 }

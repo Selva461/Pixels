@@ -14,12 +14,13 @@ import com.pixels.enhancer.domain.planning.ToneCurves
 /** Which parts of an edit a preset or a paste carries. Geometry, masks and retouching are per-photo and never included. */
 enum class SettingsGroup(val label: String) {
     LIGHT("Light"),
-    COLOR("Color"),
+    COLOR("Colour"),
     EFFECTS("Effects"),
     DETAIL("Detail"),
     CURVES("Curve"),
-    COLOR_MIXER("Color mixer"),
-    COLOR_GRADING("Color grading"),
+    COLOR_MIXER("Colour mixer"),
+    COLOR_GRADING("Colour grading"),
+    CALIBRATION("Calibration"),
     ;
 
     companion object {
@@ -40,8 +41,10 @@ data class Preset(
 )
 
 object PresetMath {
+    const val MAX_AMOUNT = 2f
+
     /** Manual controls belonging to each settings group. */
-    private fun groupOf(control: ManualControl): SettingsGroup = when (control.group) {
+    fun groupOf(control: ManualControl): SettingsGroup = when (control.group) {
         ControlGroup.LIGHT -> SettingsGroup.LIGHT
         ControlGroup.COLOR -> SettingsGroup.COLOR
         ControlGroup.EFFECTS -> SettingsGroup.EFFECTS
@@ -49,26 +52,32 @@ object PresetMath {
     }
 
     /**
-     * Applies [preset] to [current] at [amount] (0..2, 1 = as designed), replacing the preset's
-     * groups and keeping the photo's geometry, masks, retouching and scene choice.
+     * Applies [preset] on top of [before] at [amount] (0..2). A preset sets every Light and Colour
+     * slider, the groups of any other slider it uses, the colour mixer, grading and curves. Amount
+     * blends from [before] (0) to the preset (1) and beyond (2 exaggerates the difference), so 0%
+     * always gives back exactly the edit you had. Geometry, masks, healing, calibration and scene
+     * are never touched.
      */
-    fun apply(current: EditState, preset: Preset, amount: Float = 1f): EditState {
+    fun apply(before: EditState, preset: Preset, amount: Float = 1f): EditState {
         val a = amount.coerceIn(0f, MAX_AMOUNT)
-        val settings = preset.settings
+        val target = preset.settings
+        val groups = presetGroups(preset)
         var manual = ManualAdjustments.NONE
-        // Controls of groups the preset doesn't touch stay as the user set them.
-        current.manual.values.forEach { (control, value) -> if (groupOf(control) !in presetGroups(preset)) manual = manual.with(control, value) }
-        settings.manual.values.forEach { (control, value) -> manual = manual.with(control, value * a) }
-        return current.copy(
+        ManualControl.entries.forEach { control ->
+            val from = before.manual[control]
+            val value = if (groupOf(control) in groups) mix(from, target.manual[control], a) else from
+            manual = manual.with(control, value)
+        }
+        return before.copy(
             manual = manual,
-            lookId = settings.lookId,
-            colorMixer = scaleMixer(settings.colorMixer, a),
-            colorGrading = scaleGrading(settings.colorGrading, a),
-            toneCurves = settings.toneCurves,
+            lookId = if (a > 0f) target.lookId else before.lookId,
+            colorMixer = mixMixer(before.colorMixer, target.colorMixer, a),
+            colorGrading = mixGrading(before.colorGrading, target.colorGrading, a),
+            toneCurves = if (a >= HALF) target.toneCurves else before.toneCurves,
         )
     }
 
-    /** Copies the chosen [groups] of [from] onto [to] (Copy / Paste settings). */
+    /** Copies the chosen [groups] of [from] onto [to] (Copy / Paste settings, batch apply). */
     fun paste(from: EditState, to: EditState, groups: Set<SettingsGroup>): EditState {
         var manual = ManualAdjustments.NONE
         ManualControl.entries.forEach { control ->
@@ -78,9 +87,11 @@ object PresetMath {
         return to.copy(
             manual = manual,
             lookId = if (SettingsGroup.LIGHT in groups || SettingsGroup.COLOR in groups) from.lookId else to.lookId,
+            autoWhiteBalance = if (SettingsGroup.COLOR in groups) from.autoWhiteBalance else to.autoWhiteBalance,
             toneCurves = if (SettingsGroup.CURVES in groups) from.toneCurves else to.toneCurves,
             colorMixer = if (SettingsGroup.COLOR_MIXER in groups) from.colorMixer else to.colorMixer,
             colorGrading = if (SettingsGroup.COLOR_GRADING in groups) from.colorGrading else to.colorGrading,
+            calibration = if (SettingsGroup.CALIBRATION in groups) from.calibration else to.calibration,
         )
     }
 
@@ -92,21 +103,48 @@ object PresetMath {
         colorMixer = edit.colorMixer,
         toneCurves = edit.toneCurves,
         colorGrading = edit.colorGrading,
+        calibration = edit.calibration,
+        autoWhiteBalance = edit.autoWhiteBalance,
     )
 
     private fun presetGroups(preset: Preset): Set<SettingsGroup> =
         preset.settings.manual.values.keys.map(::groupOf).toSet() + setOf(SettingsGroup.LIGHT, SettingsGroup.COLOR)
 
-    private fun scaleMixer(mixer: ColorMixer, a: Float) = mixer.shifts.entries.fold(ColorMixer.NONE) { acc, (band, shift) ->
-        acc.with(band, HslShift(shift.hue * a, shift.saturation * a, shift.luminance * a))
+    private fun mix(from: Float, to: Float, a: Float) = from + (to - from) * a
+
+    private fun mixMixer(from: ColorMixer, to: ColorMixer, a: Float): ColorMixer = HueBand.entries.fold(ColorMixer.NONE) { acc, band ->
+        val f = from[band]
+        val t = to[band]
+        acc.with(band, HslShift(mix(f.hue, t.hue, a), mix(f.saturation, t.saturation, a), mix(f.luminance, t.luminance, a)))
     }
 
-    private fun scaleGrading(grading: ColorGrading, a: Float): ColorGrading {
-        fun s(w: GradeWheel) = GradeWheel(w.hue, w.saturation * a, w.luminance * a)
-        return grading.copy(shadows = s(grading.shadows), midtones = s(grading.midtones), highlights = s(grading.highlights), global = s(grading.global)).clamped()
+    private fun mixGrading(from: ColorGrading, to: ColorGrading, a: Float): ColorGrading = ColorGrading(
+        shadows = mixWheel(from.shadows, to.shadows, a),
+        midtones = mixWheel(from.midtones, to.midtones, a),
+        highlights = mixWheel(from.highlights, to.highlights, a),
+        global = mixWheel(from.global, to.global, a),
+        blending = mix(from.blending, to.blending, a),
+        balance = mix(from.balance, to.balance, a),
+        monochrome = if (a >= HALF) to.monochrome else from.monochrome,
+    ).clamped()
+
+    /** Saturation and luminance blend; hue takes the shorter way round, or the side that has colour. */
+    private fun mixWheel(from: GradeWheel, to: GradeWheel, a: Float): GradeWheel {
+        val hue = when {
+            from.saturation == 0f -> to.hue
+            to.saturation == 0f -> from.hue
+            else -> {
+                var delta = (to.hue - from.hue) % FULL_CIRCLE
+                if (delta > FULL_CIRCLE / 2) delta -= FULL_CIRCLE
+                if (delta < -FULL_CIRCLE / 2) delta += FULL_CIRCLE
+                from.hue + delta * a.coerceAtMost(1f)
+            }
+        }
+        return GradeWheel(hue, mix(from.saturation, to.saturation, a), mix(from.luminance, to.luminance, a))
     }
 
-    const val MAX_AMOUNT = 2f
+    private const val HALF = 0.5f
+    private const val FULL_CIRCLE = 360f
 }
 
 /** Built-in presets: classic, non-generative looks made only of the app's own sliders. */

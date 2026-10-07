@@ -1,8 +1,11 @@
 package com.pixels.enhancer.domain.export
 
-enum class ExportFormat(val mimeType: String, val extension: String) {
-    JPEG("image/jpeg", "jpg"),
-    PNG("image/png", "png"),
+enum class ExportFormat(val mimeType: String, val extension: String, val label: String, val lossy: Boolean) {
+    JPEG("image/jpeg", "jpg", "JPEG", lossy = true),
+    PNG("image/png", "png", "PNG", lossy = false),
+
+    /** Smaller files than JPEG at the same quality; every current browser and gallery opens it. */
+    WEBP("image/webp", "webp", "WebP", lossy = true),
 }
 
 /** Output size by long edge; [FULL] keeps the source resolution (capped by [ExportOptions.MAX_EXPORT_PIXELS]). */
@@ -29,6 +32,8 @@ data class ExportOptions(
     val quality: Int = DEFAULT_QUALITY,
     val size: ExportSize = ExportSize.FULL,
     val metadata: MetadataPolicy = MetadataPolicy.REMOVE_LOCATION,
+    val border: Border = Border.NONE,
+    val watermark: Watermark = Watermark.NONE,
 ) {
     init {
         require(quality in MIN_QUALITY..MAX_QUALITY) { "JPEG quality must be $MIN_QUALITY..$MAX_QUALITY, was $quality" }

@@ -109,3 +109,15 @@ data class ToneCurves(val curves: Map<CurveChannel, CurvePoints> = emptyMap()) {
         val NONE = ToneCurves()
     }
 }
+
+/** Ready-made curves offered in the Curve editor; applied to the selected channel. */
+enum class CurvePreset(val label: String, private val flat: List<Float>) {
+    LINEAR("Linear", listOf(0f, 0f, 1f, 1f)),
+    MEDIUM_CONTRAST("Medium contrast", listOf(0f, 0f, 0.25f, 0.21f, 0.75f, 0.79f, 1f, 1f)),
+    STRONG_CONTRAST("Strong contrast", listOf(0f, 0f, 0.25f, 0.17f, 0.75f, 0.83f, 1f, 1f)),
+    LIFT_SHADOWS("Lift shadows", listOf(0f, 0f, 0.2f, 0.27f, 0.6f, 0.64f, 1f, 1f)),
+    FADED("Faded", listOf(0f, 0.08f, 0.25f, 0.27f, 0.75f, 0.76f, 1f, 0.95f)),
+    ;
+
+    val points: CurvePoints get() = CurvePoints.of(flat.chunked(2) { CurvePoint(it[0], it[1]) })
+}

@@ -40,13 +40,29 @@ object OutputNaming {
     private const val SUFFIX = "_enhanced"
     private const val DEFAULT_BASE_NAME = "IMG"
 
-    /** `IMG_1234.jpg` -> `IMG_1234_enhanced.jpg`; output is always JPEG for the MVP. */
-    fun enhancedName(originalName: String?, extension: String = "jpg"): String {
-        val base = originalName
-            ?.substringAfterLast('/')
-            ?.substringBeforeLast('.')
-            ?.takeIf { it.isNotBlank() }
-            ?: DEFAULT_BASE_NAME
-        return "$base$SUFFIX.$extension"
+    /** Keeps names well under the 255-byte file-name limit even in multi-byte scripts. */
+    const val MAX_BASE_LENGTH = 80
+
+    /**
+     * `IMG_1234.jpg` -> `IMG_1234_enhanced.jpg`. The base name comes from another app (the source's
+     * display name), so it is sanitised: path parts dropped, only letters, digits, space and
+     * `._-()` kept, no leading dots, length capped.
+     */
+    fun enhancedName(originalName: String?, extension: String = "jpg"): String = "${safeBaseName(originalName)}$SUFFIX.$extension"
+
+    fun safeBaseName(originalName: String?): String {
+        val withoutPath = originalName?.substringAfterLast('/')?.substringAfterLast('\\')
+        val base = withoutPath?.let { if (it.contains('.')) it.substringBeforeLast('.') else it }
+        val cleaned = base
+            ?.map { if (it.isLetterOrDigit() || it in SAFE_PUNCTUATION) it else '_' }
+            ?.joinToString("")
+            ?.replace(REPEATED_UNDERSCORES, "_")
+            ?.trimStart('.', ' ')
+            ?.trim()
+            ?.take(MAX_BASE_LENGTH)
+        return cleaned?.takeIf { name -> name.any { it.isLetterOrDigit() } } ?: DEFAULT_BASE_NAME
     }
+
+    private val SAFE_PUNCTUATION = setOf(' ', '.', '_', '-', '(', ')')
+    private val REPEATED_UNDERSCORES = Regex("_{2,}")
 }

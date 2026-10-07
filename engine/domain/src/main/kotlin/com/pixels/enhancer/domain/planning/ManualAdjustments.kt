@@ -58,8 +58,10 @@ enum class ManualControl(
     SHARPEN_MASKING("Sharpen masking", ControlGroup.DETAIL, AdjustmentKind.SHARPEN_MASKING, 0f, 1f, 1f, AmountRange(0f, 1f), "Higher limits sharpening to strong edges only", advanced = true),
     SHARPEN_RADIUS("Sharpen radius", ControlGroup.DETAIL, AdjustmentKind.SHARPEN_RADIUS, 0f, 1f, 1f, AmountRange(0f, 1f), "Width of sharpened edges, 0.5 to 3 px", advanced = true),
     SHARPEN_DETAIL("Sharpen detail", ControlGroup.DETAIL, AdjustmentKind.SHARPEN_DETAIL, 0f, 1f, 1f, AmountRange(0f, 1f), "Higher sharpens fine detail more; lower keeps halos down", advanced = true),
+    DEFRINGE_PURPLE("Defringe purple", ControlGroup.DETAIL, AdjustmentKind.DEFRINGE_PURPLE, 0f, 1f, 1f, AmountRange(0f, 1f), "Removes purple fringes along high-contrast edges", advanced = true),
+    DEFRINGE_GREEN("Defringe green", ControlGroup.DETAIL, AdjustmentKind.DEFRINGE_GREEN, 0f, 1f, 1f, AmountRange(0f, 1f), "Removes green fringes along high-contrast edges", advanced = true),
     NOISE_REDUCTION("Noise reduction", ControlGroup.DETAIL, AdjustmentKind.NOISE_REDUCTION, 0f, 1f, 1f, AmountRange(0f, 1f), "Smooths brightness grain while keeping edges"),
-    COLOR_NOISE_REDUCTION("Color noise reduction", ControlGroup.DETAIL, AdjustmentKind.COLOR_NOISE_REDUCTION, 0f, 1f, 1f, AmountRange(0f, 1f), "Removes coloured speckles; brightness detail is untouched", advanced = true),
+    COLOR_NOISE_REDUCTION("Colour noise reduction", ControlGroup.DETAIL, AdjustmentKind.COLOR_NOISE_REDUCTION, 0f, 1f, 1f, AmountRange(0f, 1f), "Removes coloured speckles; brightness detail is untouched", advanced = true),
     FACE_EXPOSURE("Face exposure", ControlGroup.PORTRAIT, AdjustmentKind.FACE_EXPOSURE, -1f, 1f, 1f, AmountRange(-1.25f, 1.5f), "Brightens or darkens detected faces only, with a soft edge", format = ValueFormat.EV),
     VIGNETTE("Vignette", ControlGroup.EFFECTS, AdjustmentKind.VIGNETTE, -1f, 1f, 1f, AmountRange(-1f, 1f), "Darker or lighter corners"),
     VIGNETTE_MIDPOINT("Vignette midpoint", ControlGroup.EFFECTS, AdjustmentKind.VIGNETTE_MIDPOINT, -1f, 1f, 1f, AmountRange(-1f, 1f), "How far the vignette reaches toward the centre", advanced = true),
@@ -84,7 +86,7 @@ enum class ManualControl(
 
 enum class ControlGroup(val label: String) {
     LIGHT("Light"),
-    COLOR("Color"),
+    COLOR("Colour"),
     DETAIL("Detail"),
     PORTRAIT("Portrait"),
     EFFECTS("Effects"),
