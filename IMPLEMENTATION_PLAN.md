@@ -32,13 +32,13 @@ in `app/` is compiled in CI but has not been run on a phone by the developer.
 | Warm-scene protection | ✅ | Dim warm scenes and Night/Food scenes correct casts less |
 | Saturation, vibrance | ✅ | |
 | HSL colour mixer (8 bands × H/S/L) | ✅ | |
-| Per-channel RGB saturation, colour balance, global hue | ⬜ | |
+| Per-channel RGB saturation, colour balance, global hue | 🟡 | Colour grading wheels (shadows/midtones/highlights/global, blending, balance) cover colour balance; black-and-white treatment with mixer-based B&W mix. Per-channel RGB saturation and a global hue slider ⬜ |
 | Tone curves | ✅ | Master + R/G/B monotone-cubic curves over the histogram (tap add, drag, double-tap remove) |
 | Histogram | ✅ | Of the edited preview (Adjust tab) |
-| Clarity, dehaze, sharpening, noise reduction | ✅ | Plus texture, colour NR and sharpening masking; sharpening radius ⬜ |
+| Clarity, dehaze, sharpening, noise reduction | ✅ | Plus texture, colour NR, sharpening radius/detail/masking |
 | Crop, rotate 90°, flip H/V, straighten, grid | ✅ | Presets Free/Original/1:1/4:5/3:2/4:3/16:9/9:16 |
-| Lens distortion, CA, perspective | ⬜ | |
-| Selective adjustments / masks | 🟡 | Up to 8 radial/linear masks (exposure, contrast, saturation, temperature, feather, invert); brush, subject and sky masks ⬜ |
+| Lens distortion, CA, perspective | ✅ | Manual distortion, colour fringing, lens vignetting; Upright-style vertical/horizontal/rotate/aspect/scale/offset, auto-fitted (no empty edges). Automatic upright (line detection) ⬜ |
+| Selective adjustments / masks | ✅ | Up to 12 masks: brush (paint/erase, size, feather, flow), linear, radial, luminance range, colour range (tap to pick); invert; overlay; 9 local sliders. AI subject/sky masks deliberately not included (user chose no AI) |
 | Portrait-specific controls | 🟡 | On-device face detection (android.media.FaceDetector) drives auto face exposure incl. backlit faces; manual Face exposure slider; red-eye ⬜ |
 | Auto Enhance (analysis-driven, not a preset) | ✅ | Per-image plan with reasons |
 | Scene-aware enhancement | ✅ | Heuristic classifier (11 scenes), user override, per-scene limits |
@@ -52,6 +52,8 @@ in `app/` is compiled in CI but has not been run on a phone by the developer.
 | Export: verified write, cleanup, no false success | ✅ | Pending → verify → metadata → verify → publish → verify; device-verified |
 | Export: cancel | ✅ | Partial file deleted |
 | Export: colour profile choice, HEIC output | ⬜ | |
+| Retouching (spot heal / clone) | ✅ | Tap to heal with automatic source choice; drag target and source; heal or clone; size, feather, opacity. Real pixels only |
+| Presets, copy/paste, versions | ✅ | 29 built-in presets in 8 categories with amount 0–200 %; user presets saved on device; copy/paste settings by group; named versions inside projects |
 | Camera entry point, settings/help screens | 🟡 | About screen with privacy policy, terms, licences; settings and camera ⬜ |
 | Visual regression with real photos | 🟡 | Synthetic golden scenes only; real-photo set not yet collected |
 | Performance benchmarks on devices | ⬜ | Desktop timings only (see TESTING.md) |
@@ -61,7 +63,7 @@ in `app/` is compiled in CI but has not been run on a phone by the developer.
 1. Audit and save defect — ✅
 2. Core image engine — ✅
 3. Auto Enhance (scene-aware, strength) — ✅
-4. Advanced editing — 🟡 (HSL, histogram, dehaze, crop/straighten, curves, radial/linear masks, face exposure done; lens, brush/sky masks, eyedropper ⬜)
+4. Advanced editing — ✅ (curves, masks incl. brush and ranges, healing, lens and perspective, grading, presets, versions); eyedropper WB, auto upright ⬜
 5. Export and reliability — ✅ (device-verified); lifecycle interruption testing ⬜
 6. Quality and release — ⬜ (real-photo visual review and device benchmarks)
 

@@ -13,11 +13,11 @@
 CI: `.github/workflows/android.yml` runs engine tests, builds the debug APK (artifact
 `pixels-debug-apk`) and runs the instrumented tests on an emulator for every push.
 
-## Coverage (170 engine tests, 6 instrumented tests)
+## Coverage (190 engine tests, 6 instrumented tests)
 
 | Category | Where |
 |---|---|
-| Unit — metrics, planner rules (cases A–F), strength scaling, stages, tone curve, curves (monotone, LUT), HSL, dehaze, texture, geometry, crop maths, local masks, face exposure (incl. backlit), history, codec | `engine/domain/src/test` |
+| Unit — metrics, planner rules (cases A–F), strength scaling, stages, tone curve, curves (monotone, LUT), HSL, dehaze, texture, geometry, crop maths, local masks (brush, ranges), face exposure (incl. backlit), lens/perspective, heal/clone, grading, presets, history, codec | `engine/domain/src/test` |
 | Integration — use case open/enhance/export/save, validation, error mapping, tiling seams, scene override | `usecase/`, `processing/` tests |
 | Golden — 9 synthetic degradations with measurable expectations | `golden/GoldenScenarioTest` |
 | Storage — project round trip, corrupt/future files, atomic writes, path safety | `ProjectPersistenceTest` |
@@ -34,6 +34,11 @@ CI: `.github/workflows/android.yml` runs engine tests, builds the debug APK (art
 - Color tab: each band affects only its colours; greys stay grey.
 - Curve tab: add/drag/remove points on master and R/G/B; curve never inverts.
 - Local tab: add radial and linear masks, drag handles, invert, delete; edits stay inside the mask.
+- Presets: each category applies; amount 0/100/200 %; save your own, long-press to delete.
+- Masking: paint and erase a brush mask; luminance and colour range (tap to pick); overlay on/off.
+- Healing: tap a spot, drag source/target, switch heal/clone, delete.
+- Optics/Geometry: distortion and vertical perspective on a building photo; no empty edges.
+- Versions: save, apply, delete; copy settings on one photo and paste on another.
 - Portrait/backlit photo: auto lifts the face without darkening it; Face exposure slider works;
   photos without faces are unchanged by it.
 - Crop: rotate, flip, straighten, aspect presets, drag frame; result after leaving the tab.

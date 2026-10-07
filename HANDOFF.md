@@ -1,10 +1,10 @@
 # HANDOFF
 
-_Last updated: 2026-10-07 · algorithm version 1.1_
+_Last updated: 2026-10-07 (pro editor) · algorithm version 1.1_
 
 ## Current status (2026-10-07)
 
-- Engine: `./gradlew -p engine build` — 170 tests pass.
+- Engine: `./gradlew -p engine build` — 190 tests pass.
 - Last green CI (APK + device tests): commit 91a359a (crop/rotate). CI runs again now that the
   repository is public, but **pushes to `claude/new-session-2v9neb` are refused by the repository
   ruleset** (pull request with code-owner review + required status checks on the default branch).
@@ -28,6 +28,24 @@ Allow the push (ruleset bypass for the repository admin / Claude app, or turn en
 let CI build HEAD, fix any compile errors in `app/`, and confirm the device tests pass.
 
 ## What changed
+
+### 2026-10-07 — pro editor (Premium-level tools, no AI)
+
+The user asked for the features of a paid pro mobile editor and a similar UI, keeping the engine.
+Nothing was copied from another app: tools were implemented from scratch and the UI uses the
+common pro-editor layout (photo, panel, tool strip) with Pixels' own palette and icons from
+Material Symbols. The user chose "no AI", so subject/sky/people masks, AI denoise and generative
+remove are not included.
+
+- Engine: `geometry/Optics.kt` + `OpticsWarp` (lens and perspective in one auto-fitted warp),
+  brush/range masks (`local/MaskRaster.kt`), `retouch/` (heal/clone + automatic source),
+  `ColorGradingStage` + B&W treatment, sharpen radius/detail, vignette midpoint/feather/roundness,
+  grain size/roughness, `presets/` (library, amount, user presets, copy/paste), project versions.
+  Project files stay schema 1 (all new fields optional).
+- App: dark workspace, `EditorTool` strip, `ProSlider`, panels in `ui/panels/`, `ui/local/Masking.kt`
+  (mask canvas + panel), `ui/retouch/Healing.kt`, `EditorActions` implemented by the view model.
+- Ruleset note: updates to existing branches are refused ("changes must be made through a pull
+  request"); each push needs a new branch until the ruleset is narrowed to the default branch.
 
 ### 2026-10-07 — remaining editing requirements
 

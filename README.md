@@ -4,6 +4,12 @@ Android app that takes a poor-looking photo and corrects it so it looks **natura
 It detects what is wrong (exposure, colour cast, flatness, noise, softness) and applies only the minimum
 correction, with a recorded reason for every decision. All processing happens on the device.
 
+On top of Auto Enhance it is a full manual editor: presets with an amount slider, crop and
+straighten, light and tone curves, colour mixer and grading wheels, black and white, effects,
+detail, lens and perspective correction, brush/gradient/range masks, spot healing and cloning,
+copy/paste of settings and saved versions. No AI or generated pixels: every result comes from the
+photo's own pixels.
+
 ## Layout
 
 ```

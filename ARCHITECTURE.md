@@ -10,8 +10,10 @@ engine/domain  (pure Kotlin/JVM — no Android classes; unit-tested on the JVM)
   planning/    EnhancementPlanner (decision layer), NaturalLimits, QualityPreset (per scene),
                ManualAdjustments + merger, Looks, ColorMixer, ToneCurves (monotone cubic)
   processing/  PipelineImageProcessor (+ tiling), ProcessingStage contract, stages/, ops/
-  geometry/    Geometry, GeometryOps (rotate/flip/straighten/crop), CropMath
-  local/       LocalAdjustments (radial/linear masks), LocalAdjustmentRenderer (runs after geometry)
+  geometry/    Geometry, GeometryOps (rotate/flip/optics/straighten/crop), OpticsWarp (lens + perspective), CropMath
+  local/       LocalAdjustments (brush, linear, radial, luminance/colour range), MaskRaster, LocalAdjustmentRenderer
+  retouch/     Retouch spots (heal/clone), RetouchRenderer, RetouchSourceFinder
+  presets/     PresetLibrary, PresetMath (amount, copy/paste), FilePresetStore
   editing/     EditState (the nondestructive edit), EditHistory (undo/redo)
   project/     Project, ProjectCodec (versioned JSON), FileProjectStore, ProjectManager
   export/      ExportOptions (format, quality, size, metadata)
@@ -73,3 +75,11 @@ Deviations from the requirement's suggested sequence, and why:
 - Manual edits switch validation to structural checks only; automatic edits must also pass the
   naturalness checks (no new clipping, no colour explosion).
 - Logs contain metadata only — never pixels, file names, URIs or GPS.
+
+## Render order
+
+Pipeline (preview or tiled export): Exposure → White balance → Dehaze → Face exposure → Tone →
+Curves → Noise reduction → Clarity → Texture → Sharpen → Colour finish → Colour mixer → Colour
+grading / B&W → Vignette → Grain. Then validation, then geometry (turns, flip, lens + perspective
+warp, straighten, crop), then retouch spots, then local masks — the last two are positioned on
+the photo as the user sees it.
