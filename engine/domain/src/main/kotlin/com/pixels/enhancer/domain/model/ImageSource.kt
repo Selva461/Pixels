@@ -27,7 +27,8 @@ data class ImageSource(
 }
 
 object SupportedFormats {
-    val MIME_TYPES = setOf("image/jpeg", "image/png", "image/webp")
+    /** HEIC/HEIF decode on Android 9+; the app's minimum is Android 10, so they are always supported. */
+    val MIME_TYPES = setOf("image/jpeg", "image/png", "image/webp", "image/heic", "image/heif")
 
     /** Guards against decompression bombs; ~200 MP is far beyond any phone camera. */
     const val MAX_SOURCE_PIXELS = 200_000_000L

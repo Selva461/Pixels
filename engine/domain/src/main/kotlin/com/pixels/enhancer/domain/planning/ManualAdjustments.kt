@@ -1,12 +1,27 @@
 package com.pixels.enhancer.domain.planning
 
 import java.util.Locale
+import kotlin.math.pow
+import kotlin.math.roundToInt
+
+/** How a slider value is shown to the user. */
+enum class ValueFormat {
+    /** −100..+100 (or 0..100). */
+    PERCENT,
+
+    /** Camera stops: value × scale, one decimal, e.g. "+1.5 EV". */
+    EV,
+
+    /** Gamma 0.5..2.0: 2^value. */
+    GAMMA,
+}
 
 /**
  * A user-facing slider. Slider values run over [min]..[max] (0 = no change); [scale] converts a
- * slider value of ±1 into a plan amount. The automatic correction and the manual offset are
- * added, then clamped to [combinedRange] — wider than the natural auto ranges because the user
- * explicitly asked for the look, but still bounded so nothing breaks.
+ * slider value of ±1 into a plan amount. The automatic correction and the manual offsets of every
+ * control of the same [kind] are added, then clamped to [combinedRange] — wider than the natural
+ * auto ranges because the user explicitly asked for the look, but still bounded so nothing breaks.
+ * [advanced] controls are progressively disclosed so the beginner panel stays short.
  */
 enum class ManualControl(
     val label: String,
@@ -18,24 +33,44 @@ enum class ManualControl(
     val combinedRange: AmountRange,
     /** Shown under the slider in the editor. */
     val description: String,
+    val advanced: Boolean = false,
+    val format: ValueFormat = ValueFormat.PERCENT,
 ) {
-    EXPOSURE("Exposure", ControlGroup.LIGHT, AdjustmentKind.EXPOSURE, -1f, 1f, 1.2f, AmountRange(-1.5f, 1.5f), "Overall brightness, in camera stops"),
+    EXPOSURE("Exposure", ControlGroup.LIGHT, AdjustmentKind.EXPOSURE, -1f, 1f, 3f, AmountRange(-3.5f, 3.5f), "Overall brightness, in camera stops", format = ValueFormat.EV),
     CONTRAST("Contrast", ControlGroup.LIGHT, AdjustmentKind.CONTRAST, -1f, 1f, 0.15f, AmountRange(-0.2f, 0.25f), "Separation between light and dark"),
     HIGHLIGHTS("Highlights", ControlGroup.LIGHT, AdjustmentKind.HIGHLIGHTS, -1f, 1f, 0.2f, AmountRange(-0.3f, 0.2f), "Bright areas; lower to recover detail"),
     SHADOWS("Shadows", ControlGroup.LIGHT, AdjustmentKind.SHADOWS, -1f, 1f, 0.2f, AmountRange(-0.2f, 0.3f), "Dark areas; raise to open them up"),
     WHITES("Whites", ControlGroup.LIGHT, AdjustmentKind.WHITES, -1f, 1f, 0.15f, AmountRange(-0.15f, 0.15f), "The brightest tones and white point"),
     BLACKS("Blacks", ControlGroup.LIGHT, AdjustmentKind.BLACKS, -1f, 1f, 0.15f, AmountRange(-0.15f, 0.15f), "The darkest tones and black point"),
-    MIDTONES("Midtones", ControlGroup.LIGHT, AdjustmentKind.MIDTONES, -1f, 1f, 0.15f, AmountRange(-0.15f, 0.15f), "Middle brightness without moving black or white"),
+    BRIGHTNESS("Brightness", ControlGroup.LIGHT, AdjustmentKind.BRIGHTNESS, -1f, 1f, 0.15f, AmountRange(-0.15f, 0.15f), "Perceived lightness across most tones", advanced = true),
+    MIDTONES("Midtones", ControlGroup.LIGHT, AdjustmentKind.MIDTONES, -1f, 1f, 0.15f, AmountRange(-0.15f, 0.15f), "Only the middle tones; black and white stay put", advanced = true),
+    GAMMA("Gamma", ControlGroup.LIGHT, AdjustmentKind.GAMMA, -1f, 1f, 1f, AmountRange(-1f, 1f), "Midtone response, 0.5 to 2.0", advanced = true, format = ValueFormat.GAMMA),
+    EXPOSURE_COMPENSATION("Exposure compensation", ControlGroup.LIGHT, AdjustmentKind.EXPOSURE, -1f, 1f, 2f, AmountRange(-3.5f, 3.5f), "Fine exposure correction on top of Exposure", advanced = true, format = ValueFormat.EV),
     TEMPERATURE("Temperature", ControlGroup.COLOR, AdjustmentKind.TEMPERATURE, -1f, 1f, 1f, AmountRange(-1f, 1f), "Cooler (blue) to warmer (yellow)"),
     TINT("Tint", ControlGroup.COLOR, AdjustmentKind.TINT, -1f, 1f, 1f, AmountRange(-1f, 1f), "Green to magenta"),
     VIBRANCE("Vibrance", ControlGroup.COLOR, AdjustmentKind.SATURATION, -1f, 1f, 0.35f, AmountRange(-0.4f, 0.4f), "Boosts muted colours more than vivid ones and spares skin"),
     SATURATION("Saturation", ControlGroup.COLOR, AdjustmentKind.GLOBAL_SATURATION, -1f, 1f, 1f, AmountRange(-1f, 1f), "All colours equally; −100 is black and white"),
     CLARITY("Clarity", ControlGroup.DETAIL, AdjustmentKind.DETAIL, -1f, 1f, 0.25f, AmountRange(-0.25f, 0.35f), "Local contrast in midtones"),
+    TEXTURE("Texture", ControlGroup.DETAIL, AdjustmentKind.TEXTURE, -1f, 1f, 0.5f, AmountRange(-0.5f, 0.5f), "Fine surface detail such as fabric, bark or skin pores", advanced = true),
     DEHAZE("Dehaze", ControlGroup.DETAIL, AdjustmentKind.DEHAZE, -1f, 1f, 0.8f, AmountRange(-0.8f, 0.8f), "Removes (or adds) atmospheric haze"),
     SHARPNESS("Sharpness", ControlGroup.DETAIL, AdjustmentKind.SHARPENING, 0f, 1f, 0.6f, AmountRange(0f, 0.8f), "Edge definition; cannot restore missing detail"),
-    NOISE_REDUCTION("Noise reduction", ControlGroup.DETAIL, AdjustmentKind.NOISE_REDUCTION, 0f, 1f, 1f, AmountRange(0f, 1f), "Smooths grain while keeping edges"),
+    SHARPEN_MASKING("Sharpen masking", ControlGroup.DETAIL, AdjustmentKind.SHARPEN_MASKING, 0f, 1f, 1f, AmountRange(0f, 1f), "Higher limits sharpening to strong edges only", advanced = true),
+    NOISE_REDUCTION("Noise reduction", ControlGroup.DETAIL, AdjustmentKind.NOISE_REDUCTION, 0f, 1f, 1f, AmountRange(0f, 1f), "Smooths brightness grain while keeping edges"),
+    COLOR_NOISE_REDUCTION("Color noise reduction", ControlGroup.DETAIL, AdjustmentKind.COLOR_NOISE_REDUCTION, 0f, 1f, 1f, AmountRange(0f, 1f), "Removes coloured speckles; brightness detail is untouched", advanced = true),
     VIGNETTE("Vignette", ControlGroup.EFFECTS, AdjustmentKind.VIGNETTE, -1f, 1f, 1f, AmountRange(-1f, 1f), "Darker or lighter corners"),
     GRAIN("Grain", ControlGroup.EFFECTS, AdjustmentKind.GRAIN, 0f, 1f, 1f, AmountRange(0f, 1f), "Film-like texture"),
+    ;
+
+    /** The value as the user reads it, e.g. "+25", "−1.5 EV" or "γ 1.41". */
+    fun format(value: Float): String = when (format) {
+        ValueFormat.PERCENT -> (value * PERCENT).roundToInt().let { if (it > 0) "+$it" else it.toString() }
+        ValueFormat.EV -> String.format(Locale.ROOT, "%+.1f EV", value * scale).replace("+0.0", "0.0").replace("-0.0", "0.0")
+        ValueFormat.GAMMA -> String.format(Locale.ROOT, "γ %.2f", 2f.pow(value))
+    }
+
+    private companion object {
+        const val PERCENT = 100
+    }
 }
 
 enum class ControlGroup(val label: String) {

@@ -28,7 +28,9 @@ class SharpenStage : ProcessingStage {
 
     override suspend fun execute(input: PixelBuffer, context: ProcessingContext): PixelBuffer {
         val amount = context.effectiveAmount(id, context.plan.sharpening) * SHARPEN_GAIN
-        val threshold = max(MIN_THRESHOLD, THRESHOLD_SIGMA_MULTIPLIER * residualNoiseSigma(context))
+        // Masking raises the threshold so only clear edges are sharpened (flat areas and fine texture untouched).
+        val masking = context.effectiveAmount(id, context.plan.sharpenMasking).coerceIn(0f, 1f)
+        val threshold = max(MIN_THRESHOLD, THRESHOLD_SIGMA_MULTIPLIER * residualNoiseSigma(context)) + masking * MAX_MASKING_THRESHOLD
         val width = input.width
         val height = input.height
         val luma = LumaPlane.extract(input)
@@ -77,6 +79,9 @@ class SharpenStage : ProcessingStage {
         /** Maximum overshoot beyond the local 3×3 range, in luma units. */
         const val OVERSHOOT = 0.02f
         const val MIN_THRESHOLD = 0.004f
+
+        /** Full masking ignores luma differences below ≈13/255 — only strong edges remain. */
+        const val MAX_MASKING_THRESHOLD = 0.05f
         const val THRESHOLD_SIGMA_MULTIPLIER = 2f
 
         /** Rough share of noise the denoiser removes at amount 1; used only to set the threshold. */

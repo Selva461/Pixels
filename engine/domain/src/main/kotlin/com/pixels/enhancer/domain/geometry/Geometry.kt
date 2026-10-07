@@ -67,6 +67,9 @@ data class Geometry(
     fun flipped(): Geometry =
         copy(flipHorizontal = !flipHorizontal, straightenDegrees = -straightenDegrees, crop = crop.flippedHorizontally())
 
+    /** Upside-down mirror of what is on screen: a horizontal flip followed by a half turn. */
+    fun flippedVertically(): Geometry = flipped().rotatedClockwise().rotatedClockwise()
+
     fun straightened(degrees: Float): Geometry = copy(straightenDegrees = degrees.coerceIn(-MAX_STRAIGHTEN_DEGREES, MAX_STRAIGHTEN_DEGREES))
 
     fun withoutCrop(): Geometry = copy(crop = CropRect.FULL)

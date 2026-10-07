@@ -20,13 +20,16 @@ class NoiseReductionStage : ProcessingStage {
     override val id = StageIds.NOISE_REDUCTION
     override val displayName = "Denoise"
 
-    override fun isEnabled(context: ProcessingContext) = context.plan.noiseReduction.enabled
+    override fun isEnabled(context: ProcessingContext) =
+        context.plan.noiseReduction.enabled || context.plan.colorNoiseReduction.enabled
 
     /** Guided filter = box then box again (2 × radius); chroma = two box passes. */
     override fun margin(context: ProcessingContext, frame: ImageFrame) = 2 * maxOf(LUMA_RADIUS, CHROMA_RADIUS)
 
     override suspend fun execute(input: PixelBuffer, context: ProcessingContext): PixelBuffer {
         val amount = context.effectiveAmount(id, context.plan.noiseReduction).coerceIn(0f, 1f)
+        // Colour noise reduction can be raised on its own; it never lowers what luma denoise implies.
+        val chromaAmount = maxOf(amount, context.effectiveAmount(id, context.plan.colorNoiseReduction)).coerceIn(0f, 1f)
         val size = input.pixelCount
         val luma = FloatArray(size)
         val blueDifference = FloatArray(size)
@@ -36,11 +39,11 @@ class NoiseReductionStage : ProcessingStage {
         val scratch = GuidedFilter.Scratch(size)
         val sigma = expectedNoiseSigma(context)
         val epsilon = (EPSILON_SIGMA_MULTIPLIER * sigma).pow(2).coerceAtLeast(MIN_EPSILON)
-        GuidedFilter.smoothInPlace(luma, input.width, input.height, LUMA_RADIUS, epsilon, amount * LUMA_MIX, scratch)
+        if (amount > 0f) GuidedFilter.smoothInPlace(luma, input.width, input.height, LUMA_RADIUS, epsilon, amount * LUMA_MIX, scratch)
         currentCoroutineContext().ensureActive()
 
-        smoothChroma(blueDifference, input, amount, scratch)
-        smoothChroma(redDifference, input, amount, scratch)
+        smoothChroma(blueDifference, input, chromaAmount, scratch)
+        smoothChroma(redDifference, input, chromaAmount, scratch)
         currentCoroutineContext().ensureActive()
 
         YccPlanes.merge(luma, blueDifference, redDifference, input)

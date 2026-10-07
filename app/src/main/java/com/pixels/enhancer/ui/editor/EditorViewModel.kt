@@ -183,6 +183,8 @@ class EditorViewModel(
 
     fun onFlip() = commitGeometry(current.geometry.flipped())
 
+    fun onFlipVertical() = commitGeometry(current.geometry.flippedVertically())
+
     /** Live while dragging; [onEditFinished] records the undo step. */
     fun onStraightenChanged(degrees: Float) = edit(current.copy(geometry = current.geometry.straightened(degrees)))
 

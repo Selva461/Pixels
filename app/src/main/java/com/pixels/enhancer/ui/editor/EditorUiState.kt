@@ -64,9 +64,11 @@ enum class CropAspect(val label: String, val ratio: Float?) {
     FREE("Free", null),
     ORIGINAL("Original", null),
     SQUARE("1:1", 1f),
-    PORTRAIT_4_5("4:5", 4f / 5f),
+    LANDSCAPE_4_3("4:3", 4f / 3f),
     LANDSCAPE_3_2("3:2", 3f / 2f),
     WIDE_16_9("16:9", 16f / 9f),
+    PORTRAIT_4_5("4:5", 4f / 5f),
+    TALL_9_16("9:16", 9f / 16f),
 }
 
 data class DebugInfo(

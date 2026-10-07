@@ -96,6 +96,7 @@ class CropActions(
     val onRotateClockwise: () -> Unit,
     val onRotateCounterClockwise: () -> Unit,
     val onFlip: () -> Unit,
+    val onFlipVertical: () -> Unit,
     val onStraightenChanged: (Float) -> Unit,
     val onCropChanged: (CropRect) -> Unit,
     val onAspectSelected: (CropAspect) -> Unit,
@@ -291,7 +292,10 @@ private fun CropPanel(edit: EditState, aspect: CropAspect, crop: CropActions, on
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             OutlinedButton(shape = MaterialTheme.shapes.small, onClick = crop.onRotateCounterClockwise) { Text(stringResource(R.string.crop_rotate_left), maxLines = 1) }
             OutlinedButton(shape = MaterialTheme.shapes.small, onClick = crop.onRotateClockwise) { Text(stringResource(R.string.crop_rotate_right), maxLines = 1) }
+        }
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             OutlinedButton(shape = MaterialTheme.shapes.small, onClick = crop.onFlip) { Text(stringResource(R.string.crop_flip), maxLines = 1) }
+            OutlinedButton(shape = MaterialTheme.shapes.small, onClick = crop.onFlipVertical) { Text(stringResource(R.string.crop_flip_vertical), maxLines = 1) }
         }
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(

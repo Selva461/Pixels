@@ -66,13 +66,16 @@
     <string name="editor_tab_color">Color</string>
     <string name="editor_scene">Scene: %1$s (detected: %2$s)</string>
     <string name="editor_scene_auto">Auto-detect</string>
+    <string name="adjust_more_controls">More controls</string>
+    <string name="adjust_fewer_controls">Fewer controls</string>
     <string name="mixer_hue">Hue</string>
     <string name="mixer_saturation">Saturation</string>
     <string name="mixer_luminance">Luminance</string>
     <string name="mixer_reset">Reset all colours</string>
     <string name="crop_rotate_left">Rotate left</string>
     <string name="crop_rotate_right">Rotate right</string>
-    <string name="crop_flip">Flip</string>
+    <string name="crop_flip">Flip horizontal</string>
+    <string name="crop_flip_vertical">Flip vertical</string>
     <string name="crop_straighten">Straighten %1$s°</string>
     <string name="crop_reset">Reset</string>
     <string name="editor_auto_hint">Automatic natural correction. Drag to make it subtler or stronger.</string>
@@ -89,7 +92,7 @@
 
     <string name="error_retry">Choose another photo</string>
     <string name="error_image_not_found">The photo could not be opened. It may have been moved or deleted.</string>
-    <string name="error_image_unsupported">This file type is not supported. Use a JPEG, PNG or WebP photo.</string>
+    <string name="error_image_unsupported">This file type is not supported. Use a JPEG, PNG, WebP or HEIC photo.</string>
     <string name="error_image_decode_failed">The photo appears to be damaged and could not be read.</string>
     <string name="error_image_too_large">This photo is too large to process.</string>
     <string name="error_out_of_memory">Not enough memory for this size. Try exporting a smaller size; your edits are kept.</string>

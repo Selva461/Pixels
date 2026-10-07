@@ -138,6 +138,7 @@ private fun PixelsApp(viewModel: EditorViewModel, onPickImage: () -> Unit, modif
                         onRotateClockwise = viewModel::onRotateClockwise,
                         onRotateCounterClockwise = viewModel::onRotateCounterClockwise,
                         onFlip = viewModel::onFlip,
+                        onFlipVertical = viewModel::onFlipVertical,
                         onStraightenChanged = viewModel::onStraightenChanged,
                         onCropChanged = viewModel::onCropChanged,
                         onAspectSelected = viewModel::onCropAspectSelected,

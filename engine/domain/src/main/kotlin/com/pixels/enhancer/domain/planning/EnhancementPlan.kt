@@ -28,6 +28,8 @@ enum class AdjustmentKind(val label: String) {
     WHITES("Whites"),
     BLACKS("Blacks"),
     MIDTONES("Midtones"),
+    BRIGHTNESS("Brightness"),
+    GAMMA("Gamma"),
     DEHAZE("Dehaze"),
     WHITE_BALANCE("White Balance"),
     TEMPERATURE("Temperature"),
@@ -36,7 +38,10 @@ enum class AdjustmentKind(val label: String) {
     GLOBAL_SATURATION("Saturation"),
     NOISE_REDUCTION("Denoise"),
     DETAIL("Clarity"),
+    TEXTURE("Texture"),
     SHARPENING("Sharpen"),
+    SHARPEN_MASKING("Sharpen masking"),
+    COLOR_NOISE_REDUCTION("Color denoise"),
     VIGNETTE("Vignette"),
     GRAIN("Grain"),
 }
@@ -75,6 +80,12 @@ data class EnhancementPlan(
     val blacks: Adjustment = Adjustment.MANUAL_ONLY,
     val midtones: Adjustment = Adjustment.MANUAL_ONLY,
     val dehaze: Adjustment = Adjustment.MANUAL_ONLY,
+    val brightness: Adjustment = Adjustment.MANUAL_ONLY,
+    /** log2 of the gamma value: 0 = 1.0, ±1 = 2.0 / 0.5. */
+    val gamma: Adjustment = Adjustment.MANUAL_ONLY,
+    val texture: Adjustment = Adjustment.MANUAL_ONLY,
+    val sharpenMasking: Adjustment = Adjustment.MANUAL_ONLY,
+    val colorNoiseReduction: Adjustment = Adjustment.MANUAL_ONLY,
     /** Per-hue-band HSL shifts (manual only). */
     val colorMixer: ColorMixer = ColorMixer.NONE,
     val algorithmVersion: String = ENHANCEMENT_ALGORITHM_VERSION,
@@ -87,6 +98,11 @@ data class EnhancementPlan(
         AdjustmentKind.WHITES -> whites
         AdjustmentKind.BLACKS -> blacks
         AdjustmentKind.MIDTONES -> midtones
+        AdjustmentKind.BRIGHTNESS -> brightness
+        AdjustmentKind.GAMMA -> gamma
+        AdjustmentKind.TEXTURE -> texture
+        AdjustmentKind.SHARPEN_MASKING -> sharpenMasking
+        AdjustmentKind.COLOR_NOISE_REDUCTION -> colorNoiseReduction
         AdjustmentKind.DEHAZE -> dehaze
         AdjustmentKind.WHITE_BALANCE -> whiteBalance
         AdjustmentKind.TEMPERATURE -> temperature
@@ -110,6 +126,11 @@ data class EnhancementPlan(
         whites = transform(AdjustmentKind.WHITES, whites),
         blacks = transform(AdjustmentKind.BLACKS, blacks),
         midtones = transform(AdjustmentKind.MIDTONES, midtones),
+        brightness = transform(AdjustmentKind.BRIGHTNESS, brightness),
+        gamma = transform(AdjustmentKind.GAMMA, gamma),
+        texture = transform(AdjustmentKind.TEXTURE, texture),
+        sharpenMasking = transform(AdjustmentKind.SHARPEN_MASKING, sharpenMasking),
+        colorNoiseReduction = transform(AdjustmentKind.COLOR_NOISE_REDUCTION, colorNoiseReduction),
         dehaze = transform(AdjustmentKind.DEHAZE, dehaze),
         whiteBalance = transform(AdjustmentKind.WHITE_BALANCE, whiteBalance),
         temperature = transform(AdjustmentKind.TEMPERATURE, temperature),

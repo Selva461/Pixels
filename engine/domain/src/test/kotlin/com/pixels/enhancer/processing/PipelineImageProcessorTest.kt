@@ -49,6 +49,11 @@ fun everythingPlan(plan: com.pixels.enhancer.domain.planning.EnhancementPlan) = 
     blacks = Adjustment.of(-0.05f, "test"),
     midtones = Adjustment.of(0.05f, "test"),
     dehaze = Adjustment.of(0.3f, "test"),
+    brightness = Adjustment.of(0.05f, "test"),
+    gamma = Adjustment.of(0.2f, "test"),
+    texture = Adjustment.of(0.2f, "test"),
+    sharpenMasking = Adjustment.of(0.3f, "test"),
+    colorNoiseReduction = Adjustment.of(0.6f, "test"),
     colorMixer = com.pixels.enhancer.domain.planning.ColorMixer.NONE.with(
         com.pixels.enhancer.domain.planning.HueBand.GREEN,
         com.pixels.enhancer.domain.planning.HslShift(0.2f, -0.3f, 0.1f),
@@ -62,7 +67,7 @@ class PipelineImageProcessorTest {
         assertEquals(
             listOf(
                 StageIds.EXPOSURE, StageIds.WHITE_BALANCE, StageIds.DEHAZE, StageIds.TONE, StageIds.NOISE_REDUCTION,
-                StageIds.DETAIL, StageIds.SHARPEN, StageIds.COLOR_FINISH, StageIds.COLOR_MIXER, StageIds.VIGNETTE, StageIds.GRAIN,
+                StageIds.DETAIL, StageIds.TEXTURE, StageIds.SHARPEN, StageIds.COLOR_FINISH, StageIds.COLOR_MIXER, StageIds.VIGNETTE, StageIds.GRAIN,
             ),
             DefaultPipeline.stages().map { it.id },
         )

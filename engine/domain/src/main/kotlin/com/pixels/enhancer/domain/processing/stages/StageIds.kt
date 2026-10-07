@@ -9,6 +9,7 @@ object StageIds {
     const val TONE = "tone"
     const val NOISE_REDUCTION = "noise_reduction"
     const val DETAIL = "detail"
+    const val TEXTURE = "texture"
     const val SHARPEN = "sharpen"
     const val COLOR_FINISH = "color_finish"
     const val COLOR_MIXER = "color_mixer"
@@ -29,6 +30,7 @@ object DefaultPipeline {
         ToneStage(),
         NoiseReductionStage(),
         DetailStage(),
+        TextureStage(),
         SharpenStage(),
         ColorFinishStage(),
         ColorMixerStage(),
