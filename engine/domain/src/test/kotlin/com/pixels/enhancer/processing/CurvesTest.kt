@@ -10,10 +10,10 @@ import com.pixels.enhancer.domain.planning.ToneCurves
 import com.pixels.enhancer.domain.processing.stages.CurvesStage
 import com.pixels.enhancer.domain.project.Project
 import com.pixels.enhancer.domain.project.ProjectCodec
-import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
+import kotlinx.coroutines.test.runTest
 
 class CurvesTest {
     @Test

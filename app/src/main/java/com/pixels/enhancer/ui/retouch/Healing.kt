@@ -7,11 +7,11 @@ import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material3.FilterChip
@@ -37,6 +37,7 @@ import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.pixels.enhancer.R
@@ -65,7 +66,7 @@ fun HealingPanel(retouch: Retouch, selectedId: Int?, settings: HealSettings, act
             FilterChip(settings.mode == RetouchMode.CLONE, { actions.onHealSettingsChanged(settings.copy(mode = RetouchMode.CLONE)); actions.onEditFinished() }, { Text(stringResource(R.string.heal_mode_clone)) })
             FilterChip(settings.mode == RetouchMode.RED_EYE, { actions.onHealSettingsChanged(settings.copy(mode = RetouchMode.RED_EYE)); actions.onEditFinished() }, { Text(stringResource(R.string.heal_mode_red_eye)) })
             Text(
-                stringResource(R.string.heal_count, retouch.spots.size),
+                pluralStringResource(R.plurals.heal_count, retouch.spots.size, retouch.spots.size),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

@@ -57,7 +57,12 @@ data class Watermark(
     }
 }
 
-/** Platform hook that draws on the finished export (e.g. watermark text). */
+/**
+ * Platform hook that draws on the finished export (e.g. watermark text).
+ *
+ * Must not modify [decorate]'s input: for an unedited photo the export can be the open session's
+ * cached image itself. Return a new buffer, or the input unchanged when there is nothing to draw.
+ */
 fun interface ExportDecorator {
     fun decorate(image: PixelBuffer, options: ExportOptions): PixelBuffer
 

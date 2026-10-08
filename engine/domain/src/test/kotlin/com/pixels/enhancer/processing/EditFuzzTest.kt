@@ -44,12 +44,12 @@ import com.pixels.enhancer.domain.validation.NaturalOutputValidator
 import com.pixels.enhancer.testing.GoldenScenario
 import com.pixels.enhancer.testing.InMemoryImageRepository
 import com.pixels.enhancer.testing.RecordingImageSaver
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.test.runTest
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.test.runTest
 
 /**
  * Property tests over seeded random edits: whatever combination of tools a user reaches, rendering

@@ -19,21 +19,26 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Brush
 import androidx.compose.material.icons.outlined.Colorize
+import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.Exposure
 import androidx.compose.material.icons.outlined.Gradient
 import androidx.compose.material.icons.outlined.InvertColors
 import androidx.compose.material.icons.outlined.RadioButtonUnchecked
 import androidx.compose.material.icons.outlined.Visibility
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconToggleButton
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconToggleButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
@@ -116,6 +121,29 @@ fun MaskingPanel(
 ) {
     val selected = adjustments.items.firstOrNull { it.id == selectedId }
     var addMenu by remember { mutableStateOf(false) }
+    var renaming by remember { mutableStateOf<LocalAdjustment?>(null) }
+    renaming?.let { item ->
+        var name by remember(item.id) { mutableStateOf(item.name) }
+        AlertDialog(
+            onDismissRequest = { renaming = null },
+            title = { Text(stringResource(R.string.mask_rename)) },
+            text = {
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it.take(LocalAdjustments.MAX_NAME_LENGTH) },
+                    singleLine = true,
+                    label = { Text(stringResource(R.string.name_label)) },
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    actions.onRenameMask(item.id, name)
+                    renaming = null
+                }) { Text(stringResource(R.string.save)) }
+            },
+            dismissButton = { TextButton(onClick = { renaming = null }) { Text(stringResource(R.string.cancel)) } },
+        )
+    }
     Column(Modifier.fillMaxSize()) {
         Row(
             Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 12.dp, vertical = 6.dp),
@@ -174,6 +202,12 @@ fun MaskingPanel(
                     actions.onEditFinished()
                 }) {
                     Icon(Icons.Outlined.InvertColors, contentDescription = stringResource(R.string.local_invert), tint = if (selected.invert) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                IconButton(onClick = { actions.onDuplicateMask(selected.id) }, enabled = adjustments.items.size < LocalAdjustments.MAX_ITEMS) {
+                    Icon(Icons.Outlined.ContentCopy, contentDescription = stringResource(R.string.mask_duplicate))
+                }
+                IconButton(onClick = { renaming = selected }) {
+                    Icon(Icons.Outlined.Edit, contentDescription = stringResource(R.string.mask_rename))
                 }
                 IconButton(onClick = { actions.onMaskRemoved(selected.id) }) {
                     Icon(Icons.Outlined.Delete, contentDescription = stringResource(R.string.local_delete))

@@ -6,21 +6,25 @@ import com.pixels.enhancer.core.logging.LogcatLogger
 import com.pixels.enhancer.data.decoder.AndroidFaceLocator
 import com.pixels.enhancer.data.decoder.AndroidImageRepository
 import com.pixels.enhancer.data.preferences.SharedPreferencesSettingsRepository
+import com.pixels.enhancer.data.storage.AndroidWatermarkDecorator
+import com.pixels.enhancer.data.storage.AppStorage
+import com.pixels.enhancer.data.storage.IncomingImages
 import com.pixels.enhancer.data.storage.MediaStoreImageSaver
 import com.pixels.enhancer.data.storage.ShareCache
 import com.pixels.enhancer.data.storage.ThumbnailStore
-import com.pixels.enhancer.domain.project.FileProjectStore
-import com.pixels.enhancer.domain.project.ProjectManager
-import com.pixels.enhancer.domain.presets.FilePresetStore
-import com.pixels.enhancer.domain.presets.PresetStore
-import java.io.File
 import com.pixels.enhancer.domain.analysis.StatisticalImageAnalyzer
 import com.pixels.enhancer.domain.planning.NaturalEnhancementPlanner
+import com.pixels.enhancer.domain.presets.FilePresetStore
+import com.pixels.enhancer.domain.presets.PresetStore
 import com.pixels.enhancer.domain.processing.PipelineImageProcessor
 import com.pixels.enhancer.domain.processing.stages.DefaultPipeline
+import com.pixels.enhancer.domain.project.FileProjectStore
+import com.pixels.enhancer.domain.project.ProjectManager
 import com.pixels.enhancer.domain.repository.SettingsRepository
+import com.pixels.enhancer.domain.usecase.BatchExportUseCase
 import com.pixels.enhancer.domain.usecase.EnhanceImageUseCase
 import com.pixels.enhancer.domain.validation.NaturalOutputValidator
+import java.io.File
 
 class PixelsApplication : Application() {
     lateinit var container: AppContainer
@@ -63,5 +67,12 @@ class AppContainer(context: Context) {
         saver = MediaStoreImageSaver(appContext.contentResolver, logger),
         logger = logger,
         faceLocator = AndroidFaceLocator(),
+        exportDecorator = AndroidWatermarkDecorator(),
     )
+
+    val batchExport = BatchExportUseCase(enhanceImageUseCase, projectManager)
+
+    val incomingImages = IncomingImages(appContext)
+
+    val appStorage = AppStorage(appContext)
 }

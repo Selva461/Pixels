@@ -12,23 +12,22 @@ import com.pixels.enhancer.core.timing.StageTiming
 import com.pixels.enhancer.core.timing.SystemMonotonicClock
 import com.pixels.enhancer.core.timing.TimingReport
 import com.pixels.enhancer.core.timing.measure
-import com.pixels.enhancer.domain.analysis.ImageAnalysis
-import com.pixels.enhancer.domain.analysis.ImageAnalyzer
 import com.pixels.enhancer.domain.analysis.FaceLocator
 import com.pixels.enhancer.domain.analysis.FaceMetrics
+import com.pixels.enhancer.domain.analysis.ImageAnalysis
+import com.pixels.enhancer.domain.analysis.ImageAnalyzer
 import com.pixels.enhancer.domain.analysis.SceneClassifier
-import com.pixels.enhancer.domain.local.LocalAdjustmentRenderer
-import com.pixels.enhancer.domain.planning.Adjustment
-import com.pixels.enhancer.domain.retouch.RetouchRenderer
 import com.pixels.enhancer.domain.export.BorderOps
 import com.pixels.enhancer.domain.export.ExportDecorator
 import com.pixels.enhancer.domain.export.ExportOptions
 import com.pixels.enhancer.domain.geometry.GeometryOps
 import com.pixels.enhancer.domain.image.PixelBuffer
 import com.pixels.enhancer.domain.image.PixelResampler
+import com.pixels.enhancer.domain.local.LocalAdjustmentRenderer
 import com.pixels.enhancer.domain.model.ImageSource
 import com.pixels.enhancer.domain.model.OutputNaming
 import com.pixels.enhancer.domain.model.SupportedFormats
+import com.pixels.enhancer.domain.planning.Adjustment
 import com.pixels.enhancer.domain.planning.EnhancementPlan
 import com.pixels.enhancer.domain.planning.EnhancementPlanner
 import com.pixels.enhancer.domain.planning.ManualAdjustmentMerger
@@ -40,14 +39,15 @@ import com.pixels.enhancer.domain.repository.ImageRepository
 import com.pixels.enhancer.domain.repository.ImageSaver
 import com.pixels.enhancer.domain.repository.SaveRequest
 import com.pixels.enhancer.domain.repository.SavedImage
+import com.pixels.enhancer.domain.retouch.RetouchRenderer
 import com.pixels.enhancer.domain.validation.OutputValidator
 import com.pixels.enhancer.domain.validation.ValidationMode
-import kotlinx.coroutines.CoroutineDispatcher
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 import kotlin.math.ceil
 import kotlin.math.roundToInt
 import kotlin.math.sqrt
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 /**
  * Orchestrates open → analyse → plan → process → validate → save. Contains no image maths; it

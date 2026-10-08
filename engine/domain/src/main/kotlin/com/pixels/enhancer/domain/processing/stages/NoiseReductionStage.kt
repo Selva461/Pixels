@@ -7,10 +7,10 @@ import com.pixels.enhancer.domain.processing.ProcessingContext
 import com.pixels.enhancer.domain.processing.ProcessingStage
 import com.pixels.enhancer.domain.processing.ops.GuidedFilter
 import com.pixels.enhancer.domain.processing.ops.YccPlanes
-import kotlinx.coroutines.currentCoroutineContext
-import kotlinx.coroutines.ensureActive
 import kotlin.math.max
 import kotlin.math.pow
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 
 /**
  * Luma: edge-preserving guided filter, applied partially so fine texture (skin, foliage)

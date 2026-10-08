@@ -17,12 +17,12 @@ import com.pixels.enhancer.domain.validation.NaturalOutputValidator
 import com.pixels.enhancer.testing.GoldenScenario
 import com.pixels.enhancer.testing.InMemoryImageRepository
 import com.pixels.enhancer.testing.RecordingImageSaver
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.test.runTest
 
 class GeometryTest {
     /** 3×2 image whose pixels encode their own position, so remapping is easy to check. */

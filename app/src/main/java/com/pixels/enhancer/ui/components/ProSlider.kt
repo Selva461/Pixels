@@ -13,6 +13,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
@@ -20,9 +21,12 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.semantics.ProgressBarRangeInfo
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.disabled
 import androidx.compose.ui.semantics.progressBarRangeInfo
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.setProgress
@@ -54,6 +58,11 @@ fun ProSlider(
     val currentValue by rememberUpdatedState(value)
     val change by rememberUpdatedState(onChange)
     val finish by rememberUpdatedState(onFinished)
+    val haptics = LocalHapticFeedback.current
+    val hapticsEnabled by rememberUpdatedState(LocalHapticsEnabled.current)
+    fun tick() {
+        if (hapticsEnabled) haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+    }
     val span = range.endInclusive - range.start
     val accent = MaterialTheme.colorScheme.primary
     val rail = MaterialTheme.colorScheme.outlineVariant
@@ -66,16 +75,21 @@ fun ProSlider(
                 contentDescription = label
                 stateDescription = valueText
                 progressBarRangeInfo = ProgressBarRangeInfo(value, range)
-                setProgress { target ->
-                    change(target.coerceIn(range))
-                    finish()
-                    true
+                if (enabled) {
+                    setProgress { target ->
+                        change(target.coerceIn(range))
+                        finish()
+                        true
+                    }
+                } else {
+                    disabled()
                 }
             }
             .pointerInput(enabled, range) {
                 if (!enabled) return@pointerInput
                 detectTapGestures(onDoubleTap = {
                     change(resetValue)
+                    tick()
                     finish()
                 })
             }
@@ -90,7 +104,10 @@ fun ProSlider(
                     pointer.consume()
                     // Full width = full range; relative so the value never jumps to the finger.
                     dragged = (dragged + amount / size.width * span).coerceIn(range)
-                    change(snap(dragged, resetValue, span))
+                    val snapped = snap(dragged, resetValue, span)
+                    // A light tick when the value lands on its reset point, like a detent.
+                    if (snapped == resetValue && currentValue != resetValue) tick()
+                    change(snapped)
                 }
             }
             .padding(horizontal = 20.dp, vertical = 6.dp),
@@ -126,6 +143,9 @@ fun ProSlider(
         }
     }
 }
+
+/** Whether sliders vibrate lightly at their reset point (Settings > Haptic feedback). */
+val LocalHapticsEnabled = staticCompositionLocalOf { true }
 
 /** Sticks to the reset value within 1 % of the range so "exactly zero" is easy to reach. */
 private fun snap(value: Float, resetValue: Float, span: Float): Float = if (abs(value - resetValue) < span * SNAP) resetValue else value

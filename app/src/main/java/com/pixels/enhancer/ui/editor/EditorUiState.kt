@@ -59,6 +59,11 @@ sealed interface EditorUiState {
         val healSettings: HealSettings = HealSettings(),
         /** Clipped highlights/shadows are marked on [enhanced]. */
         val showClipping: Boolean = false,
+        /** What each history step changed, oldest first; [historyPosition] is the current step. */
+        val historyLabels: List<String> = emptyList(),
+        val historyPosition: Int = 0,
+        /** Non-null while a batch runs and until its summary is dismissed. */
+        val batch: BatchProgress? = null,
     ) : EditorUiState
 
     data class Error(val code: ErrorCode) : EditorUiState
@@ -72,6 +77,18 @@ sealed interface EditorActivity {
     data class Saved(val displayName: String, val uri: Uri, val width: Int, val height: Int) : EditorActivity
     data class Failed(val code: ErrorCode) : EditorActivity
 }
+
+/** Progress and outcome of "apply these settings to other photos". */
+data class BatchProgress(
+    val total: Int,
+    val done: Int,
+    val saved: Int,
+    val failed: Int,
+    val running: Boolean,
+    val cancelled: Boolean = false,
+    /** Photos beyond the per-batch limit that were not processed. */
+    val skipped: Int = 0,
+)
 
 data class AppliedPreset(val preset: Preset, val amount: Float)
 
@@ -90,10 +107,14 @@ enum class CropAspect(val label: String, val ratio: Float?) {
     FREE("Free", null),
     ORIGINAL("Original", null),
     SQUARE("1:1", 1f),
+    LANDSCAPE_5_4("5:4", 5f / 4f),
     LANDSCAPE_4_3("4:3", 4f / 3f),
     LANDSCAPE_3_2("3:2", 3f / 2f),
     WIDE_16_9("16:9", 16f / 9f),
+    CINEMA_21_9("21:9", 21f / 9f),
     PORTRAIT_4_5("4:5", 4f / 5f),
+    PORTRAIT_3_4("3:4", 3f / 4f),
+    PORTRAIT_2_3("2:3", 2f / 3f),
     TALL_9_16("9:16", 9f / 16f),
 }
 

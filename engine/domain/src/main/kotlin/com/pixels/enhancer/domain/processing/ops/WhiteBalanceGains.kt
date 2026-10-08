@@ -2,8 +2,8 @@ package com.pixels.enhancer.domain.processing.ops
 
 import com.pixels.enhancer.domain.analysis.ChannelBalance
 import com.pixels.enhancer.domain.image.Luma
-import com.pixels.enhancer.domain.planning.NaturalLimits
 import com.pixels.enhancer.domain.image.Srgb
+import com.pixels.enhancer.domain.planning.NaturalLimits
 import kotlin.math.log2
 import kotlin.math.pow
 import kotlin.math.sqrt

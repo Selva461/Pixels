@@ -17,7 +17,6 @@ import com.pixels.enhancer.domain.local.LocalAdjustment
 import com.pixels.enhancer.domain.local.LocalAdjustmentRenderer
 import com.pixels.enhancer.domain.local.LocalAdjustments
 import com.pixels.enhancer.domain.local.MaskShape
-import com.pixels.enhancer.domain.local.RangeMask
 import com.pixels.enhancer.domain.planning.ColorGrading
 import com.pixels.enhancer.domain.planning.GradeRange
 import com.pixels.enhancer.domain.planning.GradeWheel
@@ -46,8 +45,6 @@ import com.pixels.enhancer.domain.usecase.EnhanceRequest
 import com.pixels.enhancer.domain.validation.NaturalOutputValidator
 import com.pixels.enhancer.testing.InMemoryImageRepository
 import com.pixels.enhancer.testing.RecordingImageSaver
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.test.runTest
 import java.nio.file.Files
 import kotlin.math.abs
 import kotlin.test.Test
@@ -55,6 +52,8 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNotEquals
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.test.runTest
 
 class PremiumToolsTest {
 

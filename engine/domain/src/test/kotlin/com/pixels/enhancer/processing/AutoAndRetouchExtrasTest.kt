@@ -19,12 +19,11 @@ import com.pixels.enhancer.domain.retouch.Retouch
 import com.pixels.enhancer.domain.retouch.RetouchMode
 import com.pixels.enhancer.domain.retouch.RetouchRenderer
 import com.pixels.enhancer.domain.retouch.RetouchSpot
-import kotlinx.coroutines.runBlocking
-import kotlin.math.abs
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlinx.coroutines.runBlocking
 
 class AutoAndRetouchExtrasTest {
 

@@ -8,9 +8,11 @@ import com.pixels.enhancer.domain.geometry.LensCorrection
 import com.pixels.enhancer.domain.geometry.Perspective
 import com.pixels.enhancer.domain.local.BrushStroke
 import com.pixels.enhancer.domain.local.LocalAdjustment
+import com.pixels.enhancer.domain.planning.Calibration
 import com.pixels.enhancer.domain.planning.ColorGrading
 import com.pixels.enhancer.domain.planning.CurveChannel
 import com.pixels.enhancer.domain.planning.CurvePoints
+import com.pixels.enhancer.domain.planning.CurvePreset
 import com.pixels.enhancer.domain.planning.HslShift
 import com.pixels.enhancer.domain.planning.HueBand
 import com.pixels.enhancer.domain.planning.ManualControl
@@ -18,6 +20,7 @@ import com.pixels.enhancer.domain.presets.Preset
 import com.pixels.enhancer.domain.presets.SettingsGroup
 import com.pixels.enhancer.domain.project.EditVersion
 import com.pixels.enhancer.domain.retouch.RetouchSpot
+import com.pixels.enhancer.ui.panels.PanelReset
 
 /**
  * Everything the editor screen can ask for. Live changes (`…Changed`) are followed by
@@ -94,6 +97,22 @@ interface EditorActions {
     fun onAutoStraighten()
     fun onAutoUpright()
     fun onShowClippingChanged(show: Boolean)
+
+    fun onCalibrationChanged(calibration: Calibration)
+    fun onResetCalibration()
+    fun onAutoWhiteBalanceChanged(enabled: Boolean)
+    fun onCurvePresetSelected(channel: CurveChannel, preset: CurvePreset)
+    fun onResetPanel(panel: PanelReset)
+
+    fun onJumpToHistory(index: Int)
+
+    fun onDuplicateMask(id: Int)
+    fun onRenameMask(id: Int, name: String)
+
+    /** Remembers which settings a batch copies; the photo picker opens next. */
+    fun onBatchGroupsChosen(groups: Set<SettingsGroup>)
+    fun onCancelBatch()
+    fun onDismissBatch()
 
     fun onExportOptionsChanged(options: ExportOptions)
     fun onExportConfirmed()

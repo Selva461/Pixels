@@ -5,6 +5,7 @@ import android.content.ContentValues
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri
+import android.os.Build
 import android.os.Environment
 import android.provider.MediaStore
 import com.pixels.enhancer.core.error.EnhancerException
@@ -16,10 +17,10 @@ import com.pixels.enhancer.domain.image.PixelBuffer
 import com.pixels.enhancer.domain.repository.ImageSaver
 import com.pixels.enhancer.domain.repository.SaveRequest
 import com.pixels.enhancer.domain.repository.SavedImage
+import java.io.IOException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.withContext
-import java.io.IOException
 
 /**
  * Saves a new image under Pictures/Pixels following the export state flow:
@@ -64,7 +65,7 @@ class MediaStoreImageSaver(
     }
 
     private fun encode(uri: Uri, image: PixelBuffer, request: SaveRequest) {
-        val format = if (request.mimeType == MIME_PNG) Bitmap.CompressFormat.PNG else Bitmap.CompressFormat.JPEG
+        val format = compressFormatFor(request.mimeType)
         val bitmap = BitmapConversions.toBitmap(image)
         try {
             val stream = contentResolver.openOutputStream(uri) ?: throw EnhancerException(ErrorCode.SAVE_FAILED, "Cannot open output")
@@ -75,7 +76,13 @@ class MediaStoreImageSaver(
         }
     }
 
-    /** Metadata is best-effort: a photo without EXIF is still a valid export, but the failure is logged. */
+    /**
+     * Metadata is best-effort: a photo without EXIF is still a valid export, but the failure is
+     * logged. ExifInterface reports unsupported containers and malformed source EXIF with runtime
+     * exceptions as well as IOException, so those are contained too; the decode check that follows
+     * still rejects a file the copy might have damaged.
+     */
+    @Suppress("TooGenericExceptionCaught")
     private fun copyMetadata(uri: Uri, request: SaveRequest) {
         val source = request.metadataSourceId ?: return
         try {
@@ -83,6 +90,8 @@ class MediaStoreImageSaver(
         } catch (error: IOException) {
             logger.error("METADATA_COPY_FAILED", mapOf("policy" to request.metadata), error)
         } catch (error: SecurityException) {
+            logger.error("METADATA_COPY_FAILED", mapOf("policy" to request.metadata), error)
+        } catch (error: RuntimeException) {
             logger.error("METADATA_COPY_FAILED", mapOf("policy" to request.metadata), error)
         }
     }
@@ -125,5 +134,18 @@ class MediaStoreImageSaver(
     private companion object {
         const val ALBUM = "Pixels"
         const val MIME_PNG = "image/png"
+        const val MIME_WEBP = "image/webp"
+
+        fun compressFormatFor(mimeType: String): Bitmap.CompressFormat = when (mimeType) {
+            MIME_PNG -> Bitmap.CompressFormat.PNG
+            MIME_WEBP -> if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                Bitmap.CompressFormat.WEBP_LOSSY
+            } else {
+                // Android 10 only has the combined format: lossy below quality 100.
+                @Suppress("DEPRECATION")
+                Bitmap.CompressFormat.WEBP
+            }
+            else -> Bitmap.CompressFormat.JPEG
+        }
     }
 }

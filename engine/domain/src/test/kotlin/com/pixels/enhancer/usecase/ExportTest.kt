@@ -23,12 +23,12 @@ import com.pixels.enhancer.domain.validation.NaturalOutputValidator
 import com.pixels.enhancer.testing.GoldenScenario
 import com.pixels.enhancer.testing.InMemoryImageRepository
 import com.pixels.enhancer.testing.RecordingImageSaver
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.test.runTest
 import java.io.IOException
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.test.runTest
 
 class ExportTest {
     private val saver = RecordingImageSaver()

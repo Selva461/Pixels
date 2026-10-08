@@ -59,9 +59,6 @@ import com.pixels.enhancer.domain.validation.NaturalOutputValidator
 import com.pixels.enhancer.testing.GoldenScenario
 import com.pixels.enhancer.testing.InMemoryImageRepository
 import com.pixels.enhancer.testing.RecordingImageSaver
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.test.runTest
 import java.nio.file.Files
 import kotlin.math.abs
 import kotlin.math.max
@@ -73,6 +70,9 @@ import kotlin.test.assertFalse
 import kotlin.test.assertNotEquals
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.test.runTest
 
 class ProEditorExtrasTest {
 

@@ -29,5 +29,5 @@ enum class EditorTool(val labelRes: Int, val icon: ImageVector) {
     GEOMETRY(R.string.tool_geometry, Icons.Outlined.Transform),
     MASKING(R.string.tool_masking, Icons.Outlined.Gradient),
     HEALING(R.string.tool_healing, Icons.Outlined.Healing),
-    VERSIONS(R.string.tool_versions, Icons.Outlined.History),
+    HISTORY(R.string.tool_history, Icons.Outlined.History),
 }

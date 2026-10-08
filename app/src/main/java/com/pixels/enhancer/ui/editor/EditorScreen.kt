@@ -4,21 +4,16 @@ import android.net.Uri
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.layout.BoxWithConstraints
-import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.layout.ContentScale
-import com.pixels.enhancer.ui.theme.OnPhotoCanvas
-import com.pixels.enhancer.ui.theme.PhotoCanvas
-import kotlin.math.min
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -50,6 +45,7 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -63,7 +59,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.selected
@@ -77,6 +78,7 @@ import com.pixels.enhancer.ui.compare.CompareView
 import com.pixels.enhancer.ui.compare.SplitOrientation
 import com.pixels.enhancer.ui.crop.CropEditor
 import com.pixels.enhancer.ui.export.ExportDialog
+import com.pixels.enhancer.ui.local.BrushMode
 import com.pixels.enhancer.ui.local.BrushSettings
 import com.pixels.enhancer.ui.local.MaskCanvas
 import com.pixels.enhancer.ui.local.MaskingPanel
@@ -86,27 +88,39 @@ import com.pixels.enhancer.ui.panels.CropPanel
 import com.pixels.enhancer.ui.panels.DetailPanel
 import com.pixels.enhancer.ui.panels.EffectsPanel
 import com.pixels.enhancer.ui.panels.GeometryPanel
+import com.pixels.enhancer.ui.panels.HistoryPanel
 import com.pixels.enhancer.ui.panels.LightPanel
 import com.pixels.enhancer.ui.panels.OpticsPanel
+import com.pixels.enhancer.ui.panels.PanelControls
 import com.pixels.enhancer.ui.panels.PresetsPanel
-import com.pixels.enhancer.ui.panels.VersionsPanel
 import com.pixels.enhancer.ui.retouch.HealCanvas
 import com.pixels.enhancer.ui.retouch.HealingPanel
+import com.pixels.enhancer.ui.theme.OnPhotoCanvas
+import com.pixels.enhancer.ui.theme.PhotoCanvas
+import kotlin.math.min
 
-/** Fixed panel height keeps the photo the same size whichever tool is open. */
+/** Fixed panel height keeps the photo the same size whichever tool is open (portrait layout). */
 private val PANEL_HEIGHT = 270.dp
+
+/** Width of the side column holding the panel and tools in landscape. */
+private val SIDE_PANEL_WIDTH = 360.dp
 
 private enum class NamePrompt { PRESET, VERSION }
 
+/** Which settings-group dialog is open: paste onto this photo, or apply to other photos. */
+private enum class GroupsDialog { PASTE, BATCH }
+
 /**
- * The editor: photo on top, the open tool's panel below it, and the tool strip at the bottom.
- * Press and hold the photo to see the original.
+ * The editor. Portrait: photo on top, the open tool's panel below it, the tool strip at the
+ * bottom. Landscape (phones on their side, tablets): photo on the left, panel and tools on the
+ * right, so the photo never shrinks to a sliver. Press and hold the photo to see the original.
  */
 @Composable
 fun EditorScreen(
     state: EditorUiState.Success,
     actions: EditorActions,
     onOpenDebug: (() -> Unit)?,
+    onPickBatchPhotos: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var tool by rememberSaveable { mutableStateOf(EditorTool.PRESETS) }
@@ -114,7 +128,7 @@ fun EditorScreen(
     var viewResetKey by rememberSaveable { mutableIntStateOf(0) }
     var brush by remember { mutableStateOf(BrushSettings()) }
     var namePrompt by remember { mutableStateOf<NamePrompt?>(null) }
-    var pasteDialog by remember { mutableStateOf(false) }
+    var groupsDialog by remember { mutableStateOf<GroupsDialog?>(null) }
     var pickingWhiteBalance by remember { mutableStateOf(false) }
     val snackbarHostState = remember { SnackbarHostState() }
 
@@ -122,52 +136,98 @@ fun EditorScreen(
     ResultSnackbar(state.activity, snackbarHostState, actions::onViewSaved)
     LaunchedEffect(tool) {
         actions.onCropModeChanged(tool == EditorTool.CROP)
-        if (tool != EditorTool.MASKING) brush = brush.copy(mode = com.pixels.enhancer.ui.local.BrushMode.OFF)
+        if (tool != EditorTool.MASKING) brush = brush.copy(mode = BrushMode.OFF)
         if (tool != EditorTool.COLOR) pickingWhiteBalance = false
     }
-    Dialogs(state, actions, namePrompt, onNameDone = { namePrompt = null }, pasteDialog, onPasteDone = { pasteDialog = false })
+    Dialogs(state, actions, namePrompt, onNameDone = { namePrompt = null })
+    groupsDialog?.let { which ->
+        SettingsGroupsDialog(
+            title = stringResource(if (which == GroupsDialog.PASTE) R.string.menu_paste_settings else R.string.batch_title),
+            message = if (which == GroupsDialog.BATCH) stringResource(R.string.batch_message) else null,
+            confirmLabel = stringResource(if (which == GroupsDialog.PASTE) R.string.paste else R.string.batch_choose_photos),
+            onConfirm = { groups ->
+                groupsDialog = null
+                if (which == GroupsDialog.PASTE) {
+                    actions.onPasteSettings(groups)
+                } else {
+                    actions.onBatchGroupsChosen(groups)
+                    onPickBatchPhotos()
+                }
+            },
+            onDismiss = { groupsDialog = null },
+        )
+    }
+    state.batch?.let { BatchDialog(it, actions) }
 
-    Box(modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
-        Column(Modifier.fillMaxSize()) {
-            TopBar(
-                state = state,
-                actions = actions,
-                compare = compare,
-                onCompareChange = {
-                    compare = it
-                    viewResetKey++
+    val topBar: @Composable () -> Unit = {
+        TopBar(
+            state = state,
+            actions = actions,
+            compare = compare,
+            onCompareChange = {
+                compare = it
+                viewResetKey++
+            },
+            onSavePreset = { namePrompt = NamePrompt.PRESET },
+            onPaste = { groupsDialog = GroupsDialog.PASTE },
+            onBatch = { groupsDialog = GroupsDialog.BATCH },
+            onOpenDebug = onOpenDebug,
+        )
+    }
+    val photo: @Composable (Modifier) -> Unit = { photoModifier ->
+        if (pickingWhiteBalance) {
+            TapToPick(
+                image = state.enhanced,
+                hint = stringResource(R.string.color_pick_wb_hint),
+                onPick = { x, y ->
+                    actions.onPickWhiteBalance(x, y)
+                    pickingWhiteBalance = false
                 },
-                onSavePreset = { namePrompt = NamePrompt.PRESET },
-                onPaste = { pasteDialog = true },
-                onOpenDebug = onOpenDebug,
+                modifier = photoModifier,
             )
-            if (pickingWhiteBalance) {
-                TapToPick(
-                    image = state.enhanced,
-                    hint = stringResource(R.string.color_pick_wb_hint),
-                    onPick = { x, y ->
-                        actions.onPickWhiteBalance(x, y)
-                        pickingWhiteBalance = false
-                    },
-                    modifier = Modifier.weight(1f).fillMaxWidth(),
-                )
-            } else {
-                PhotoArea(state, tool, compare, viewResetKey, brush, actions, Modifier.weight(1f).fillMaxWidth())
-            }
-            ActivityLine(state.activity, actions::onCancelExport)
-            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-            Box(Modifier.fillMaxWidth().height(PANEL_HEIGHT).background(MaterialTheme.colorScheme.surfaceContainer)) {
-                ToolPanel(
-                    state, tool, brush, onBrushChanged = { brush = it }, actions,
-                    onSavePreset = { namePrompt = NamePrompt.PRESET },
-                    onSaveVersion = { namePrompt = NamePrompt.VERSION },
-                    pickingWhiteBalance = pickingWhiteBalance,
-                    onPickWhiteBalance = { pickingWhiteBalance = !pickingWhiteBalance },
-                )
-            }
-            ToolStrip(tool, state) { tool = it }
+        } else {
+            PhotoArea(state, tool, compare, viewResetKey, brush, actions, photoModifier)
         }
-        SnackbarHost(snackbarHostState, Modifier.align(Alignment.BottomCenter).padding(bottom = PANEL_HEIGHT, start = 16.dp, end = 16.dp))
+    }
+    val panel: @Composable (Modifier) -> Unit = { panelModifier ->
+        Box(panelModifier.background(MaterialTheme.colorScheme.surfaceContainer)) {
+            ToolPanel(
+                state, tool, brush, onBrushChanged = { brush = it }, actions,
+                onSavePreset = { namePrompt = NamePrompt.PRESET },
+                onSaveVersion = { namePrompt = NamePrompt.VERSION },
+                pickingWhiteBalance = pickingWhiteBalance,
+                onPickWhiteBalance = { pickingWhiteBalance = !pickingWhiteBalance },
+            )
+        }
+    }
+
+    BoxWithConstraints(modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+        val landscape = maxWidth > maxHeight
+        if (landscape) {
+            Row(Modifier.fillMaxSize()) {
+                Column(Modifier.weight(1f).fillMaxHeight()) {
+                    topBar()
+                    photo(Modifier.weight(1f).fillMaxWidth())
+                    ActivityLine(state.activity, actions::onCancelExport)
+                }
+                VerticalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                Column(Modifier.width(SIDE_PANEL_WIDTH).fillMaxHeight()) {
+                    panel(Modifier.weight(1f).fillMaxWidth())
+                    ToolStrip(tool, state) { tool = it }
+                }
+            }
+            SnackbarHost(snackbarHostState, Modifier.align(Alignment.BottomStart).padding(16.dp))
+        } else {
+            Column(Modifier.fillMaxSize()) {
+                topBar()
+                photo(Modifier.weight(1f).fillMaxWidth())
+                ActivityLine(state.activity, actions::onCancelExport)
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                panel(Modifier.fillMaxWidth().height(PANEL_HEIGHT))
+                ToolStrip(tool, state) { tool = it }
+            }
+            SnackbarHost(snackbarHostState, Modifier.align(Alignment.BottomCenter).padding(bottom = PANEL_HEIGHT, start = 16.dp, end = 16.dp))
+        }
     }
 }
 
@@ -226,9 +286,10 @@ private fun TapToPick(image: ImageBitmap, hint: String, onPick: (Float, Float) -
         val top = (boxHeight - image.height * scale) / 2f
         Image(
             image,
-            contentDescription = null,
+            contentDescription = hint,
             contentScale = ContentScale.Fit,
-            modifier = Modifier.fillMaxSize().pointerInput(image) {
+            // Keyed on the fitted frame too, so a resized window never maps taps with stale numbers.
+            modifier = Modifier.fillMaxSize().pointerInput(image, scale, left, top) {
                 detectTapGestures { position ->
                     val x = (position.x - left) / (image.width * scale)
                     val y = (position.y - top) / (image.height * scale)
@@ -240,7 +301,11 @@ private fun TapToPick(image: ImageBitmap, hint: String, onPick: (Float, Float) -
             hint,
             style = MaterialTheme.typography.labelLarge,
             color = OnPhotoCanvas,
-            modifier = Modifier.align(Alignment.TopCenter).background(Color.Black.copy(alpha = 0.55f), MaterialTheme.shapes.small).padding(horizontal = 12.dp, vertical = 6.dp),
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .padding(top = 8.dp)
+                .background(Color.Black.copy(alpha = 0.55f), MaterialTheme.shapes.small)
+                .padding(horizontal = 12.dp, vertical = 6.dp),
         )
     }
 }
@@ -287,31 +352,35 @@ private fun ToolPanel(
         EditorTool.COLOR -> ColorPanel(edit, pickingWhiteBalance, onPickWhiteBalance, actions)
         EditorTool.EFFECTS -> EffectsPanel(edit, actions)
         EditorTool.DETAIL -> DetailPanel(edit, actions)
-        EditorTool.OPTICS -> OpticsPanel(edit.geometry, actions)
+        EditorTool.OPTICS -> OpticsPanel(edit, actions)
         EditorTool.GEOMETRY -> GeometryPanel(edit.geometry, actions)
         EditorTool.MASKING -> MaskingPanel(edit.localAdjustments, state.selectedMaskId, state.showMaskOverlay, brush, onBrushChanged, actions)
         EditorTool.HEALING -> HealingPanel(edit.retouch, state.selectedSpotId, state.healSettings, actions)
-        EditorTool.VERSIONS -> VersionsPanel(state.versions, actions, onSaveVersion)
+        EditorTool.HISTORY -> HistoryPanel(state.historyLabels, state.historyPosition, state.versions, actions, onSaveVersion)
     }
 }
+
+/** Test tag of a tool strip entry. */
+fun toolTag(tool: EditorTool) = "tool:${tool.name}"
 
 /** True when a tool has changes, shown as a dot under its icon. */
 private fun EditorUiState.Success.isEdited(tool: EditorTool): Boolean {
     val e = edit
-    fun anyOf(vararg names: String) = e.manual.values.keys.any { it.group.name in names }
+    val g = e.geometry
     return when (tool) {
         EditorTool.PRESETS -> appliedPreset != null
         EditorTool.AUTO -> e.sceneOverride != null
-        EditorTool.CROP -> e.geometry.quarterTurns != 0 || e.geometry.flipHorizontal || e.geometry.straightenDegrees != 0f || !e.geometry.crop.isFull
-        EditorTool.LIGHT -> anyOf("LIGHT", "PORTRAIT") || !e.toneCurves.isIdentity
-        EditorTool.COLOR -> anyOf("COLOR") || !e.colorMixer.isNeutral || !e.colorGrading.isNeutral
-        EditorTool.EFFECTS -> anyOf("EFFECTS") || e.manual.values.keys.any { it.name in setOf("TEXTURE", "CLARITY", "DEHAZE") }
-        EditorTool.DETAIL -> e.manual.values.keys.any { it.name.startsWith("SHARPEN") || it.name.endsWith("NOISE_REDUCTION") || it.name == "SHARPNESS" }
-        EditorTool.OPTICS -> !e.geometry.lens.isIdentity
-        EditorTool.GEOMETRY -> !e.geometry.perspective.isIdentity
+        EditorTool.CROP -> g.quarterTurns != 0 || g.flipHorizontal || g.straightenDegrees != 0f || !g.crop.isFull
+        EditorTool.LIGHT -> PanelControls.edited(e, PanelControls.LIGHT) || !e.toneCurves.isIdentity
+        EditorTool.COLOR -> PanelControls.edited(e, PanelControls.COLOR) || !e.colorMixer.isNeutral || !e.colorGrading.isNeutral ||
+            !e.calibration.isNeutral || !e.autoWhiteBalance
+        EditorTool.EFFECTS -> PanelControls.edited(e, PanelControls.EFFECTS)
+        EditorTool.DETAIL -> PanelControls.edited(e, PanelControls.DETAIL)
+        EditorTool.OPTICS -> !g.lens.isIdentity || PanelControls.edited(e, PanelControls.OPTICS)
+        EditorTool.GEOMETRY -> !g.perspective.isIdentity
         EditorTool.MASKING -> e.localAdjustments.items.isNotEmpty()
         EditorTool.HEALING -> !e.retouch.isEmpty
-        EditorTool.VERSIONS -> versions.isNotEmpty()
+        EditorTool.HISTORY -> versions.isNotEmpty()
     }
 }
 
@@ -331,6 +400,7 @@ private fun ToolStrip(selected: EditorTool, state: EditorUiState.Success, onSele
             Column(
                 Modifier
                     .width(66.dp)
+                    .testTag(toolTag(tool))
                     .semantics { this.selected = isSelected }
                     .clickable(role = Role.Tab) { onSelect(tool) }
                     .padding(vertical = 4.dp),
@@ -358,6 +428,7 @@ private fun TopBar(
     onCompareChange: (Boolean) -> Unit,
     onSavePreset: () -> Unit,
     onPaste: () -> Unit,
+    onBatch: () -> Unit,
     onOpenDebug: (() -> Unit)?,
 ) {
     val busy = state.activity is EditorActivity.Saving
@@ -379,6 +450,7 @@ private fun TopBar(
             DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
                 DropdownMenuItem(text = { Text(stringResource(R.string.menu_copy_settings)) }, onClick = { menu = false; actions.onCopySettings() })
                 DropdownMenuItem(text = { Text(stringResource(R.string.menu_paste_settings)) }, enabled = state.canPaste, onClick = { menu = false; onPaste() })
+                DropdownMenuItem(text = { Text(stringResource(R.string.menu_apply_to_others)) }, enabled = state.batch?.running != true, onClick = { menu = false; onBatch() })
                 DropdownMenuItem(text = { Text(stringResource(R.string.menu_save_preset)) }, onClick = { menu = false; onSavePreset() })
                 HorizontalDivider()
                 DropdownMenuItem(text = { Text(stringResource(R.string.editor_reset_all)) }, onClick = { menu = false; actions.onResetAll() })
@@ -393,15 +465,12 @@ private fun TopBar(
     }
 }
 
-@Suppress("LongParameterList")
 @Composable
 private fun Dialogs(
     state: EditorUiState.Success,
     actions: EditorActions,
     namePrompt: NamePrompt?,
     onNameDone: () -> Unit,
-    pasteDialog: Boolean,
-    onPasteDone: () -> Unit,
 ) {
     state.exportDialog?.let { dialog ->
         ExportDialog(dialog, actions::onExportOptionsChanged, actions::onExportConfirmed, actions::onExportDismissed)
@@ -440,33 +509,69 @@ private fun Dialogs(
             dismissButton = { TextButton(onClick = onNameDone) { Text(stringResource(R.string.cancel)) } },
         )
     }
-    if (pasteDialog) {
-        var groups by remember { mutableStateOf(SettingsGroup.ALL) }
-        AlertDialog(
-            onDismissRequest = onPasteDone,
-            title = { Text(stringResource(R.string.menu_paste_settings)) },
-            text = {
-                Column {
-                    SettingsGroup.entries.forEach { group ->
-                        Row(
-                            Modifier.fillMaxWidth().clickable { groups = if (group in groups) groups - group else groups + group },
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Checkbox(checked = group in groups, onCheckedChange = null)
-                            Text(group.label, modifier = Modifier.padding(start = 8.dp))
-                        }
+}
+
+/** Ticks for the settings groups to copy (paste, or apply to other photos). */
+@Composable
+private fun SettingsGroupsDialog(
+    title: String,
+    message: String?,
+    confirmLabel: String,
+    onConfirm: (Set<SettingsGroup>) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    var groups by remember { mutableStateOf(SettingsGroup.ALL) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(title) },
+        text = {
+            Column {
+                if (message != null) Text(message, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(bottom = 8.dp))
+                SettingsGroup.entries.forEach { group ->
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .clickable(role = Role.Checkbox) { groups = if (group in groups) groups - group else groups + group },
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Checkbox(checked = group in groups, onCheckedChange = null)
+                        Text(group.label, modifier = Modifier.padding(start = 8.dp))
                     }
                 }
-            },
-            confirmButton = {
-                TextButton(enabled = groups.isNotEmpty(), onClick = {
-                    actions.onPasteSettings(groups)
-                    onPasteDone()
-                }) { Text(stringResource(R.string.paste)) }
-            },
-            dismissButton = { TextButton(onClick = onPasteDone) { Text(stringResource(R.string.cancel)) } },
-        )
-    }
+            }
+        },
+        confirmButton = { TextButton(enabled = groups.isNotEmpty(), onClick = { onConfirm(groups) }) { Text(confirmLabel) } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) } },
+    )
+}
+
+/** Progress of "apply to other photos", then a summary. */
+@Composable
+private fun BatchDialog(batch: BatchProgress, actions: EditorActions) {
+    AlertDialog(
+        onDismissRequest = { if (!batch.running) actions.onDismissBatch() },
+        title = { Text(stringResource(if (batch.running) R.string.batch_running_title else R.string.batch_done_title)) },
+        text = {
+            Column {
+                if (batch.running) {
+                    LinearProgressIndicator(progress = { if (batch.total == 0) 0f else batch.done / batch.total.toFloat() }, modifier = Modifier.fillMaxWidth())
+                    Text(pluralStringResource(R.plurals.batch_progress, batch.total, batch.done, batch.total), modifier = Modifier.padding(top = 8.dp))
+                } else {
+                    Text(stringResource(R.string.batch_summary, batch.saved, batch.failed))
+                    if (batch.cancelled) Text(stringResource(R.string.batch_cancelled))
+                    if (batch.skipped > 0) Text(pluralStringResource(R.plurals.batch_skipped, batch.skipped, batch.skipped))
+                    Text(stringResource(R.string.batch_where), style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 8.dp))
+                }
+            }
+        },
+        confirmButton = {
+            if (batch.running) {
+                TextButton(onClick = actions::onCancelBatch) { Text(stringResource(R.string.cancel)) }
+            } else {
+                TextButton(onClick = actions::onDismissBatch) { Text(stringResource(R.string.batch_ok)) }
+            }
+        },
+    )
 }
 
 private const val MAX_NAME = 40

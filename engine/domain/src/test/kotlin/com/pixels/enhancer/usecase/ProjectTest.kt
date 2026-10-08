@@ -13,8 +13,6 @@ import com.pixels.enhancer.domain.project.FileProjectStore
 import com.pixels.enhancer.domain.project.Project
 import com.pixels.enhancer.domain.project.ProjectCodec
 import com.pixels.enhancer.domain.project.ProjectManager
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.test.runTest
 import java.nio.file.Files
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -22,6 +20,8 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.test.runTest
 
 class EditHistoryTest {
     private val a = EditState(strength = 0.1f)

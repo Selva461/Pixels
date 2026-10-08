@@ -13,12 +13,12 @@ import com.pixels.enhancer.domain.processing.StageConfig
 import com.pixels.enhancer.domain.processing.stages.DefaultPipeline
 import com.pixels.enhancer.domain.processing.stages.StageIds
 import com.pixels.enhancer.goodAnalysis
-import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
+import kotlinx.coroutines.test.runTest
 
 fun contextFor(
     analysis: com.pixels.enhancer.domain.analysis.ImageAnalysis = goodAnalysis(),

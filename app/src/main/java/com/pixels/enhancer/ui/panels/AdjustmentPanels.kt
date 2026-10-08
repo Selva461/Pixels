@@ -1,5 +1,6 @@
 package com.pixels.enhancer.ui.panels
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -10,11 +11,12 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.RotateLeft
-import androidx.compose.material.icons.outlined.RotateRight
+import androidx.compose.material.icons.automirrored.outlined.RotateLeft
+import androidx.compose.material.icons.automirrored.outlined.RotateRight
 import androidx.compose.material.icons.outlined.Colorize
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Flip
@@ -34,15 +36,18 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.pixels.enhancer.R
 import com.pixels.enhancer.domain.analysis.Histogram
 import com.pixels.enhancer.domain.analysis.SceneType
 import com.pixels.enhancer.domain.editing.EditState
 import com.pixels.enhancer.domain.geometry.Geometry
-import com.pixels.enhancer.domain.geometry.LensCorrection
 import com.pixels.enhancer.domain.geometry.Perspective
+import com.pixels.enhancer.domain.planning.Calibration
 import com.pixels.enhancer.domain.planning.ManualControl
 import com.pixels.enhancer.domain.project.EditVersion
 import com.pixels.enhancer.ui.adjust.ColorMixerPanel
@@ -85,6 +90,19 @@ fun ControlSlider(control: ManualControl, edit: EditState, actions: EditorAction
     )
 }
 
+@Composable
+private fun ControlSliders(controls: List<ManualControl>, edit: EditState, actions: EditorActions) {
+    controls.forEach { ControlSlider(it, edit, actions) }
+}
+
+/** "Reset" at the bottom of a panel; disabled when there is nothing to reset. */
+@Composable
+fun PanelResetButton(enabled: Boolean, onReset: () -> Unit) {
+    TextButton(onClick = onReset, enabled = enabled, modifier = Modifier.padding(horizontal = 8.dp)) {
+        Text(stringResource(R.string.panel_reset))
+    }
+}
+
 /** Small segmented switch between a panel's sub-views. */
 @Composable
 fun <T> SegmentRow(options: List<T>, selected: T, label: @Composable (T) -> String, onSelect: (T) -> Unit) {
@@ -111,86 +129,124 @@ private enum class LightView { SLIDERS, CURVE }
 @Composable
 fun LightPanel(edit: EditState, histogram: Histogram?, showClipping: Boolean, actions: EditorActions) {
     var view by rememberSaveable { mutableStateOf(LightView.SLIDERS) }
+    var rgbHistogram by rememberSaveable { mutableStateOf(false) }
     Column(Modifier.fillMaxSize()) {
         SegmentRow(LightView.entries, view, { stringResource(if (it == LightView.SLIDERS) R.string.panel_adjust else R.string.panel_curve) }) { view = it }
         when (view) {
-            LightView.CURVE -> CurvePanel(edit, histogram, actions::onCurveChanged, actions::onEditFinished, actions::onResetCurve)
+            LightView.CURVE -> CurvePanel(
+                edit, histogram, actions::onCurveChanged, actions::onEditFinished, actions::onResetCurve, actions::onCurvePresetSelected,
+            )
             LightView.SLIDERS -> PanelColumn {
-                histogram?.let { HistogramView(it, Modifier.fillMaxWidth().height(44.dp).padding(horizontal = 20.dp)) }
-                Row(Modifier.padding(horizontal = 16.dp)) {
-                    FilterChip(
-                        selected = showClipping,
-                        onClick = { actions.onShowClippingChanged(!showClipping) },
-                        label = { Text(stringResource(R.string.light_show_clipping)) },
-                    )
+                histogram?.let { HistogramView(it, Modifier.fillMaxWidth().height(44.dp).padding(horizontal = 20.dp), rgb = rgbHistogram) }
+                Row(Modifier.padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    FilterChip(showClipping, { actions.onShowClippingChanged(!showClipping) }, { Text(stringResource(R.string.light_show_clipping)) })
+                    FilterChip(rgbHistogram, { rgbHistogram = !rgbHistogram }, { Text(stringResource(R.string.light_rgb_histogram)) })
                 }
-                listOf(
-                    ManualControl.EXPOSURE, ManualControl.CONTRAST, ManualControl.HIGHLIGHTS, ManualControl.SHADOWS,
-                    ManualControl.WHITES, ManualControl.BLACKS,
-                ).forEach { ControlSlider(it, edit, actions) }
+                ControlSliders(PanelControls.LIGHT_MAIN, edit, actions)
                 PanelHeading(stringResource(R.string.panel_fine_tune))
-                listOf(ManualControl.BRIGHTNESS, ManualControl.MIDTONES, ManualControl.GAMMA, ManualControl.EXPOSURE_COMPENSATION)
-                    .forEach { ControlSlider(it, edit, actions) }
+                ControlSliders(PanelControls.LIGHT_FINE, edit, actions)
                 PanelHeading(stringResource(R.string.panel_portrait))
-                ControlSlider(ManualControl.FACE_EXPOSURE, edit, actions)
+                ControlSliders(PanelControls.LIGHT_PORTRAIT, edit, actions)
+                PanelResetButton(PanelControls.edited(edit, PanelControls.LIGHT) || !edit.toneCurves.isIdentity) {
+                    actions.onResetPanel(PanelReset.LIGHT)
+                }
             }
         }
     }
 }
 
-private enum class ColorView { ADJUST, MIXER, GRADING }
+private enum class ColorView(val labelRes: Int) {
+    ADJUST(R.string.panel_adjust),
+    MIXER(R.string.panel_mixer),
+    GRADING(R.string.panel_grading),
+    CALIBRATION(R.string.panel_calibration),
+}
 
 @Composable
 fun ColorPanel(edit: EditState, picking: Boolean, onPick: () -> Unit, actions: EditorActions) {
     var view by rememberSaveable { mutableStateOf(ColorView.ADJUST) }
     Column(Modifier.fillMaxSize()) {
-        SegmentRow(ColorView.entries, view, {
-            stringResource(
-                when (it) {
-                    ColorView.ADJUST -> R.string.panel_adjust
-                    ColorView.MIXER -> R.string.panel_mixer
-                    ColorView.GRADING -> R.string.panel_grading
-                },
-            )
-        }) { view = it }
+        SegmentRow(ColorView.entries, view, { stringResource(it.labelRes) }) { view = it }
         when (view) {
-            ColorView.ADJUST -> PanelColumn {
-                Row(Modifier.padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    FilterChip(!edit.colorGrading.monochrome, { actions.onMonochromeChanged(false) }, { Text(stringResource(R.string.color_treatment_color)) })
-                    FilterChip(edit.colorGrading.monochrome, { actions.onMonochromeChanged(true) }, { Text(stringResource(R.string.color_treatment_bw)) })
-                    FilterChip(
-                        selected = picking,
-                        onClick = onPick,
-                        leadingIcon = { Icon(Icons.Outlined.Colorize, contentDescription = null) },
-                        label = { Text(stringResource(R.string.color_pick_wb)) },
-                    )
-                }
-                listOf(ManualControl.TEMPERATURE, ManualControl.TINT, ManualControl.VIBRANCE, ManualControl.SATURATION, ManualControl.HUE)
-                    .forEach { ControlSlider(it, edit, actions) }
-                if (edit.colorGrading.monochrome) {
-                    Text(
-                        stringResource(R.string.color_bw_mix_hint),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
-                    )
-                }
-            }
+            ColorView.ADJUST -> ColorAdjust(edit, picking, onPick, actions)
             ColorView.MIXER -> ColorMixerPanel(edit, actions::onColorMixerChanged, actions::onEditFinished, actions::onResetColorMixer)
             ColorView.GRADING -> GradingPanel(edit.colorGrading, actions)
+            ColorView.CALIBRATION -> CalibrationPanel(edit.calibration, actions)
         }
+    }
+}
+
+@Composable
+private fun ColorAdjust(edit: EditState, picking: Boolean, onPick: () -> Unit, actions: EditorActions) {
+    PanelColumn {
+        Row(Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            FilterChip(!edit.colorGrading.monochrome, { actions.onMonochromeChanged(false) }, { Text(stringResource(R.string.color_treatment_color)) })
+            FilterChip(edit.colorGrading.monochrome, { actions.onMonochromeChanged(true) }, { Text(stringResource(R.string.color_treatment_bw)) })
+        }
+        PanelHeading(stringResource(R.string.color_white_balance))
+        Row(Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            FilterChip(edit.autoWhiteBalance, { actions.onAutoWhiteBalanceChanged(true) }, { Text(stringResource(R.string.color_wb_auto)) })
+            FilterChip(!edit.autoWhiteBalance, { actions.onAutoWhiteBalanceChanged(false) }, { Text(stringResource(R.string.color_wb_as_shot)) })
+            FilterChip(
+                selected = picking,
+                onClick = onPick,
+                leadingIcon = { Icon(Icons.Outlined.Colorize, contentDescription = null) },
+                label = { Text(stringResource(R.string.color_pick_wb)) },
+            )
+        }
+        ControlSliders(PanelControls.COLOR, edit, actions)
+        if (edit.colorGrading.monochrome) {
+            Text(
+                stringResource(R.string.color_bw_mix_hint),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
+            )
+        }
+        val edited = PanelControls.edited(edit, PanelControls.COLOR) || !edit.colorMixer.isNeutral || !edit.colorGrading.isNeutral ||
+            !edit.calibration.isNeutral || !edit.autoWhiteBalance
+        PanelResetButton(edited) { actions.onResetPanel(PanelReset.COLOR) }
+    }
+}
+
+@Composable
+private fun CalibrationPanel(calibration: Calibration, actions: EditorActions) {
+    fun set(value: Calibration) = actions.onCalibrationChanged(value)
+    val hue = stringResource(R.string.calibration_hue)
+    val saturation = stringResource(R.string.calibration_saturation)
+    PanelColumn {
+        Text(
+            stringResource(R.string.calibration_hint),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(horizontal = 20.dp, vertical = 6.dp),
+        )
+        ProSlider(
+            stringResource(R.string.calibration_shadows_tint), calibration.shadowsTint, percentText(calibration.shadowsTint),
+            { set(calibration.copy(shadowsTint = it)) }, actions::onEditFinished, track = Tracks.tint,
+        )
+        PanelHeading(stringResource(R.string.calibration_red))
+        ProSlider("$hue (${stringResource(R.string.calibration_red)})", calibration.redHue, percentText(calibration.redHue), { set(calibration.copy(redHue = it)) }, actions::onEditFinished)
+        ProSlider("$saturation (${stringResource(R.string.calibration_red)})", calibration.redSaturation, percentText(calibration.redSaturation), { set(calibration.copy(redSaturation = it)) }, actions::onEditFinished)
+        PanelHeading(stringResource(R.string.calibration_green))
+        ProSlider("$hue (${stringResource(R.string.calibration_green)})", calibration.greenHue, percentText(calibration.greenHue), { set(calibration.copy(greenHue = it)) }, actions::onEditFinished)
+        ProSlider("$saturation (${stringResource(R.string.calibration_green)})", calibration.greenSaturation, percentText(calibration.greenSaturation), { set(calibration.copy(greenSaturation = it)) }, actions::onEditFinished)
+        PanelHeading(stringResource(R.string.calibration_blue))
+        ProSlider("$hue (${stringResource(R.string.calibration_blue)})", calibration.blueHue, percentText(calibration.blueHue), { set(calibration.copy(blueHue = it)) }, actions::onEditFinished)
+        ProSlider("$saturation (${stringResource(R.string.calibration_blue)})", calibration.blueSaturation, percentText(calibration.blueSaturation), { set(calibration.copy(blueSaturation = it)) }, actions::onEditFinished)
+        PanelResetButton(!calibration.isNeutral, actions::onResetCalibration)
     }
 }
 
 @Composable
 fun EffectsPanel(edit: EditState, actions: EditorActions) {
     PanelColumn {
-        listOf(ManualControl.TEXTURE, ManualControl.CLARITY, ManualControl.DEHAZE).forEach { ControlSlider(it, edit, actions) }
+        ControlSliders(PanelControls.EFFECTS_PRESENCE, edit, actions)
         PanelHeading(stringResource(R.string.panel_vignette))
-        listOf(ManualControl.VIGNETTE, ManualControl.VIGNETTE_MIDPOINT, ManualControl.VIGNETTE_FEATHER, ManualControl.VIGNETTE_ROUNDNESS)
-            .forEach { ControlSlider(it, edit, actions) }
+        ControlSliders(PanelControls.EFFECTS_VIGNETTE, edit, actions)
         PanelHeading(stringResource(R.string.panel_grain))
-        listOf(ManualControl.GRAIN, ManualControl.GRAIN_SIZE, ManualControl.GRAIN_ROUGHNESS).forEach { ControlSlider(it, edit, actions) }
+        ControlSliders(PanelControls.EFFECTS_GRAIN, edit, actions)
+        PanelResetButton(PanelControls.edited(edit, PanelControls.EFFECTS)) { actions.onResetPanel(PanelReset.EFFECTS) }
     }
 }
 
@@ -198,16 +254,16 @@ fun EffectsPanel(edit: EditState, actions: EditorActions) {
 fun DetailPanel(edit: EditState, actions: EditorActions) {
     PanelColumn {
         PanelHeading(stringResource(R.string.panel_sharpening))
-        listOf(ManualControl.SHARPNESS, ManualControl.SHARPEN_RADIUS, ManualControl.SHARPEN_DETAIL, ManualControl.SHARPEN_MASKING)
-            .forEach { ControlSlider(it, edit, actions) }
+        ControlSliders(PanelControls.DETAIL_SHARPEN, edit, actions)
         PanelHeading(stringResource(R.string.panel_noise))
-        listOf(ManualControl.NOISE_REDUCTION, ManualControl.COLOR_NOISE_REDUCTION).forEach { ControlSlider(it, edit, actions) }
+        ControlSliders(PanelControls.DETAIL_NOISE, edit, actions)
+        PanelResetButton(PanelControls.edited(edit, PanelControls.DETAIL)) { actions.onResetPanel(PanelReset.DETAIL) }
     }
 }
 
 @Composable
-fun OpticsPanel(geometry: Geometry, actions: EditorActions) {
-    val lens = geometry.lens
+fun OpticsPanel(edit: EditState, actions: EditorActions) {
+    val lens = edit.geometry.lens
     PanelColumn {
         Text(
             stringResource(R.string.optics_hint),
@@ -221,9 +277,9 @@ fun OpticsPanel(geometry: Geometry, actions: EditorActions) {
             { actions.onLensChanged(lens.copy(chromaticAberration = it)) }, actions::onEditFinished,
         )
         ProSlider(stringResource(R.string.optics_vignetting), lens.vignetting, percentText(lens.vignetting), { actions.onLensChanged(lens.copy(vignetting = it)) }, actions::onEditFinished)
-        TextButton(onClick = actions::onResetLens, enabled = !lens.isIdentity, modifier = Modifier.padding(horizontal = 8.dp)) {
-            Text(stringResource(R.string.reset))
-        }
+        PanelHeading(stringResource(R.string.optics_defringe))
+        ControlSliders(PanelControls.OPTICS, edit, actions)
+        PanelResetButton(!lens.isIdentity || PanelControls.edited(edit, PanelControls.OPTICS)) { actions.onResetPanel(PanelReset.OPTICS) }
     }
 }
 
@@ -251,9 +307,7 @@ fun GeometryPanel(geometry: Geometry, actions: EditorActions) {
         ProSlider(stringResource(R.string.geometry_scale), p.scale, percentText(p.scale), { set(p.copy(scale = it)) }, actions::onEditFinished)
         ProSlider(stringResource(R.string.geometry_offset_x), p.offsetX, percentText(p.offsetX), { set(p.copy(offsetX = it)) }, actions::onEditFinished)
         ProSlider(stringResource(R.string.geometry_offset_y), p.offsetY, percentText(p.offsetY), { set(p.copy(offsetY = it)) }, actions::onEditFinished)
-        TextButton(onClick = actions::onResetPerspective, enabled = !p.isIdentity, modifier = Modifier.padding(horizontal = 8.dp)) {
-            Text(stringResource(R.string.reset))
-        }
+        PanelResetButton(!p.isIdentity, actions::onResetPerspective)
     }
 }
 
@@ -295,18 +349,20 @@ fun CropPanel(edit: EditState, aspect: CropAspect, actions: EditorActions) {
             horizontalArrangement = Arrangement.SpaceEvenly,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            ToolIconButton(Icons.Outlined.RotateLeft, stringResource(R.string.crop_rotate_left), actions::onRotateCounterClockwise)
-            ToolIconButton(Icons.Outlined.RotateRight, stringResource(R.string.crop_rotate_right), actions::onRotateClockwise)
+            ToolIconButton(Icons.AutoMirrored.Outlined.RotateLeft, stringResource(R.string.crop_rotate_left), actions::onRotateCounterClockwise)
+            ToolIconButton(Icons.AutoMirrored.Outlined.RotateRight, stringResource(R.string.crop_rotate_right), actions::onRotateClockwise)
             ToolIconButton(Icons.Outlined.Flip, stringResource(R.string.crop_flip), actions::onFlip)
             ToolIconButton(Icons.Outlined.Flip, stringResource(R.string.crop_flip_vertical), actions::onFlipVertical, Modifier.rotate(90f))
-            TextButton(onClick = actions::onAutoStraighten) { Text(stringResource(R.string.crop_auto_straighten)) }
-            TextButton(onClick = actions::onResetGeometry) { Text(stringResource(R.string.crop_reset)) }
         }
         ProSlider(
             stringResource(R.string.crop_straighten_label), straighten, String.format(Locale.ROOT, "%.1f°", straighten),
             actions::onStraightenChanged, actions::onEditFinished,
             range = -Geometry.MAX_STRAIGHTEN_DEGREES..Geometry.MAX_STRAIGHTEN_DEGREES,
         )
+        Row(Modifier.padding(horizontal = 8.dp)) {
+            TextButton(onClick = actions::onAutoStraighten) { Text(stringResource(R.string.crop_auto_straighten)) }
+            TextButton(onClick = actions::onResetGeometry) { Text(stringResource(R.string.crop_reset)) }
+        }
         PanelHeading(stringResource(R.string.crop_aspect))
         Row(
             Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp),
@@ -318,15 +374,73 @@ fun CropPanel(edit: EditState, aspect: CropAspect, actions: EditorActions) {
 }
 
 @Composable
-fun ToolIconButton(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, onClick: () -> Unit, iconModifier: Modifier = Modifier) {
+fun ToolIconButton(icon: ImageVector, label: String, onClick: () -> Unit, iconModifier: Modifier = Modifier) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         IconButton(onClick = onClick) { Icon(icon, contentDescription = label, modifier = iconModifier) }
         Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
     }
 }
 
+private enum class HistoryView(val labelRes: Int) { HISTORY(R.string.history_title), VERSIONS(R.string.versions_title) }
+
+/** Every step of the edit (tap one to go back to it) and the named versions. */
 @Composable
-fun VersionsPanel(versions: List<EditVersion>, actions: EditorActions, onSaveVersion: () -> Unit) {
+fun HistoryPanel(
+    historyLabels: List<String>,
+    historyPosition: Int,
+    versions: List<EditVersion>,
+    actions: EditorActions,
+    onSaveVersion: () -> Unit,
+) {
+    var view by rememberSaveable { mutableStateOf(HistoryView.HISTORY) }
+    Column(Modifier.fillMaxSize()) {
+        SegmentRow(HistoryView.entries, view, { stringResource(it.labelRes) }) { view = it }
+        when (view) {
+            HistoryView.HISTORY -> HistoryList(historyLabels, historyPosition, actions)
+            HistoryView.VERSIONS -> VersionsList(versions, actions, onSaveVersion)
+        }
+    }
+}
+
+@Composable
+private fun HistoryList(historyLabels: List<String>, historyPosition: Int, actions: EditorActions) {
+    PanelColumn {
+        Text(
+            stringResource(R.string.history_hint),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(horizontal = 20.dp, vertical = 6.dp),
+        )
+        // Newest first; steps after the current one are undone steps that Redo would bring back.
+        historyLabels.indices.reversed().forEach { index ->
+            val isCurrent = index == historyPosition
+            TextButton(
+                onClick = { actions.onJumpToHistory(index) },
+                modifier = Modifier.fillMaxWidth().semantics { selected = isCurrent },
+            ) {
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        Modifier
+                            .padding(end = 12.dp)
+                            .size(8.dp)
+                            .background(
+                                if (isCurrent) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant,
+                                MaterialTheme.shapes.extraLarge,
+                            ),
+                    )
+                    Text(
+                        "${index + 1}. ${historyLabels[index]}",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = if (index > historyPosition) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface,
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun VersionsList(versions: List<EditVersion>, actions: EditorActions, onSaveVersion: () -> Unit) {
     val format = DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT)
     PanelColumn {
         Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -355,7 +469,7 @@ fun VersionsPanel(versions: List<EditVersion>, actions: EditorActions, onSaveVer
                     }
                 }
                 IconButton(onClick = { actions.onDeleteVersion(version) }) {
-                    Icon(Icons.Outlined.Delete, contentDescription = stringResource(R.string.delete))
+                    Icon(Icons.Outlined.Delete, contentDescription = stringResource(R.string.versions_delete, version.name))
                 }
             }
         }

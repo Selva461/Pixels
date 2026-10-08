@@ -20,10 +20,10 @@ import com.pixels.enhancer.domain.project.ProjectCodec
 import com.pixels.enhancer.goodAnalysis
 import com.pixels.enhancer.testing.Degradations
 import com.pixels.enhancer.testing.SyntheticScenes
-import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
+import kotlinx.coroutines.test.runTest
 
 class ToneControlsTest {
     @Test

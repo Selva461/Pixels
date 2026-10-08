@@ -16,8 +16,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -86,16 +86,27 @@ fun ColorMixerPanel(
     }
 }
 
-/** Brightness histogram of the edited preview (not the source). One neutral tone keeps it readable. */
+/**
+ * Histogram of the edited preview (not the source): brightness in one neutral tone, or with [rgb]
+ * the red, green and blue channels overlaid (where they overlap the bars mix towards grey).
+ */
 @Composable
-fun HistogramView(histogram: Histogram, modifier: Modifier = Modifier) {
+fun HistogramView(histogram: Histogram, modifier: Modifier = Modifier, rgb: Boolean = false) {
     val lumaColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
-    Canvas(modifier) {
-        val peak = histogram.luma.max().coerceAtLeast(1).toFloat()
+    val description = stringResource(if (rgb) R.string.histogram_rgb_description else R.string.histogram_description)
+    Canvas(modifier.semantics { contentDescription = description }) {
         val barWidth = size.width / histogram.bins
-        histogram.luma.forEachIndexed { index, count ->
+        fun bars(values: IntArray, color: Color, peak: Float) = values.forEachIndexed { index, count ->
             val barHeight = size.height * count / peak
-            drawRect(lumaColor, Offset(index * barWidth, size.height - barHeight), Size(barWidth, barHeight))
+            drawRect(color, Offset(index * barWidth, size.height - barHeight), Size(barWidth, barHeight))
+        }
+        if (rgb) {
+            val peak = histogram.peak.coerceAtLeast(1).toFloat()
+            bars(histogram.red, Color(0x99E5484D), peak)
+            bars(histogram.green, Color(0x9946C46B), peak)
+            bars(histogram.blue, Color(0x994D7BE5), peak)
+        } else {
+            bars(histogram.luma, lumaColor, histogram.luma.max().coerceAtLeast(1).toFloat())
         }
     }
 }

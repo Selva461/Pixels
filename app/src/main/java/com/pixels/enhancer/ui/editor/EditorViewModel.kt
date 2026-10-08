@@ -9,65 +9,76 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.pixels.enhancer.AppContainer
+import com.pixels.enhancer.core.error.EnhancerException
 import com.pixels.enhancer.core.error.ErrorCode
 import com.pixels.enhancer.core.error.OperationResult
 import com.pixels.enhancer.core.error.runControlled
 import com.pixels.enhancer.data.decoder.BitmapConversions
+import com.pixels.enhancer.data.storage.AppStorage
+import com.pixels.enhancer.data.storage.IncomingImages
 import com.pixels.enhancer.data.storage.ShareCache
+import com.pixels.enhancer.data.storage.ThumbnailStore
 import com.pixels.enhancer.domain.analysis.Histogram
 import com.pixels.enhancer.domain.analysis.SceneType
 import com.pixels.enhancer.domain.debug.DebugReport
-import com.pixels.enhancer.data.storage.ThumbnailStore
+import com.pixels.enhancer.domain.editing.EditDiff
 import com.pixels.enhancer.domain.editing.EditHistory
 import com.pixels.enhancer.domain.editing.EditState
 import com.pixels.enhancer.domain.export.ExportOptions
-import com.pixels.enhancer.domain.local.LocalAdjustment
-import com.pixels.enhancer.domain.geometry.LensCorrection
 import com.pixels.enhancer.domain.geometry.AutoGeometry
-import com.pixels.enhancer.domain.geometry.OpticsWarp
-import com.pixels.enhancer.domain.image.PixelResampler
-import com.pixels.enhancer.domain.processing.ops.WhiteBalanceGains
-import com.pixels.enhancer.domain.retouch.RetouchMode
-import com.pixels.enhancer.domain.geometry.Perspective
-import com.pixels.enhancer.domain.local.BrushStroke
-import com.pixels.enhancer.domain.local.LocalAdjustmentRenderer
-import com.pixels.enhancer.domain.local.LocalAdjustments
-import com.pixels.enhancer.domain.local.RangeMask
-import com.pixels.enhancer.domain.planning.ColorGrading
-import com.pixels.enhancer.domain.presets.Preset
-import com.pixels.enhancer.domain.presets.PresetMath
-import com.pixels.enhancer.domain.presets.PresetStore
-import com.pixels.enhancer.domain.presets.SettingsGroup
-import com.pixels.enhancer.domain.project.EditVersion
-import com.pixels.enhancer.domain.retouch.RetouchSourceFinder
-import com.pixels.enhancer.domain.retouch.RetouchSpot
-import java.util.UUID
-import com.pixels.enhancer.domain.project.Project
-import com.pixels.enhancer.domain.project.ProjectManager
 import com.pixels.enhancer.domain.geometry.CropMath
 import com.pixels.enhancer.domain.geometry.CropRect
 import com.pixels.enhancer.domain.geometry.Geometry
 import com.pixels.enhancer.domain.geometry.GeometryOps
+import com.pixels.enhancer.domain.geometry.LensCorrection
+import com.pixels.enhancer.domain.geometry.OpticsWarp
+import com.pixels.enhancer.domain.geometry.Perspective
 import com.pixels.enhancer.domain.image.PixelBuffer
+import com.pixels.enhancer.domain.image.PixelResampler
+import com.pixels.enhancer.domain.local.BrushStroke
+import com.pixels.enhancer.domain.local.LocalAdjustment
+import com.pixels.enhancer.domain.local.LocalAdjustmentRenderer
+import com.pixels.enhancer.domain.local.LocalAdjustments
+import com.pixels.enhancer.domain.local.RangeMask
 import com.pixels.enhancer.domain.model.OutputNaming
+import com.pixels.enhancer.domain.planning.Calibration
+import com.pixels.enhancer.domain.planning.ColorGrading
 import com.pixels.enhancer.domain.planning.ColorMixer
 import com.pixels.enhancer.domain.planning.CurveChannel
 import com.pixels.enhancer.domain.planning.CurvePoints
+import com.pixels.enhancer.domain.planning.CurvePreset
 import com.pixels.enhancer.domain.planning.EnhancementStrength
 import com.pixels.enhancer.domain.planning.HslShift
 import com.pixels.enhancer.domain.planning.HueBand
-import com.pixels.enhancer.domain.planning.Look
 import com.pixels.enhancer.domain.planning.ManualControl
 import com.pixels.enhancer.domain.planning.QualityPreset
+import com.pixels.enhancer.domain.presets.Preset
+import com.pixels.enhancer.domain.presets.PresetMath
+import com.pixels.enhancer.domain.presets.PresetStore
+import com.pixels.enhancer.domain.presets.SettingsGroup
 import com.pixels.enhancer.domain.processing.ProcessingListener
 import com.pixels.enhancer.domain.processing.ProcessingStage
 import com.pixels.enhancer.domain.processing.StageConfig
+import com.pixels.enhancer.domain.processing.ops.WhiteBalanceGains
+import com.pixels.enhancer.domain.project.EditVersion
+import com.pixels.enhancer.domain.project.Project
+import com.pixels.enhancer.domain.project.ProjectManager
+import com.pixels.enhancer.domain.repository.EnhancerSettings
 import com.pixels.enhancer.domain.repository.SettingsRepository
+import com.pixels.enhancer.domain.retouch.RetouchMode
+import com.pixels.enhancer.domain.retouch.RetouchSourceFinder
+import com.pixels.enhancer.domain.retouch.RetouchSpot
+import com.pixels.enhancer.domain.usecase.BatchExportUseCase
+import com.pixels.enhancer.domain.usecase.BatchItemResult
 import com.pixels.enhancer.domain.usecase.EnhanceImageUseCase
 import com.pixels.enhancer.domain.usecase.EnhanceRequest
 import com.pixels.enhancer.domain.usecase.EnhancementOutcome
 import com.pixels.enhancer.domain.usecase.EnhancementSession
 import com.pixels.enhancer.domain.usecase.RenderTarget
+import com.pixels.enhancer.domain.usecase.toRequest
+import com.pixels.enhancer.ui.panels.PanelReset
+import java.util.UUID
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.Job
@@ -99,6 +110,9 @@ class EditorViewModel(
     private val projectManager: ProjectManager,
     private val thumbnails: ThumbnailStore,
     private val presetStore: PresetStore,
+    private val batchExport: BatchExportUseCase,
+    private val incomingImages: IncomingImages,
+    private val appStorage: AppStorage,
     private val isDebugBuild: Boolean,
 ) : ViewModel(), EditorActions {
 
@@ -109,6 +123,17 @@ class EditorViewModel(
     val events: Flow<EditorEvent> = _events.receiveAsFlow()
 
     private var settings = settingsRepository.load()
+
+    private val _settingsState = MutableStateFlow(settings)
+
+    /** Current settings, for the Settings screen and app-wide preferences (haptics). */
+    val settingsState: StateFlow<EnhancerSettings> = _settingsState.asStateFlow()
+
+    private val _storageUsed = MutableStateFlow<Long?>(null)
+
+    /** Bytes Pixels stores on the device; null until measured. */
+    val storageUsed: StateFlow<Long?> = _storageUsed.asStateFlow()
+
     private var session: EnhancementSession? = null
     private var outcome: EnhancementOutcome? = null
     private var cropMode = false
@@ -139,9 +164,19 @@ class EditorViewModel(
     private var healSettings = HealSettings()
     private var showClipping = false
 
+    /** History labels, recomputed only when the history changes (never per slider frame). */
+    private var historyLabelCache: List<String> = emptyList()
+
+    /** The edit a preset (or its amount slider) produced; any other change ends the amount slider. */
+    private var lastPresetResult: EditState? = null
+    private var batch: BatchProgress? = null
+    private var batchJob: Job? = null
+    private var pendingBatchGroups: Set<SettingsGroup> = SettingsGroup.ALL
+
     private var disabledStages: Set<String> = emptySet()
     private var runUntilStageId: String? = null
     private var openJob: Job? = null
+    private var importJob: Job? = null
     private var exportJob: Job? = null
 
     /** Every edit becomes a preview request; newer requests cancel older renders. */
@@ -150,14 +185,105 @@ class EditorViewModel(
     init {
         startPreviewRenderer()
         refreshRecent()
-        viewModelScope.launch { userPresets = runCatching { presetStore.list() }.getOrDefault(emptyList()) }
+        viewModelScope.launch { userPresets = attempt { presetStore.list() }.getOrDefault(emptyList()) }
     }
 
     fun onImagePicked(uri: Uri) = openSource(uri.toString(), projectId = null)
 
+    /**
+     * A photo shared or sent to Pixels by another app: validated and copied into app storage first
+     * (see [IncomingImages.importShared]), so the project can be reopened after a restart.
+     */
+    fun onImportShared(uri: Uri) {
+        importJob?.cancel()
+        openJob?.cancel()
+        clearSession()
+        _uiState.value = EditorUiState.Loading
+        importJob = viewModelScope.launch {
+            // Another app chose this URI, so any failure at all ends on the error screen, never a crash.
+            val local = attempt { incomingImages.importShared(uri) }.getOrElse { error ->
+                _uiState.value = EditorUiState.Error((error as? EnhancerException)?.code ?: ErrorCode.IMAGE_NOT_FOUND)
+                return@launch
+            }
+            openSource(local.toString(), projectId = null)
+        }
+    }
+
+    /** Camera capture finished; the photo is already in app storage. */
+    fun onCaptured(uri: Uri) = openSource(uri.toString(), projectId = null)
+
+    fun onCaptureCancelled(uri: Uri) {
+        viewModelScope.launch(Dispatchers.IO) { incomingImages.discardCapture(uri) }
+    }
+
+    // --- Home: project list management ---
+
+    fun onDuplicateProject(id: String) {
+        viewModelScope.launch {
+            val copy = attempt { projectManager.duplicate(id) }.getOrNull() ?: return@launch
+            attempt { thumbnails.copy(id, copy.id) }
+            refreshRecent()
+        }
+    }
+
+    fun onRenameProject(id: String, name: String) {
+        viewModelScope.launch {
+            attempt { projectManager.rename(id, name) }
+            refreshRecent()
+        }
+    }
+
+    /** Called when Home is shown again (e.g. back from Settings) so the list is current. */
+    fun onHomeShown() = refreshRecent()
+
+    // --- Settings ---
+
+    fun onSettingsChanged(updated: EnhancerSettings) = saveSettings(updated)
+
+    private fun saveSettings(updated: EnhancerSettings) {
+        settings = updated
+        settingsRepository.save(updated)
+        _settingsState.value = updated
+    }
+
+    /** Deletes every project, preview, imported and captured photo. Gallery photos are never touched. */
+    fun onDeleteAllEdits() {
+        viewModelScope.launch {
+            attempt { projectManager.recent().forEach { projectManager.delete(it.id) } }
+            attempt { thumbnails.deleteAll() }
+            attempt { incomingImages.deleteAll() }
+            refreshRecent()
+            measureStorage()
+        }
+    }
+
+    fun onDeleteAllPresets() {
+        viewModelScope.launch {
+            attempt { presetStore.list().forEach { presetStore.delete(it.id) } }
+            userPresets = emptyList()
+            measureStorage()
+        }
+    }
+
+    fun onClearTemporaryFiles() {
+        viewModelScope.launch {
+            attempt { shareCache.clear() }
+            measureStorage()
+        }
+    }
+
+    /** Re-measures [storageUsed] (the Settings screen asks when it opens). */
+    fun onRefreshStorage() {
+        viewModelScope.launch { measureStorage() }
+    }
+
+    private suspend fun measureStorage() {
+        _storageUsed.value = attempt { appStorage.bytesUsed() }.getOrNull()
+    }
+
     fun onOpenProject(id: String) {
         viewModelScope.launch {
-            val saved = projectManager.load(id) ?: return@launch refreshRecent()
+            val saved = attempt { projectManager.load(id) }.getOrNull() ?: return@launch refreshRecent()
             openSource(saved.sourceId, saved.id)
         }
     }
@@ -165,8 +291,8 @@ class EditorViewModel(
     /** Removes the project from Recent; the original photo is never touched. */
     fun onDeleteProject(id: String) {
         viewModelScope.launch {
-            projectManager.delete(id)
-            thumbnails.delete(id)
+            attempt { projectManager.delete(id) }
+            attempt { thumbnails.delete(id) }
             refreshRecent()
         }
     }
@@ -174,17 +300,24 @@ class EditorViewModel(
     private fun openSource(sourceId: String, projectId: String?) {
         openJob?.cancel()
         clearSession()
+        // Settings may have changed on the Settings screen since the last photo.
+        settings = settingsRepository.load()
         openJob = viewModelScope.launch {
             _uiState.value = EditorUiState.Loading
             when (val opened = enhanceImage.open(sourceId, QualityPreset.byId(settings.presetId))) {
                 is OperationResult.Failure -> _uiState.value = EditorUiState.Error(opened.code)
                 is OperationResult.Success -> {
                     session = opened.value
-                    val resumed = projectId?.let { projectManager.load(it) }
-                        ?: projectManager.startOrResume(opened.value.source, EditState(settings.strength), settings.export)
+                    // Editing still works if the project file can't be read or written (e.g. storage
+                    // full); only autosave and Recent are lost, and both recover on the next open.
+                    val resumed = attempt {
+                        projectId?.let { projectManager.load(it) }
+                            ?: projectManager.startOrResume(opened.value.source, EditState(settings.strength), settings.export)
+                    }.getOrNull()
                     project = resumed
-                    history = projectManager.historyOf(resumed)
+                    history = resumed?.let(projectManager::historyOf) ?: EditHistory(EditState(settings.strength))
                     current = history.current
+                    refreshHistoryLabels()
                     requestPreview()
                 }
             }
@@ -193,8 +326,9 @@ class EditorViewModel(
 
     private fun refreshRecent() {
         viewModelScope.launch {
-            val recent = projectManager.recent().map { saved ->
-                RecentProject(saved.id, saved.displayName ?: saved.id.take(8), saved.modifiedAtMillis, thumbnails.load(saved.id))
+            val recent = attempt { projectManager.recent() }.getOrDefault(emptyList()).map { saved ->
+                val thumbnail = attempt { thumbnails.load(saved.id) }.getOrNull()
+                RecentProject(saved.id, saved.displayName ?: saved.id.take(8), saved.modifiedAtMillis, thumbnail)
             }
             _uiState.update { state -> if (state is EditorUiState.Idle) EditorUiState.Idle(recent, recentLoaded = true) else state }
         }
@@ -206,12 +340,14 @@ class EditorViewModel(
 
     /** Called when a slider drag ends: records an undo step and remembers the strength. */
     override fun onEditFinished() {
+        if (appliedPreset != null && current != lastPresetResult) {
+            appliedPreset = null
+            presetBase = null
+        }
         if (!history.commit(current)) return
         autosave()
-        if (settings.strength != current.strength) {
-            settings = settings.copy(strength = current.strength)
-            settingsRepository.save(settings)
-        }
+        if (settings.strength != current.strength) saveSettings(settings.copy(strength = current.strength))
+        refreshHistoryLabels()
         publishEdit()
     }
 
@@ -283,20 +419,10 @@ class EditorViewModel(
         onEditFinished()
     }
 
-    fun onAddLocal(radial: Boolean): Int {
-        val output = outcome?.output
-        val aspect = if (output == null) 1f else output.width.toFloat() / output.height
-        val id = current.localAdjustments.nextId()
-        val item = if (radial) LocalAdjustment.radialAt(id, 0.5f, 0.5f, aspect) else LocalAdjustment.linearTop(id)
-        edit(current.copy(localAdjustments = current.localAdjustments.with(item)))
-        onEditFinished()
-        return id
-    }
-
     /** Live while dragging a mask handle or slider; [onEditFinished] records the undo step. */
     override fun onLocalChanged(item: LocalAdjustment) = edit(current.copy(localAdjustments = current.localAdjustments.with(item)))
 
-    fun onLocalRemoved(id: Int) {
+    private fun onLocalRemoved(id: Int) {
         edit(current.copy(localAdjustments = current.localAdjustments.without(id)))
         onEditFinished()
     }
@@ -307,7 +433,9 @@ class EditorViewModel(
         val base = if (appliedPreset != null) presetBase ?: current else current
         presetBase = base
         appliedPreset = AppliedPreset(preset, 1f)
-        edit(PresetMath.apply(base, preset, 1f))
+        val result = PresetMath.apply(base, preset, 1f)
+        lastPresetResult = result
+        edit(result)
         onEditFinished()
     }
 
@@ -316,25 +444,29 @@ class EditorViewModel(
         val applied = appliedPreset ?: return
         val base = presetBase ?: return
         appliedPreset = applied.copy(amount = amount)
-        edit(PresetMath.apply(base, applied.preset, amount))
+        val result = PresetMath.apply(base, applied.preset, amount)
+        lastPresetResult = result
+        edit(result)
     }
 
     override fun onSavePreset(name: String) {
         val trimmed = name.trim().ifEmpty { return }
         val preset = Preset("user-${UUID.randomUUID()}", trimmed, USER_PRESET_CATEGORY, PresetMath.settingsOf(current), builtIn = false)
         viewModelScope.launch {
-            runCatching { presetStore.save(preset) }.onSuccess {
-                userPresets = presetStore.list()
-                publishEdit()
-            }.onFailure { setActivity(EditorActivity.Failed(ErrorCode.UNKNOWN)) }
+            attempt { presetStore.save(preset) }
+                .onSuccess {
+                    userPresets = attempt { presetStore.list() }.getOrDefault(userPresets + preset)
+                    publishEdit()
+                }
+                .onFailure { setActivity(EditorActivity.Failed(ErrorCode.SAVE_FAILED)) }
         }
     }
 
     override fun onDeletePreset(preset: Preset) {
         if (preset.builtIn) return
         viewModelScope.launch {
-            runCatching { presetStore.delete(preset.id) }
-            userPresets = runCatching { presetStore.list() }.getOrDefault(userPresets - preset)
+            attempt { presetStore.delete(preset.id) }
+            userPresets = attempt { presetStore.list() }.getOrDefault(userPresets - preset)
             publishEdit()
         }
     }
@@ -371,7 +503,7 @@ class EditorViewModel(
         publishEdit()
         viewModelScope.launch {
             saveMutex.withLock {
-                runCatching { projectManager.recordVersions(project ?: saved, versions) }.onSuccess { updated -> if (project?.id == updated.id) project = updated }
+                attempt { projectManager.recordVersions(project ?: saved, versions) }.onSuccess { updated -> if (project?.id == updated.id) project = updated }
             }
         }
     }
@@ -516,10 +648,11 @@ class EditorViewModel(
     /** Levels the photo from its own straight edges (after turns, flips and lens correction). */
     override fun onAutoStraighten() {
         val source = session?.original ?: return
+        val geometry = current.geometry
         viewModelScope.launch {
             val degrees = withContext(Dispatchers.Default) {
                 val small = PixelResampler.downscaleToFit(source, AUTO_ANALYSIS_EDGE)
-                AutoGeometry.levelDegrees(GeometryOps.apply(small, current.geometry.copy(straightenDegrees = 0f, crop = CropRect.FULL, perspective = Perspective.NONE)))
+                AutoGeometry.levelDegrees(GeometryOps.apply(small, geometry.copy(straightenDegrees = 0f, crop = CropRect.FULL, perspective = Perspective.NONE)))
             }
             commitGeometry(current.geometry.straightened(degrees))
         }
@@ -528,13 +661,14 @@ class EditorViewModel(
     /** Level plus vertical and horizontal perspective, found from the photo's straight edges. */
     override fun onAutoUpright() {
         val source = session?.original ?: return
+        val geometry = current.geometry
         viewModelScope.launch {
             val perspective = withContext(Dispatchers.Default) {
                 val small = PixelResampler.downscaleToFit(source, AUTO_ANALYSIS_EDGE)
-                val base = GeometryOps.apply(small, current.geometry.copy(straightenDegrees = 0f, crop = CropRect.FULL, lens = LensCorrection.NONE, perspective = Perspective.NONE))
-                val rotate = AutoGeometry.levelDegrees(OpticsWarp.apply(base, current.geometry.lens, Perspective.NONE))
+                val base = GeometryOps.apply(small, geometry.copy(straightenDegrees = 0f, crop = CropRect.FULL, lens = LensCorrection.NONE, perspective = Perspective.NONE))
+                val rotate = AutoGeometry.levelDegrees(OpticsWarp.apply(base, geometry.lens, Perspective.NONE))
                     .coerceIn(-Perspective.MAX_ROTATE_DEGREES, Perspective.MAX_ROTATE_DEGREES)
-                AutoGeometry.upright(base, current.geometry.lens, rotate)
+                AutoGeometry.upright(base, geometry.lens, rotate)
             }
             // Upright includes levelling, so a manual straighten would rotate twice.
             commitGeometry(current.geometry.withPerspective(perspective).straightened(0f))
@@ -610,6 +744,98 @@ class EditorViewModel(
         }
     }
 
+    // --- Calibration, white balance mode, curve presets, panel resets ---
+
+    /** Live while dragging; [onEditFinished] records the undo step. */
+    override fun onCalibrationChanged(calibration: Calibration) = edit(current.copy(calibration = calibration.clamped()))
+
+    override fun onResetCalibration() {
+        edit(current.copy(calibration = Calibration.NONE))
+        onEditFinished()
+    }
+
+    override fun onAutoWhiteBalanceChanged(enabled: Boolean) {
+        edit(current.copy(autoWhiteBalance = enabled))
+        onEditFinished()
+    }
+
+    override fun onCurvePresetSelected(channel: CurveChannel, preset: CurvePreset) {
+        edit(current.copy(toneCurves = current.toneCurves.with(channel, preset.points)))
+        onEditFinished()
+    }
+
+    override fun onResetPanel(panel: PanelReset) {
+        edit(panel.reset(current))
+        onEditFinished()
+    }
+
+    // --- History ---
+
+    override fun onJumpToHistory(index: Int) {
+        if (index !in history.timeline.indices || index == history.position) return
+        restore(history.jumpTo(index))
+    }
+
+    // --- Mask management ---
+
+    override fun onDuplicateMask(id: Int) {
+        val duplicated = current.localAdjustments.duplicate(id)
+        if (duplicated == current.localAdjustments) return
+        val index = duplicated.items.indexOfFirst { it.id == id }
+        selectedMaskId = duplicated.items[index + 1].id
+        edit(current.copy(localAdjustments = duplicated))
+        onEditFinished()
+        refreshMaskOverlay()
+    }
+
+    override fun onRenameMask(id: Int, name: String) {
+        edit(current.copy(localAdjustments = current.localAdjustments.renamed(id, name)))
+        onEditFinished()
+    }
+
+    // --- Batch: apply these settings to other photos ---
+
+    override fun onBatchGroupsChosen(groups: Set<SettingsGroup>) {
+        pendingBatchGroups = groups
+    }
+
+    /** Photos picked for a batch: each gets the chosen settings and is saved as a new file. */
+    fun onBatchPhotosPicked(uris: List<Uri>) {
+        if (uris.isEmpty() || batch?.running == true) return
+        val ids = uris.map(Uri::toString).distinct().take(BatchExportUseCase.MAX_ITEMS)
+        val settingsSnapshot = current
+        val groups = pendingBatchGroups
+        val options = project?.exportOptions ?: settings.export
+        batch = BatchProgress(total = ids.size, done = 0, saved = 0, failed = 0, running = true, skipped = uris.size - ids.size)
+        publishEdit()
+        batchJob = viewModelScope.launch {
+            val results = batchExport.run(ids, settingsSnapshot, groups, options, QualityPreset.byId(settings.presetId)) { done, total ->
+                batch = batch?.copy(done = done, total = total)
+                publishEdit()
+            }
+            batch = batch?.copy(
+                done = results.size,
+                saved = results.count { it is BatchItemResult.Saved },
+                failed = results.count { it is BatchItemResult.Failed },
+                running = false,
+            )
+            publishEdit()
+        }
+    }
+
+    override fun onCancelBatch() {
+        batchJob?.cancel()
+        batchJob = null
+        batch = batch?.copy(running = false, cancelled = true)
+        publishEdit()
+    }
+
+    override fun onDismissBatch() {
+        if (batch?.running == true) return
+        batch = null
+        publishEdit()
+    }
+
     override fun onResetColorMixer() {
         edit(current.copy(colorMixer = ColorMixer.NONE))
         onEditFinished()
@@ -618,11 +844,6 @@ class EditorViewModel(
     /** null returns to the detected scene. */
     override fun onSceneSelected(scene: SceneType?) {
         edit(current.copy(sceneOverride = scene))
-        onEditFinished()
-    }
-
-    fun onLookSelected(look: Look) {
-        edit(current.copy(manual = look.adjustments, lookId = look.id))
         onEditFinished()
     }
 
@@ -653,6 +874,7 @@ class EditorViewModel(
 
     private fun restore(state: EditState?) {
         current = state ?: return
+        refreshHistoryLabels()
         appliedPreset = null
         presetBase = null
         autosave()
@@ -667,9 +889,9 @@ class EditorViewModel(
         viewModelScope.launch {
             saveMutex.withLock {
                 val latest = project?.takeIf { it.id == saved.id } ?: saved
-                runCatching { projectManager.recordHistory(latest, snapshot) }
+                attempt { projectManager.recordHistory(latest, snapshot) }
                     .onSuccess { updated -> if (project?.id == updated.id) project = updated }
-                outcome?.output?.let { runCatching { thumbnails.save(saved.id, it) } }
+                outcome?.output?.let { attempt { thumbnails.save(saved.id, it) } }
             }
         }
     }
@@ -690,8 +912,7 @@ class EditorViewModel(
     override fun onExportConfirmed() {
         val currentSession = session ?: return
         val options = (_uiState.value as? EditorUiState.Success)?.exportDialog?.options ?: return
-        settings = settings.copy(export = options)
-        settingsRepository.save(settings)
+        saveSettings(settings.copy(export = options))
         _uiState.update { state -> if (state is EditorUiState.Success) state.copy(exportDialog = null, activity = EditorActivity.Saving(0f)) else state }
         exportJob = viewModelScope.launch {
             val listener = progressListener { setActivity(EditorActivity.Saving(it)) }
@@ -701,7 +922,7 @@ class EditorViewModel(
                     val result = exported.value
                     setActivity(EditorActivity.Saved(result.saved.displayName, Uri.parse(result.saved.id), result.width, result.height))
                     project?.let { saved ->
-                        runCatching { projectManager.recordExport(saved, options, current) }.onSuccess { project = it }
+                        attempt { projectManager.recordExport(saved, options, current) }.onSuccess { project = it }
                     }
                 }
             }
@@ -763,7 +984,7 @@ class EditorViewModel(
 
     /** Close asks first when the current edit has never been exported. */
     override fun onCloseRequested() {
-        if (project?.hasUnexportedChanges == true) {
+        if (settings.confirmBeforeLeaving && project?.hasUnexportedChanges == true) {
             _uiState.update { state -> if (state is EditorUiState.Success) state.copy(confirmLeave = true) else state }
         } else {
             onClose()
@@ -777,6 +998,7 @@ class EditorViewModel(
     override fun onClose() {
         openJob?.cancel()
         exportJob?.cancel()
+        batchJob?.cancel()
         clearSession()
         _uiState.value = EditorUiState.Idle()
         refreshRecent()
@@ -807,24 +1029,25 @@ class EditorViewModel(
         selectedSpotId = selectedSpotId?.takeIf { id -> current.retouch.spots.any { it.id == id } },
         healSettings = healSettings,
         showClipping = showClipping,
+        historyLabels = historyLabelCache,
+        historyPosition = history.position,
+        batch = batch,
     )
+
+    /** One label per history step, oldest first: what that step changed. */
+    private fun refreshHistoryLabels() {
+        val timeline = history.timeline
+        historyLabelCache = timeline.mapIndexed { index, state -> if (index == 0) HISTORY_START else EditDiff.describe(timeline[index - 1], state) }
+    }
 
     private fun requestPreview() {
         if (session == null) return
         previewRequests.value = request(RenderTarget.PREVIEW)
     }
 
-    private fun request(target: RenderTarget) = EnhanceRequest(
-        strength = current.strength,
-        manual = current.manual,
+    /** Every edit field goes through [toRequest]; only preview-specific overrides are added here. */
+    private fun request(target: RenderTarget) = current.toRequest(target).copy(
         geometry = if (cropMode && target == RenderTarget.PREVIEW) current.geometry.withoutCrop() else current.geometry,
-        colorMixer = current.colorMixer,
-        toneCurves = current.toneCurves,
-        localAdjustments = current.localAdjustments,
-        colorGrading = current.colorGrading,
-        retouch = current.retouch,
-        sceneOverride = current.sceneOverride,
-        target = target,
         debugEnabled = isDebugBuild,
         stageConfigs = disabledStages.associateWith { StageConfig(enabled = false) },
         runUntilStageId = runUntilStageId,
@@ -925,14 +1148,30 @@ class EditorViewModel(
         showMaskOverlay = false
         maskOverlay = null
         selectedSpotId = null
+        lastPresetResult = null
+        historyLabelCache = emptyList()
         disabledStages = emptySet()
         runUntilStageId = null
+    }
+
+    /**
+     * Like runCatching, but never swallows coroutine cancellation (which would keep a cancelled
+     * job running). Used for storage work whose failure must not break editing.
+     */
+    @Suppress("TooGenericExceptionCaught")
+    private suspend fun <T> attempt(block: suspend () -> T): Result<T> = try {
+        Result.success(block())
+    } catch (cancelled: CancellationException) {
+        throw cancelled
+    } catch (error: Exception) {
+        Result.failure(error)
     }
 
     companion object {
         /** Coalesces rapid slider movement into one render. */
         private const val PREVIEW_DEBOUNCE_MS = 60L
         private const val USER_PRESET_CATEGORY = "Yours"
+        private const val HISTORY_START = "Opened"
         private const val OVERLAY_ALPHA = 150f
         private const val OVERLAY_RGB = 0xE5484D
         private const val AUTO_ANALYSIS_EDGE = 800
@@ -950,6 +1189,9 @@ class EditorViewModel(
                     projectManager = container.projectManager,
                     thumbnails = container.thumbnails,
                     presetStore = container.presetStore,
+                    batchExport = container.batchExport,
+                    incomingImages = container.incomingImages,
+                    appStorage = container.appStorage,
                     isDebugBuild = container.isDebugBuild,
                 )
             }

@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -32,6 +33,8 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.pixels.enhancer.R
 import com.pixels.enhancer.domain.analysis.Histogram
@@ -39,6 +42,7 @@ import com.pixels.enhancer.domain.editing.EditState
 import com.pixels.enhancer.domain.planning.CurveChannel
 import com.pixels.enhancer.domain.planning.CurvePoint
 import com.pixels.enhancer.domain.planning.CurvePoints
+import com.pixels.enhancer.domain.planning.CurvePreset
 
 private const val CURVE_SAMPLES = 64
 
@@ -54,6 +58,7 @@ fun CurvePanel(
     onCurveChanged: (CurveChannel, CurvePoints) -> Unit,
     onEditFinished: () -> Unit,
     onResetChannel: (CurveChannel) -> Unit,
+    onPreset: (CurveChannel, CurvePreset) -> Unit,
 ) {
     var channel by rememberSaveable { mutableStateOf(CurveChannel.MASTER) }
     val curve = edit.toneCurves[channel]
@@ -66,11 +71,16 @@ fun CurvePanel(
             onFinished = onEditFinished,
             modifier = Modifier.fillMaxHeight().aspectRatio(1f),
         )
-        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Column(Modifier.weight(1f).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 CurveChannel.entries.forEach { option ->
                     val edited = !edit.toneCurves[option].isIdentity
                     FilterChip(channel == option, { channel = option }, { Text(if (edited) "${option.label} •" else option.label) })
+                }
+            }
+            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                CurvePreset.entries.forEach { preset ->
+                    FilterChip(curve == preset.points, { onPreset(channel, preset) }, { Text(preset.label) })
                 }
             }
             Text(stringResource(R.string.curve_hint), style = MaterialTheme.typography.bodySmall)
@@ -99,8 +109,10 @@ private fun CurveCanvas(
         CurveChannel.GREEN -> Color(0xFF2E7D4F)
         CurveChannel.BLUE -> Color(0xFF2F5FA8)
     }
+    val description = stringResource(R.string.curve_description, channel.label)
     Canvas(
         modifier
+            .semantics { contentDescription = description }
             .pointerInput(channel) {
                 detectTapGestures(
                     onTap = { position ->

@@ -3,7 +3,6 @@ package com.pixels.enhancer.domain.processing.stages
 import com.pixels.enhancer.domain.image.Argb
 import com.pixels.enhancer.domain.image.PixelBuffer
 import com.pixels.enhancer.domain.image.smoothstep
-import com.pixels.enhancer.domain.planning.ColorGrading
 import com.pixels.enhancer.domain.planning.GradeWheel
 import com.pixels.enhancer.domain.processing.ProcessingContext
 import com.pixels.enhancer.domain.processing.ProcessingStage

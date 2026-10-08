@@ -13,10 +13,10 @@ import com.pixels.enhancer.domain.usecase.EnhanceImageUseCase
 import com.pixels.enhancer.domain.usecase.EnhanceRequest
 import com.pixels.enhancer.domain.validation.NaturalOutputValidator
 import com.pixels.enhancer.testing.GoldenScenario
-import kotlinx.coroutines.runBlocking
 import java.io.File
 import javax.imageio.ImageIO
 import kotlin.system.exitProcess
+import kotlinx.coroutines.runBlocking
 
 /**
  * Runs the real engine on desktop image files for fast visual iteration without a phone.

@@ -3,9 +3,9 @@ package com.pixels.enhancer.domain.processing.stages
 import com.pixels.enhancer.domain.image.Argb
 import com.pixels.enhancer.domain.image.Luma
 import com.pixels.enhancer.domain.image.PixelBuffer
+import com.pixels.enhancer.domain.image.smoothstep
 import com.pixels.enhancer.domain.processing.ProcessingContext
 import com.pixels.enhancer.domain.processing.ProcessingStage
-import com.pixels.enhancer.domain.image.smoothstep
 import kotlin.math.floor
 import kotlin.math.max
 import kotlin.math.min

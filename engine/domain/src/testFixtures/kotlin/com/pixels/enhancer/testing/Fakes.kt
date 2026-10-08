@@ -1,7 +1,7 @@
 package com.pixels.enhancer.testing
 
-import com.pixels.enhancer.core.error.ErrorCode
 import com.pixels.enhancer.core.error.EnhancerException
+import com.pixels.enhancer.core.error.ErrorCode
 import com.pixels.enhancer.core.logging.EnhancerLogger
 import com.pixels.enhancer.core.logging.LogFormat
 import com.pixels.enhancer.domain.image.PixelBuffer

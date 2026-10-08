@@ -3,13 +3,13 @@ package com.pixels.enhancer.domain.editing
 import com.pixels.enhancer.domain.analysis.SceneType
 import com.pixels.enhancer.domain.geometry.Geometry
 import com.pixels.enhancer.domain.local.LocalAdjustments
+import com.pixels.enhancer.domain.planning.Calibration
+import com.pixels.enhancer.domain.planning.ColorGrading
 import com.pixels.enhancer.domain.planning.ColorMixer
 import com.pixels.enhancer.domain.planning.EnhancementStrength
 import com.pixels.enhancer.domain.planning.Look
 import com.pixels.enhancer.domain.planning.ManualAdjustments
 import com.pixels.enhancer.domain.planning.ToneCurves
-import com.pixels.enhancer.domain.planning.ColorGrading
-import com.pixels.enhancer.domain.planning.Calibration
 import com.pixels.enhancer.domain.retouch.Retouch
 
 /**

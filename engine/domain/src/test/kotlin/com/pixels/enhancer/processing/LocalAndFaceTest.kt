@@ -26,12 +26,12 @@ import com.pixels.enhancer.domain.validation.NaturalOutputValidator
 import com.pixels.enhancer.goodAnalysis
 import com.pixels.enhancer.testing.InMemoryImageRepository
 import com.pixels.enhancer.testing.RecordingImageSaver
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.test.runTest
 
 class LocalAdjustmentTest {
     private val grey = TestImages.solid(128, 200, 100)

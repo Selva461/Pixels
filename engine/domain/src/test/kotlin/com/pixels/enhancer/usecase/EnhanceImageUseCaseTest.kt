@@ -7,6 +7,8 @@ import com.pixels.enhancer.domain.analysis.StatisticalImageAnalyzer
 import com.pixels.enhancer.domain.debug.DebugReport
 import com.pixels.enhancer.domain.image.PixelBuffer
 import com.pixels.enhancer.domain.model.ImageSource
+import com.pixels.enhancer.domain.planning.ManualAdjustments
+import com.pixels.enhancer.domain.planning.ManualControl
 import com.pixels.enhancer.domain.planning.NaturalEnhancementPlanner
 import com.pixels.enhancer.domain.planning.QualityPreset
 import com.pixels.enhancer.domain.processing.ImageProcessor
@@ -18,23 +20,21 @@ import com.pixels.enhancer.domain.repository.ImageRepository
 import com.pixels.enhancer.domain.usecase.EnhanceImageUseCase
 import com.pixels.enhancer.domain.usecase.EnhanceRequest
 import com.pixels.enhancer.domain.usecase.RenderTarget
-import com.pixels.enhancer.domain.planning.ManualAdjustments
-import com.pixels.enhancer.domain.planning.ManualControl
-import com.pixels.enhancer.domain.validation.ValidationMode
 import com.pixels.enhancer.domain.validation.NaturalOutputValidator
 import com.pixels.enhancer.domain.validation.OutputValidator
 import com.pixels.enhancer.domain.validation.ValidationCheck
+import com.pixels.enhancer.domain.validation.ValidationMode
 import com.pixels.enhancer.domain.validation.ValidationResult
 import com.pixels.enhancer.testing.GoldenScenario
 import com.pixels.enhancer.testing.InMemoryImageRepository
 import com.pixels.enhancer.testing.RecordingImageSaver
 import com.pixels.enhancer.testing.RecordingLogger
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.test.runTest
 
 class EnhanceImageUseCaseTest {
     private val logger = RecordingLogger()

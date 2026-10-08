@@ -36,6 +36,19 @@ android {
         compose = true
         buildConfig = true
     }
+
+    lint {
+        // Any lint error fails CI; the HTML/XML/SARIF reports are uploaded as build artifacts.
+        abortOnError = true
+        checkReleaseBuilds = true
+        htmlReport = true
+        xmlReport = true
+        sarifReport = true
+        // "Newer version available" checks depend on the network and the day, not on this code.
+        disable += setOf("GradleDependency", "NewerVersionAvailable", "AndroidGradlePluginVersion")
+        // Play's target-API deadline is a release decision tracked in AUDIT.md, not a code defect.
+        warning += setOf("ExpiredTargetSdkVersion", "OldTargetApi")
+    }
 }
 
 kotlin {
@@ -66,4 +79,8 @@ dependencies {
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.test.ext.junit)
     androidTestImplementation(libs.androidx.test.runner)
+    androidTestImplementation(platform(libs.androidx.compose.bom))
+    androidTestImplementation(libs.androidx.compose.ui.test.junit4)
+    // Hosts composables in tests (debug builds only; never in release).
+    debugImplementation(libs.androidx.compose.ui.test.manifest)
 }
