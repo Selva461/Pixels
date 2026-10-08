@@ -19,7 +19,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           persist-credentials: false
 
@@ -29,13 +29,13 @@ jobs:
       - name: String resource check
         run: python3 scripts/check_resources.py
 
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: "17"
 
       # Also verifies gradle-wrapper.jar against Gradle's published checksums.
-      - uses: gradle/actions/setup-gradle@v4
+      - uses: gradle/actions/setup-gradle@v5
 
       - name: Engine build and tests (compiler warnings are errors)
         run: ./gradlew -p engine build
@@ -44,7 +44,7 @@ jobs:
       - name: App unit tests, lint and debug APK
         run: ./gradlew --continue :app:testDebugUnitTest :app:lintDebug :app:assembleDebug
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         if: success() || failure()
         with:
           name: pixels-debug-apk
@@ -53,7 +53,7 @@ jobs:
 
       - name: Upload test and lint reports
         if: success() || failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: build-reports
           path: |
@@ -65,16 +65,16 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 50
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           persist-credentials: false
 
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: "17"
 
-      - uses: gradle/actions/setup-gradle@v4
+      - uses: gradle/actions/setup-gradle@v5
 
       - name: Enable KVM
         run: |
@@ -93,7 +93,7 @@ jobs:
 
       - name: Upload device test reports
         if: success() || failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: device-test-reports
           path: app/build/reports/androidTests/
