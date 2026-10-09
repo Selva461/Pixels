@@ -53,7 +53,8 @@ walk-through on a phone still to do).
   focus stop.
 - Editor: adaptive top bar (Share → Compare → Redo move into More when Save would not fit; the
   Save label is measured), tool labels grow with the text, `initialTool` parameter (tests),
-  settings-group rows are 48 dp toggleables, named photo areas, crop frame and mask/heal canvases.
+  settings-group rows are 48 dp toggleables in a scrolling dialog (on a small screen the last row
+  was squeezed to 40 dp), named photo areas, crop frame and mask/heal canvases.
 - Panels: curve square limited to half the width; preset tiles grow and tick the applied preset;
   mixer swatches 48 dp radio buttons; crop buttons share the row and wrap; history marks the
   current step bold and undone steps italic and "Undone"; colour wheel strings translated.

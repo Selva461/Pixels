@@ -24,6 +24,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.toggleable
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.automirrored.outlined.Redo
@@ -612,7 +613,8 @@ private fun SettingsGroupsDialog(
         onDismissRequest = onDismiss,
         title = { Text(title) },
         text = {
-            Column {
+            // Scrolls on small screens, so every row keeps its full 48 dp height.
+            Column(Modifier.verticalScroll(rememberScrollState())) {
                 if (message != null) Text(message, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(bottom = 8.dp))
                 SettingsGroup.entries.forEach { group ->
                     Row(
