@@ -1,3 +1,5 @@
+<img src="docs/brand/pixels-icon-512.png" alt="" width="96" align="right">
+
 # Pixels — Natural Image Enhancer
 
 Android app that takes a poor-looking photo and corrects it so it looks **naturally corrected, not edited**.
@@ -25,6 +27,7 @@ engine/                     Pure-JVM Gradle build (no Android SDK needed)
 app/                        Android app (Kotlin + Compose): decoding, EXIF, MediaStore, UI
 scripts/                    CI gates: security_gate.py, check_resources.py
 tools/offline-typecheck/    Compile-check the app without the Android SDK or Google Maven
+docs/brand/                 App icon source (SVG) and the 512 px store icon
 ```
 
 The app consumes the engine as an included build, so the dependency direction is

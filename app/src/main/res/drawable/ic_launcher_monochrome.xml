@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Themed icon (Android 13+): the same shapes in one colour; the launcher tints them. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M0,108 L0,84 L6,84 L6,78 L12,78 L12,72 L18,72 L18,66 L24,66 L24,60 L30,60 L30,54 L36,54 L36,48 L42,48 L42,42 L48,42 L48,48 L54,48 L54,54 L60,54 L60,60 L66,60 L66,66 L72,66 L72,72 L78,72 L78,78 L84,78 L84,84 L108,84 L108,108 Z" />
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M60,38 a9,9 0 1,0 18,0 a9,9 0 1,0 -18,0 Z" />
+</vector>
