@@ -171,7 +171,7 @@ class AccessibilityTest {
             compose.waitForIdle()
             problems += controlProblems(next.name.lowercase(Locale.ROOT))
         }
-        assertTrue(problems.joinToString("\n"), problems.isEmpty())
+        assertTrue(problems.joinToString(" | "), problems.isEmpty())
     }
 
     @Test
@@ -184,19 +184,19 @@ class AccessibilityTest {
             compose.waitForIdle()
             problems += textProblems(next.name.lowercase(Locale.ROOT))
         }
-        assertTrue(problems.joinToString("\n"), problems.isEmpty())
+        assertTrue(problems.joinToString(" | "), problems.isEmpty())
     }
 
     @Test
     fun everyEditorViewHasNamedControlsAndLargeTargets() {
         val problems = eachEditorView(fontScale = 1f) { controlProblems(it) }
-        assertTrue(problems.joinToString("\n"), problems.isEmpty())
+        assertTrue(problems.joinToString(" | "), problems.isEmpty())
     }
 
     @Test
     fun everyEditorViewFitsTextAt200Percent() {
         val problems = eachEditorView(fontScale = LARGE_TEXT) { textProblems(it) }
-        assertTrue(problems.joinToString("\n"), problems.isEmpty())
+        assertTrue(problems.joinToString(" | "), problems.isEmpty())
     }
 
     /** Opens every tool, and every sub-view of the tools that have them, and runs [check] on each. */
@@ -243,25 +243,33 @@ class AccessibilityTest {
         compose.onNodeWithText(string(R.string.menu_apply_to_others)).performClick()
         compose.waitForIdle()
         problems += controlProblems("dialog settings groups")
-        assertTrue(problems.joinToString("\n"), problems.isEmpty())
+        assertTrue(problems.joinToString(" | "), problems.isEmpty())
     }
 
-    /** Controls without a spoken name, and tap targets smaller than 48 × 48 dp. */
+    /**
+     * Controls without a spoken name, and tap targets smaller than 48 × 48 dp. The target is the
+     * control's layout: Material keeps 48 dp of layout around a smaller visible button
+     * (minimumInteractiveComponentSize) and routes touches there.
+     */
     private fun controlProblems(where: String): List<String> {
         val minimum = with(compose.density) { MIN_TARGET.toPx() } - 1f
         val controls = compose.onAllNodes(hasClickAction() or SET_PROGRESS or isToggleable()).fetchSemanticsNodes()
         val unnamed = controls.filter { spokenName(it).isBlank() }.map { "$where: no spoken name: ${it.config}" }
         val small = compose.onAllNodes(hasClickAction()).fetchSemanticsNodes()
-            .filter { it.size.width > 0 && it.size.height > 0 }
-            .filter { it.size.width < minimum || it.size.height < minimum }
+            .filter { it.layoutInfo.width > 0 && it.layoutInfo.height > 0 }
+            .filter { it.layoutInfo.width < minimum || it.layoutInfo.height < minimum }
             .map { node ->
-                val (w, h) = with(compose.density) { node.size.width.toDp().value to node.size.height.toDp().value }
+                val (w, h) = with(compose.density) { node.layoutInfo.width.toDp().value to node.layoutInfo.height.toDp().value }
                 String.format(Locale.ROOT, "%s: \"%s\" is %.0f × %.0f dp", where, spokenName(node), w, h)
             }
         return unnamed + small
     }
 
-    /** Texts whose layout is cut off or ellipsised. */
+    /**
+     * Texts with lines cut off or ellipsised. Only the height is checked: for a short single-line
+     * text, the layout reported to semantics is re-measured at the full available width, so its
+     * width comparison would flag every label that does not fill its row.
+     */
     private fun textProblems(where: String): List<String> {
         val nodes = compose.onAllNodes(SemanticsMatcher.keyIsDefined(SemanticsActions.GetTextLayoutResult), useUnmergedTree = true).fetchSemanticsNodes()
         val problems = mutableListOf<String>()
@@ -270,7 +278,7 @@ class AccessibilityTest {
                 val results = mutableListOf<TextLayoutResult>()
                 node.config[SemanticsActions.GetTextLayoutResult].action?.invoke(results)
                 val layout = results.firstOrNull() ?: return@forEach
-                if (layout.hasVisualOverflow) problems += "$where: text cut off at 200 %: \"${layout.layoutInput.text}\""
+                if (layout.didOverflowHeight) problems += "$where: text cut off at 200 %: \"${layout.layoutInput.text}\""
             }
         }
         return problems
