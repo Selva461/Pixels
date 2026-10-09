@@ -1,6 +1,6 @@
 # Feature specification
 
-_Version 1.0 draft · 9 October 2026 · statuses as of pull request #3_
+_Version 1.0 draft · 9 October 2026 · statuses as of roadmap PR 1 (accessibility must-haves)_
 
 The best capabilities of established photo editors, written as requirements for Pixels. Every
 feature has an ID, what it does, a **Done when** acceptance test, where the capability is
@@ -13,8 +13,8 @@ Not planned: left out on purpose, with the reason.
 
 **Priority.** P0 must-have for release 1.0 · P1 next · P2 later · P3 to explore.
 
-**Totals.** 137 features: 63 built, 11 partial, 63 planned, plus 5 not planned.
-45 of the 50 P0 features are built; the open ones are A-01 Screen reader support, A-04 Text up to 200 per cent, A-05 Touch targets of 48 dp, A-06 Contrast in every theme, P-01 Preview follows the finger.
+**Totals.** 137 features: 67 built, 9 partial, 61 planned, plus 5 not planned.
+48 of the 50 P0 features are built; the open ones are A-01 Screen reader support (the TalkBack walk-through on a phone) and P-01 Preview follows the finger.
 
 ## Principles every feature must keep
 
@@ -262,12 +262,12 @@ Pixels must work with a screen reader, with large text, without fine finger cont
 
 | ID | Feature | What it does | Done when | Seen in | Status | Priority |
 |---|---|---|---|---|---|---|
-| A-01 | Screen reader support | Every control has a spoken name, role, value and state, such as "Exposure, plus 0.35 EV". | a TalkBack user completes the five main tasks alone. Names and slider values are built; the walk-through on a phone is not done. | TalkBack · WCAG 4.1.2 Name, Role, Value | Partial | P0 |
+| A-01 | Screen reader support | Every control has a spoken name, role, value and state, such as "Exposure, plus 0.35 EV". | a TalkBack user completes the five main tasks alone. Names, roles, values and states are built and checked on every screen by AccessibilityTest; the walk-through on a phone is not done. | TalkBack · WCAG 4.1.2 Name, Role, Value | Partial | P0 |
 | A-02 | Type exact values | Tap a slider's value to type a number instead of dragging. | the number keyboard has a minus sign, and values outside the range are corrected and announced. | Lightroom Classic, Capture One · WCAG 2.5.7 Dragging Movements | Planned | P1 |
 | A-03 | Fine steps with − and + | Each slider has − and + buttons. A press moves one step and holding repeats; the step is 1, 5 or 10. | every value of every slider can be reached without dragging, and each press is announced. | WCAG 2.5.7 Dragging Movements | Planned | P1 |
-| A-04 | Text up to 200 per cent | All text follows the phone's font size up to 200 per cent; layouts reflow instead of cutting text off. | at 200 per cent text and the largest display size, nothing on any screen is cut off or overlaps. | WCAG 1.4.4 Resize Text, 1.4.10 Reflow | Planned | P0 |
-| A-05 | Touch targets of 48 dp | Every tappable control is at least 48 by 48 dp, with space between neighbours. | an automated check finds no smaller target. Most controls pass today; small icon buttons are not yet checked. | Android accessibility guidelines · WCAG 2.5.8 Target Size | Partial | P0 |
-| A-06 | Contrast in every theme | Text has 4.5:1 contrast with its background; large text, icons, slider tracks and focus rings have 3:1. | a test checks every colour pair in every theme, and labels on the photo sit on a solid backing. | WCAG 1.4.3 Contrast, 1.4.11 Non-text Contrast | Planned | P0 |
+| A-04 | Text up to 200 per cent | All text follows the phone's font size up to 200 per cent; layouts reflow instead of cutting text off. | at 200 per cent text and the largest display size, nothing on any screen is cut off or overlaps. AccessibilityTest checks cut-off text at 200 % on a 320 dp screen; overlap is checked by hand. | WCAG 1.4.4 Resize Text, 1.4.10 Reflow | Built | P0 |
+| A-05 | Touch targets of 48 dp | Every tappable control is at least 48 by 48 dp, with space between neighbours. | an automated check finds no smaller target. AccessibilityTest checks every tappable control on every screen. | Android accessibility guidelines · WCAG 2.5.8 Target Size | Built | P0 |
+| A-06 | Contrast in every theme | Text has 4.5:1 contrast with its background; large text, icons, slider tracks and focus rings have 3:1. | a test checks every colour pair in every theme, and labels on the photo sit on a solid backing. ContrastTest covers both schemes and photo labels. | WCAG 1.4.3 Contrast, 1.4.11 Non-text Contrast | Built | P0 |
 | A-07 | Keyboard, D-pad and Switch Access | Every action works without touch. Focus is always visible and moves in reading order. | the five main tasks work by keyboard alone, with Ctrl+Z, Ctrl+Shift+Z and backslash to compare. | Lightroom Classic shortcuts · WCAG 2.1.1 Keyboard, 2.4.7 Focus Visible | Planned | P1 |
 | A-08 | Reduce motion | When the phone's Remove animations setting is on, panels and messages appear without sliding or fading. | with the setting on, nothing moves except the photo under your finger. | Android settings · WCAG 2.3.3 Animation from Interactions | Planned | P1 |
 | A-09 | Colour-safe overlays | Mask and clipping overlays use colours most colour-blind people can tell apart, with optional patterns. | overlays stay distinct in protanopia, deuteranopia and tritanopia simulations and in greyscale. | Lightroom overlay colour · WCAG 1.4.1 Use of Color | Planned | P1 |
@@ -288,7 +288,7 @@ How the editor feels in the hand. Every gesture also has a button or a key that 
 |---|---|---|---|---|---|---|
 | U-01 | Photo first | The photo gets all the space the controls do not need. Panels sit beside or below it, never on top. | only the handles of the tool in use are drawn on the photo. | Lightroom, Snapseed | Built | P0 |
 | U-02 | Hold to compare and split view | Hold the photo to see the original. Split view shows before and after side by side with a movable divider. | letting go always returns to the edit, and the divider stays where you left it. | Lightroom, Snapseed | Built | P0 |
-| U-03 | Edited markers | Tools you have changed show a dot, and a screen reader says "edited" after the tool's name. | every dot has a spoken equivalent. The dots are built; the spoken state is not on every tool yet. | Lightroom, Capture One | Partial | P1 |
+| U-03 | Edited markers | Tools you have changed show a dot, and a screen reader says "edited" after the tool's name. | every dot has a spoken equivalent. Tools, curve channels and colour bands say "edited". | Lightroom, Capture One | Built | P1 |
 | U-04 | Landscape and tablet layouts | In landscape and on tablets the photo sits beside a side panel, with the tool rail along the edge. | every screen works in both orientations, and turning the phone never loses an edit. | Lightroom, Affinity Photo for iPad | Built | P1 |
 | U-05 | One-hand reach | An option moves Undo, Redo and Compare to a bar just above the tools, within reach of one thumb. | with the option on, every frequent action is reachable by one thumb on a 6.7-inch phone. | Snapseed, VSCO | Planned | P2 |
 | U-06 | Swipe to adjust | Swipe up or down on the photo to pick a setting and sideways to change it, as an extra to the sliders. | it can be turned off, never replaces the sliders, and each change is announced. | Snapseed | Planned | P3 |
@@ -323,9 +323,10 @@ Automated checks run on every build. The rest are done by hand, on the reference
 **On every build**
 
 - UI tests check each control's name, role, value and state
+- On every screen at 320 dp: spoken names, 48 dp touch targets, and no text cut off at 200 %
+- A contrast test for every colour pair in both themes
 - Android lint, including its accessibility checks
 - Security check: no permissions, no backups, private file sharing
-- To add: a contrast test for every colour pair, and a touch target check
 
 **Before each release**
 

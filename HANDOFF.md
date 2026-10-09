@@ -1,6 +1,6 @@
 # HANDOFF
 
-_Last updated: 2026-10-09 (feature specification and roadmap) · algorithm version 1.1_
+_Last updated: 2026-10-09 (roadmap PR 1: accessibility must-haves) · algorithm version 1.1_
 
 ## Current status (2026-10-08)
 
@@ -35,9 +35,33 @@ debug APK from the CI run on a phone and work through the manual checklist in TE
 (especially camera, sharing from a gallery app, landscape and TalkBack).
 
 Development: work through [ROADMAP.md](ROADMAP.md) in order. PR 1 (accessibility must-haves) is
-in progress; each roadmap PR stacks on the previous one until the stack is merged.
+in review; PR 2 (speed baseline) is next. Each roadmap PR stacks on the previous one until the
+stack is merged.
 
 ## What changed
+
+### 2026-10-09 — roadmap PR 1: accessibility must-haves
+
+FEATURE_SPEC A-04, A-05, A-06 and U-03 built; A-01 names/roles/values/states done (TalkBack
+walk-through on a phone still to do).
+
+- `ui/components/Choices.kt`: `ChoiceChip` (selected = inverted + tick, unselected = 3:1 outline,
+  optional "edited" dot that is spoken) replaces every `FilterChip`; `StateIconToggle` for on/off
+  icon buttons (compare, mask overlay, invert).
+- `Theme.kt`: `pixelsColorScheme()` for tests, `PhotoLabelBacking` (near-opaque) for text over the
+  photo, `CurveInk` channel colours. `ProSlider` rail uses `outline`; its texts merge into one
+  focus stop.
+- Editor: adaptive top bar (Share → Compare → Redo move into More when Save would not fit; the
+  Save label is measured), tool labels grow with the text, `initialTool` parameter (tests),
+  settings-group rows are 48 dp toggleables, named photo areas, crop frame and mask/heal canvases.
+- Panels: curve square limited to half the width; preset tiles grow and tick the applied preset;
+  mixer swatches 48 dp radio buttons; crop buttons share the row and wrap; history marks the
+  current step bold and undone steps italic and "Undone"; colour wheel strings translated.
+- Home is one `LazyColumn` (links under the start buttons); Settings and Export sliders have
+  names; the watermark field has a real label.
+- Tests: `ContrastTest` (JVM, both schemes, photo labels, curve lines) and `AccessibilityTest`
+  (device; names, 48 dp targets and 200 % text on every screen, editor tool, sub-view and dialog
+  at 320 × 560 dp).
 
 ### 2026-10-09 — feature specification and roadmap
 

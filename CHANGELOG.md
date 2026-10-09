@@ -42,6 +42,19 @@ published to a store yet. Detailed engineering notes for each entry are in HANDO
 - "1 photos" / "1 spots" wording; WebP quality was labelled "JPEG quality"; Home was clipped in
   landscape.
 
+### Accessibility (roadmap PR 1)
+- Works with TalkBack: every control has a name; sliders, the before/after divider and the colour
+  wheel read their value; tools, curve channels and colour bands with changes are read as
+  "edited"; screen titles and sections are headings.
+- Text up to 200 per cent: the editor's top bar moves Share, Compare and Redo into More when Save
+  would be squeezed; tool labels, preset tiles, recent edit names and panels grow, wrap or scroll
+  instead of cutting text off; Home is one scrolling list.
+- Every control is at least 48 × 48 dp (colour-mixer swatches, the split-view knob, settings
+  groups and heal spots were smaller).
+- Contrast: slider rails, curve lines and labels over the photo meet WCAG 2.2; selected chips are
+  filled with a tick and on/off buttons are filled when on, so no choice relies on colour alone;
+  mask handles and heal circles have a dark edge so they show over any photo.
+
 ### Documentation
 - [FEATURE_SPEC.md](FEATURE_SPEC.md): 137 features drawn from established editors, each with an
   acceptance test, status and priority, plus 5 left out on purpose with the reason.
