@@ -16,6 +16,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.pixels.enhancer.BuildConfig
 import com.pixels.enhancer.R
@@ -30,7 +32,7 @@ fun AboutScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
             TextButton(onClick = onBack) { Text(stringResource(R.string.about_back)) }
         }
         Column(Modifier.verticalScroll(rememberScrollState()).padding(horizontal = 24.dp, vertical = 8.dp)) {
-            Text(stringResource(R.string.about_title), style = MaterialTheme.typography.headlineSmall)
+            Text(stringResource(R.string.about_title), style = MaterialTheme.typography.headlineSmall, modifier = Modifier.semantics { heading() })
             Text(
                 stringResource(R.string.about_version, BuildConfig.VERSION_NAME, ENHANCEMENT_ALGORITHM_VERSION),
                 style = MaterialTheme.typography.bodySmall,
@@ -46,7 +48,7 @@ fun AboutScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
 @Composable
 private fun Section(title: String, body: String, note: String? = null) {
     HorizontalDivider(Modifier.padding(vertical = 16.dp))
-    Text(title, style = MaterialTheme.typography.titleMedium)
+    Text(title, style = MaterialTheme.typography.titleMedium, modifier = Modifier.semantics { heading() })
     if (note != null) Text(note, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     Text(body, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(top = 8.dp))
 }

@@ -310,4 +310,20 @@
     <string name="settings_delete_edits_title">Delete all edits?</string>
     <string name="settings_delete_edits_message">Removes every edit in Recent, their previews, and photos imported from other apps or the camera. Photos in your gallery and files you saved are not touched.</string>
     <string name="tool_history">History</string>
+    <!-- Accessibility (screen readers): names and states that are not shown as text. -->
+    <string name="a11y_edited_name">%1$s, edited</string>
+    <string name="a11y_on">On</string>
+    <string name="a11y_off">Off</string>
+    <string name="history_undone">Undone</string>
+    <string name="editor_photo_description">Your photo, as edited</string>
+    <string name="editor_photo_compare_description">Your photo: original on the left, edited on the right</string>
+    <string name="compare_divider">Divider between original and edited</string>
+    <string name="crop_frame_description">Crop frame. Drag inside it to move it, or drag a corner to resize it.</string>
+    <string name="mask_canvas_description">Photo with the selected mask. Drag the round handles to move or resize the mask.</string>
+    <string name="grading_wheel">Colour wheel</string>
+    <string name="grading_wheel_state">Hue %1$d degrees, saturation %2$d per cent</string>
+    <string name="settings_strength">Auto strength for new photos</string>
+    <string name="export_quality_name">Quality</string>
+    <string name="export_watermark_size_name">Watermark text size</string>
+    <string name="export_watermark_opacity_name">Watermark opacity</string>
 </resources>

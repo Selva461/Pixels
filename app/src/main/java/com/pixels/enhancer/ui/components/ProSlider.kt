@@ -27,6 +27,7 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.semantics.ProgressBarRangeInfo
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.disabled
+import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.progressBarRangeInfo
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.setProgress
@@ -65,13 +66,16 @@ fun ProSlider(
     }
     val span = range.endInclusive - range.start
     val accent = MaterialTheme.colorScheme.primary
-    val rail = MaterialTheme.colorScheme.outlineVariant
+    // The outline colour keeps the rail at 3:1 against the panels (ContrastTest).
+    val rail = MaterialTheme.colorScheme.outline
     val thumb = MaterialTheme.colorScheme.onSurface
     val changed = abs(value - resetValue) > 1e-4f
     Column(
         modifier
             .fillMaxWidth()
-            .semantics {
+            // One focus stop that reads "Exposure, +0.35" and can be adjusted; the two texts are
+            // merged into it instead of being read again on their own.
+            .semantics(mergeDescendants = true) {
                 contentDescription = label
                 stateDescription = valueText
                 progressBarRangeInfo = ProgressBarRangeInfo(value, range)
@@ -165,7 +169,7 @@ fun PanelHeading(text: String, modifier: Modifier = Modifier) {
         text.uppercase(),
         style = MaterialTheme.typography.labelSmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = modifier.padding(start = 20.dp, end = 20.dp, top = 14.dp, bottom = 2.dp),
+        modifier = modifier.semantics { heading() }.padding(start = 20.dp, end = 20.dp, top = 14.dp, bottom = 2.dp),
     )
 }
 

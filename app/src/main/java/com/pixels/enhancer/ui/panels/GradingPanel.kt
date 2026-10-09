@@ -90,11 +90,13 @@ fun ColorWheel(wheel: GradeWheel, onChange: (GradeWheel) -> Unit, onFinished: ()
     val current by rememberUpdatedState(wheel)
     val change by rememberUpdatedState(onChange)
     val ring = MaterialTheme.colorScheme.outlineVariant
+    val name = stringResource(R.string.grading_wheel)
+    val state = stringResource(R.string.grading_wheel_state, wheel.hue.roundToInt(), (wheel.saturation * 100).roundToInt())
     Canvas(
         modifier
             .semantics {
-                contentDescription = "Colour wheel"
-                stateDescription = "Hue ${wheel.hue.roundToInt()} degrees, saturation ${(wheel.saturation * 100).roundToInt()} percent"
+                contentDescription = name
+                stateDescription = state
             }
             .pointerInput(Unit) {
                 detectTapGestures(onDoubleTap = {

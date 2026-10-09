@@ -24,7 +24,11 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import com.pixels.enhancer.R
 import com.pixels.enhancer.domain.geometry.CropCorner
 import com.pixels.enhancer.domain.geometry.CropMath
 import com.pixels.enhancer.domain.geometry.CropRect
@@ -54,8 +58,9 @@ fun CropEditor(
     val frameAspect = image.width.toFloat() / image.height
     val touchSlopPx = with(LocalDensity.current) { 36.dp.toPx() }
     var target by remember { mutableStateOf<DragTarget?>(null) }
+    val description = stringResource(R.string.crop_frame_description)
 
-    BoxWithConstraints(modifier.clipToBounds().background(PhotoCanvas)) {
+    BoxWithConstraints(modifier.clipToBounds().background(PhotoCanvas).semantics { contentDescription = description }) {
         val boxWidth = constraints.maxWidth.toFloat()
         val boxHeight = constraints.maxHeight.toFloat()
         val scale = min(boxWidth / image.width, boxHeight / image.height)

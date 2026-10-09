@@ -8,7 +8,8 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -18,6 +19,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -48,8 +50,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.pixels.enhancer.R
 import com.pixels.enhancer.core.error.ErrorCode
@@ -80,7 +83,8 @@ fun HomeScreen(
     modifier: Modifier = Modifier,
 ) {
     val links: @Composable () -> Unit = {
-        Row(Modifier.padding(vertical = 8.dp)) {
+        // Wraps onto a second line with large text instead of squeezing the last link.
+        FlowRow(Modifier.padding(vertical = 8.dp)) {
             TextButton(onClick = onOpenGuide) { Text(stringResource(R.string.home_guide)) }
             TextButton(onClick = onOpenSettings) { Text(stringResource(R.string.home_settings)) }
             TextButton(onClick = onOpenAbout) { Text(stringResource(R.string.home_about)) }
@@ -94,16 +98,21 @@ fun HomeScreen(
                     Intro(onPickImage, onTakePhoto)
                     links()
                 }
-                Column(Modifier.weight(1f).fillMaxHeight().padding(top = 32.dp)) {
-                    RecentSection(recent, recentLoaded, actions)
+                LazyColumn(Modifier.weight(1f).fillMaxHeight(), contentPadding = PaddingValues(top = 32.dp)) {
+                    recentItems(recent, recentLoaded, actions)
                 }
             }
         } else {
-            Column(Modifier.fillMaxSize().padding(horizontal = 24.dp)) {
-                Intro(onPickImage, onTakePhoto)
-                Spacer(Modifier.height(24.dp))
-                RecentSection(recent, recentLoaded, actions)
-                links()
+            // One scrolling list, so everything stays reachable with large text on a small screen.
+            LazyColumn(Modifier.fillMaxSize().padding(horizontal = 24.dp)) {
+                item {
+                    Column {
+                        Intro(onPickImage, onTakePhoto)
+                        links()
+                        Spacer(Modifier.height(8.dp))
+                    }
+                }
+                recentItems(recent, recentLoaded, actions)
             }
         }
     }
@@ -112,7 +121,7 @@ fun HomeScreen(
 @Composable
 private fun Intro(onPickImage: () -> Unit, onTakePhoto: () -> Unit) {
     Spacer(Modifier.height(32.dp))
-    Text(stringResource(R.string.home_title), style = MaterialTheme.typography.displaySmall)
+    Text(stringResource(R.string.home_title), style = MaterialTheme.typography.displaySmall, modifier = Modifier.semantics { heading() })
     Spacer(Modifier.height(8.dp))
     Text(stringResource(R.string.home_subtitle), style = MaterialTheme.typography.bodyLarge)
     Spacer(Modifier.height(24.dp))
@@ -122,25 +131,27 @@ private fun Intro(onPickImage: () -> Unit, onTakePhoto: () -> Unit) {
     }
 }
 
-/** Recent edits, filling the space the column leaves. */
-@Composable
-private fun ColumnScope.RecentSection(recent: List<RecentProject>, recentLoaded: Boolean, actions: RecentActions) {
+/** The Recent edits heading and rows (placeholders until the list has loaded). */
+private fun LazyListScope.recentItems(recent: List<RecentProject>, recentLoaded: Boolean, actions: RecentActions) {
     when {
         !recentLoaded -> {
-            Text(stringResource(R.string.home_recent), style = MaterialTheme.typography.titleMedium)
-            HorizontalDivider(Modifier.padding(vertical = 8.dp))
-            repeat(SKELETON_ROWS) { RecentSkeletonRow() }
-            Spacer(Modifier.weight(1f))
+            item { RecentHeader(withHint = false) }
+            items(SKELETON_ROWS) { RecentSkeletonRow() }
         }
         recent.isNotEmpty() -> {
-            Text(stringResource(R.string.home_recent), style = MaterialTheme.typography.titleMedium)
-            Text(stringResource(R.string.home_recent_hint), style = MaterialTheme.typography.bodySmall)
-            HorizontalDivider(Modifier.padding(vertical = 8.dp))
-            LazyColumn(Modifier.weight(1f)) {
-                items(recent, key = { it.id }) { project -> RecentRow(project, actions) }
-            }
+            item { RecentHeader(withHint = true) }
+            items(recent, key = { it.id }) { project -> RecentRow(project, actions) }
         }
-        else -> Spacer(Modifier.weight(1f))
+        else -> Unit
+    }
+}
+
+@Composable
+private fun RecentHeader(withHint: Boolean) {
+    Column {
+        Text(stringResource(R.string.home_recent), style = MaterialTheme.typography.titleMedium, modifier = Modifier.semantics { heading() })
+        if (withHint) Text(stringResource(R.string.home_recent_hint), style = MaterialTheme.typography.bodySmall)
+        HorizontalDivider(Modifier.padding(vertical = 8.dp))
     }
 }
 
@@ -189,7 +200,8 @@ private fun RecentRow(project: RecentProject, actions: RecentActions) {
             Box(thumbnailModifier.background(MaterialTheme.colorScheme.surfaceVariant))
         }
         Column(Modifier.weight(1f).padding(horizontal = 12.dp)) {
-            Text(project.name, style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            // Wraps rather than cutting the name off at large text sizes.
+            Text(project.name, style = MaterialTheme.typography.bodyLarge)
             Text(
                 DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT).format(Date(project.modifiedAtMillis)),
                 style = MaterialTheme.typography.bodySmall,

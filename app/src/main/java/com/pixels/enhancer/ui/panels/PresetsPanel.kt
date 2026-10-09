@@ -10,12 +10,17 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -33,8 +38,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.pixels.enhancer.R
 import com.pixels.enhancer.domain.planning.GradeWheel
@@ -74,16 +81,17 @@ fun PresetsPanel(userPresets: List<Preset>, applied: AppliedPreset?, actions: Ed
         )
     }
 
-    Column(Modifier.fillMaxSize()) {
+    // Scrolls, so the Amount slider stays reachable when large text makes the tiles taller.
+    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
         SegmentRow(categories, category, { it }) { category = it }
         LazyRow(
-            Modifier.fillMaxWidth().height(104.dp),
+            Modifier.fillMaxWidth(),
             contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 16.dp),
             horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             if (category == yours) {
                 item {
-                    OutlinedButton(onClick = onCreatePreset, shape = MaterialTheme.shapes.medium, modifier = Modifier.size(width = 92.dp, height = 96.dp)) {
+                    OutlinedButton(onClick = onCreatePreset, shape = MaterialTheme.shapes.medium, modifier = Modifier.width(TILE_WIDTH).heightIn(min = TILE_HEIGHT)) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             Icon(Icons.Outlined.Add, contentDescription = null)
                             Text(stringResource(R.string.presets_create), style = MaterialTheme.typography.labelSmall, textAlign = TextAlign.Center)
@@ -95,12 +103,15 @@ fun PresetsPanel(userPresets: List<Preset>, applied: AppliedPreset?, actions: Ed
                 val selected = applied?.preset?.id == preset.id
                 Column(
                     Modifier
-                        .size(width = 92.dp, height = 96.dp)
+                        // Fixed width, flexible height: long names wrap at large text sizes.
+                        .width(TILE_WIDTH)
+                        .heightIn(min = TILE_HEIGHT)
                         .border(
-                            2.dp,
-                            if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant,
+                            if (selected) 3.dp else 1.dp,
+                            if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
                             MaterialTheme.shapes.medium,
                         )
+                        .semantics { this.selected = selected }
                         .combinedClickable(
                             onClickLabel = preset.name,
                             onClick = { actions.onPresetApplied(preset) },
@@ -108,12 +119,24 @@ fun PresetsPanel(userPresets: List<Preset>, applied: AppliedPreset?, actions: Ed
                         )
                         .padding(6.dp),
                 ) {
-                    Box(Modifier.fillMaxWidth().height(52.dp).background(swatchOf(preset), MaterialTheme.shapes.small))
+                    Box(Modifier.fillMaxWidth().height(52.dp).background(swatchOf(preset), MaterialTheme.shapes.small)) {
+                        // The applied preset also gets a tick, so the choice is not shown by colour alone.
+                        if (selected) {
+                            Icon(
+                                Icons.Outlined.CheckCircle,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSurface,
+                                modifier = Modifier
+                                    .align(Alignment.TopEnd)
+                                    .padding(4.dp)
+                                    .background(MaterialTheme.colorScheme.surface, CircleShape),
+                            )
+                        }
+                    }
                     Text(
                         preset.name,
                         style = MaterialTheme.typography.labelMedium,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
+                        fontWeight = if (selected) FontWeight.Bold else null,
                         modifier = Modifier.padding(top = 4.dp),
                     )
                 }
@@ -140,6 +163,9 @@ fun PresetsPanel(userPresets: List<Preset>, applied: AppliedPreset?, actions: Ed
         }
     }
 }
+
+private val TILE_WIDTH = 92.dp
+private val TILE_HEIGHT = 96.dp
 
 /**
  * A tile colour that hints at the preset's look without rendering it: warm or cool from
