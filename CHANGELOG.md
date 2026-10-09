@@ -42,6 +42,11 @@ published to a store yet. Detailed engineering notes for each entry are in HANDO
 - "1 photos" / "1 spots" wording; WebP quality was labelled "JPEG quality"; Home was clipped in
   landscape.
 
+### Documentation
+- [FEATURE_SPEC.md](FEATURE_SPEC.md): 137 features drawn from established editors, each with an
+  acceptance test, status and priority, plus 5 left out on purpose with the reason.
+- [ROADMAP.md](ROADMAP.md): the 74 open features split into 22 pull requests, in order.
+
 ### Security and quality
 - No permissions at all; only `content://` images are accepted from other apps, never Pixels' own
   files; imports capped at 200 MB; backups and device transfer exclude all app data.
