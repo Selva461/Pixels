@@ -8,3 +8,8 @@ captures/
 .externalNativeBuild/
 .cxx/
 /harness-output/
+
+# Python (tools/forensics)
+__pycache__/
+.pytest_cache/
+.venv/

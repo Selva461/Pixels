@@ -1,0 +1,40 @@
+#!/usr/bin/env bash
+# Renders the forensics sample (tools/forensics/samples/original_p3.jpg) through Pixels the way a new
+# photo opens in the app (Auto + Smart edit), then runs the acceptance test on that render and
+# prints which checks it fails. Exit code 0 = every check passes.
+#
+#   scripts/check_output                 # needs Java 17 and Python with tools/forensics/requirements.txt
+#   PYTHON=.venv/bin/python GRADLE_FLAGS=--offline scripts/check_output
+#
+# Note: the desktop harness has no people model (the phone runs DeepLab v3), so the subject comes
+# from Smart edit's rules unless tools/forensics/samples/original_p3.people.png exists.
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+PYTHON="${PYTHON:-python3}"
+OUT="${OUT_DIR:-$ROOT/build/check_output}"
+SAMPLE="$ROOT/tools/forensics/samples/original_p3.jpg"
+RENDER="$OUT/app_render.png"
+
+mkdir -p "$OUT"
+echo "== Rendering $SAMPLE through the Pixels engine"
+# shellcheck disable=SC2086
+"$ROOT/gradlew" -q ${GRADLE_FLAGS:-} -p "$ROOT/engine" :harness:run \
+  --args="--smart --out $OUT --output $RENDER $SAMPLE" | grep -E "smart edit|wrote|FAILED" || true
+test -s "$RENDER" || { echo "check_output: no render was written" >&2; exit 2; }
+
+echo "== Measuring the render (tools/forensics, ~1 min)"
+cd "$ROOT/tools/forensics"
+set +e
+OUTPUT_UNDER_TEST="$RENDER" "$PYTHON" -m pytest -q -p no:cacheprovider tests -k app --tb=short 2>&1 \
+  | tee "$OUT/check_output.log" | grep -E "AssertionError|passed|failed|error" 
+status=${PIPESTATUS[0]}
+set -e
+if [ "$status" -eq 0 ]; then
+  echo "check_output: all checks pass"
+else
+  echo "check_output: failing checks:"
+  # The test's assertion message is the list of failures; print one per line.
+  grep -m1 -oE "AssertionError: \[.*\]" "$OUT/check_output.log" | sed -E "s/^AssertionError: \[//; s/\]$//" | tr -d "'" | tr ',' '\n' | sed 's/^ */  - /'
+fi
+exit "$status"

@@ -91,7 +91,13 @@ private suspend fun processFile(file: File, options: HarnessOptions): Boolean {
         is OperationResult.Failure -> return reportFailure(file, enhanced)
         is OperationResult.Success -> enhanced.value
     }
-    if (options.smart && !writeSmartEdit(useCase, session, request, outcome, file, options)) return false
+    val final = if (options.smart) writeSmartEdit(useCase, session, request, outcome, file, options) ?: return false else outcome
+    options.renderPath?.let { path ->
+        // The finished picture as the app renders it (working resolution, geometry and masks applied).
+        File(path).absoluteFile.parentFile?.mkdirs()
+        ImageIO.write(ImageIoConversions.toBufferedImage(final.output), "png", File(path))
+        println("  wrote $path (${final.output.width}x${final.output.height})")
+    }
     useCase.save(session, request)
     val stem = file.nameWithoutExtension
     ImageIO.write(
@@ -119,13 +125,13 @@ private suspend fun writeSmartEdit(
     auto: EnhancementOutcome,
     file: File,
     options: HarnessOptions,
-): Boolean {
+): EnhancementOutcome? {
     val masks = when (val suggested = useCase.suggestSmartEdit(session, request)) {
-        is OperationResult.Failure -> return reportFailure(file, suggested)
+        is OperationResult.Failure -> return reportFailure(file, suggested).let { null }
         is OperationResult.Success -> suggested.value
     }
     val smart = when (val enhanced = useCase.enhance(session, request.copy(localAdjustments = SmartEdit.merge(LocalAdjustments.NONE, masks)))) {
-        is OperationResult.Failure -> return reportFailure(file, enhanced)
+        is OperationResult.Failure -> return reportFailure(file, enhanced).let { null }
         is OperationResult.Success -> enhanced.value
     }
     val stem = file.nameWithoutExtension
@@ -150,7 +156,7 @@ private suspend fun writeSmartEdit(
     ImageIO.write(ImageIoConversions.toBufferedImage(tinted), "png", File(options.outputDirectory, "${stem}_regions.png"))
     println("  smart edit (subject confidence ${"%.2f".format(maps.subjectConfidence)}, sky ${"%.0f".format(maps.skyFraction * 100)} %):")
     masks.forEach { println("    $it") }
-    return true
+    return smart
 }
 
 private const val TINT = 0.55f
@@ -179,10 +185,11 @@ private data class HarnessOptions(
     val verbose: Boolean,
     val look: String?,
     val smart: Boolean,
+    val renderPath: String?,
 ) {
     companion object {
         const val USAGE = "usage: harness [--synthetic] [--out DIR] [--strength 0..1] [--until STAGE] " +
-            "[--disable STAGE,STAGE] [--look ID] [--smart] [--verbose] [files...]"
+            "[--disable STAGE,STAGE] [--look ID] [--smart] [--output FILE.png] [--verbose] [files...]"
 
         fun parse(args: Array<String>): HarnessOptions? {
             val inputs = mutableListOf<String>()
@@ -194,6 +201,7 @@ private data class HarnessOptions(
             var verbose = false
             var look: String? = null
             var smart = false
+            var renderPath: String? = null
             val iterator = args.iterator()
             while (iterator.hasNext()) {
                 when (val arg = iterator.next()) {
@@ -204,11 +212,12 @@ private data class HarnessOptions(
                     "--synthetic" -> synthetic = true
                     "--verbose" -> verbose = true
                     "--smart" -> smart = true
+                    "--output" -> renderPath = iterator.nextOrNull() ?: return null
                     "--look" -> look = iterator.nextOrNull() ?: return null
                     else -> if (arg.startsWith("--")) return null else inputs += arg
                 }
             }
-            return HarnessOptions(inputs, output, strength, until, disabled, synthetic, verbose, look, smart)
+            return HarnessOptions(inputs, output, strength, until, disabled, synthetic, verbose, look, smart, renderPath)
         }
 
         private fun Iterator<String>.nextOrNull(): String? = if (hasNext()) next() else null
