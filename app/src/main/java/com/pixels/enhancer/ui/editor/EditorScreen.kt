@@ -361,7 +361,7 @@ private fun ToolPanel(
     val edit = state.edit
     when (tool) {
         EditorTool.PRESETS -> PresetsPanel(state.userPresets, state.appliedPreset, actions, onSavePreset)
-        EditorTool.AUTO -> AutoPanel(edit, state.detectedScene, actions)
+        EditorTool.AUTO -> AutoPanel(edit, state.detectedScene, state.smartEditRunning, actions)
         EditorTool.CROP -> CropPanel(edit, state.cropAspect, actions)
         EditorTool.LIGHT -> LightPanel(edit, state.histogram, state.showClipping, actions)
         EditorTool.COLOR -> ColorPanel(edit, pickingWhiteBalance, onPickWhiteBalance, actions)
@@ -680,6 +680,7 @@ private fun ResultSnackbar(activity: EditorActivity, hostState: SnackbarHostStat
                 if (result == SnackbarResult.ActionPerformed) onViewSaved(activity.uri)
             }
             is EditorActivity.Failed -> hostState.showSnackbar(context.getString(ErrorMessages.forCode(activity.code)))
+            is EditorActivity.Notice -> hostState.showSnackbar(context.getString(activity.message))
             else -> Unit
         }
     }

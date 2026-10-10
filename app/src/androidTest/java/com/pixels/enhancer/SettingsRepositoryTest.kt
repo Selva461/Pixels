@@ -45,6 +45,7 @@ class SettingsRepositoryTest {
             ),
             confirmBeforeLeaving = false,
             hapticFeedback = false,
+            smartEditNewPhotos = false,
         )
         repository().save(settings)
         assertEquals(settings, repository().load())

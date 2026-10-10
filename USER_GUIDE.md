@@ -43,7 +43,7 @@ as well as by dragging. Selection never relies on colour alone.
 | Tool | What it does |
 |---|---|
 | **Presets** | 29 looks in 8 groups (Portrait, Landscape, Cinematic, Vintage, Black & White, Food, Urban, Seasons). Tap one, then set **Amount** from 0 to 200 %. Save your own with ⋮ > Save as preset; long-press one of yours to delete it. |
-| **Auto** | Fixes exposure, colour casts and noise for this photo. Lower **Auto strength** for a lighter touch; pick a scene if Pixels guessed wrong. **Original (no edits)** returns to the untouched photo. |
+| **Auto** | Fixes exposure, colour casts and noise for this photo. Lower **Auto strength** for a lighter touch; pick a scene if Pixels guessed wrong. **Smart edit** finds the subject, the sky and the background and edits each one on its own (new photos get it automatically; turn that off in Settings). **Original (no edits)** returns to the untouched photo. |
 | **Crop** | Rotate, flip, straighten (Auto levels the horizon) and aspect ratios: Free, Original, 1:1, 5:4, 4:3, 3:2, 16:9, 21:9, 4:5, 3:4, 2:3, 9:16. |
 | **Light** | Exposure, Contrast, Highlights, Shadows, Whites, Blacks, plus fine-tune and Face exposure. **Show clipping** marks pure white in red and pure black in blue. **Curve:** tap to add a point, drag it, double-tap to remove; or start from a curve preset. |
 | **Colour** | White balance **Auto**, **As shot** (keeps the camera's colours) or **Pick** (tap something that should be grey or white), Temperature, Tint, Vibrance, Saturation, Hue. **Mixer** changes one colour at a time; **Grading** tints shadows, midtones and highlights; **Calibration** re-tunes all reds, greens and blues at once; **B&W** converts to black and white. |
@@ -51,7 +51,7 @@ as well as by dragging. Selection never relies on colour alone.
 | **Detail** | Sharpening (amount, radius, detail, masking) and noise reduction (luminance and colour). |
 | **Optics** | Lens distortion, colour fringing, lens vignetting, and **Defringe** for purple or green edges. |
 | **Geometry** | **Auto upright** straightens leaning buildings; fine-tune Vertical, Horizontal, Rotate, Aspect, Scale and Offset. The photo zooms just enough to hide empty edges. |
-| **Masking** | Up to 12 masks: Brush, Linear, Radial, Luminance range, Colour range. **Show mask** shows it in red; paint, erase, invert, duplicate, rename. Each mask has its own light and colour sliders. |
+| **Masking** | Up to 12 masks: Subject, Sky, Background (found in the photo), Brush, Linear, Radial, Luminance range, Colour range. **Show mask** shows it in red; paint, erase, invert, duplicate, rename. Each mask has its own light and colour sliders. |
 | **Healing** | Tap a blemish to remove it; drag the dashed circle to choose another source. **Clone** copies exactly; **Red eye** fixes red pupils. |
 | **History** | Every change by name; tap a step to go back to it. **Versions** saves named snapshots of the edit. |
 
@@ -70,9 +70,30 @@ as well as by dragging. Selection never relies on colour alone.
   each is saved as a new file with your export settings. Crop, masks and healing stay with the
   original photo.
 
+## Smart edit
+
+Smart edit looks at the photo the way a retoucher would, without AI and without adding anything
+that isn't in the photo:
+
+- **Subject**: what is sharp, stands out in colour, or is skin, near the middle. Brightened if it
+  is darker than the scene, shadows opened, detail and a little colour added (gently on skin).
+- **Sky**: blue, overcast, hazy or sunset sky and its clouds. Highlights recovered, clouds given
+  contrast and detail, its colour deepened: bluer for blue, grey or hazy skies, warmer for sunsets.
+- **Background**: everything else. Slightly darker, calmer and less saturated so your eye goes to
+  the subject. With no subject, the land under the sky gets open shadows and detail instead.
+
+The result is three ordinary masks in **Masking**, named Subject, Sky and Background (or Land).
+Change any slider, paint or erase to fix the edge, or delete a mask. Tapping **Smart edit** again
+replaces those three and keeps masks you added yourself. Masks are found again for each photo, so
+they also work with Paste settings and Apply to other photos.
+
+Limits: it can miss a very small subject, take sharp branches or a busy foreground for the
+subject, or count fog as sky. Check with **Show mask** and paint or erase. It cannot turn a white
+sky blue; it only deepens the colour that is there.
+
 ## Settings (Home > Settings)
 
-Auto strength for new photos · haptic feedback · ask before leaving an edit that was never saved ·
+Auto strength for new photos · Smart edit new photos · haptic feedback · ask before leaving an edit that was never saved ·
 export defaults · storage used by Pixels · **Clear temporary files** · **Delete my presets** ·
 **Delete all edits** (removes Recent edits, previews and photos imported from other apps or the
 camera; photos in your gallery and files you saved are not touched).

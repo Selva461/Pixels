@@ -3,7 +3,18 @@
 All notable changes to Pixels. Dates are when the work landed on a branch; nothing has been
 published to a store yet. Detailed engineering notes for each entry are in HANDOFF.md.
 
-## [Unreleased] — 2026-10-08
+## [Unreleased] — 2026-10-10
+
+### Smart edit
+- **Smart edit** (Auto panel, and automatically for new photos): finds the subject, the sky and the
+  background with plain image measurements (focus, colour, texture, position; no AI, nothing
+  generated) and edits each part on its own. The subject is brightened and sharpened, the sky's
+  highlights, clouds and colour are brought back, the background is calmed so the subject stands
+  out. Everything lands as three normal masks in Masking whose sliders you can change.
+- **Subject, Sky and Background masks** can also be added by hand in Masking; they are found
+  again on each photo, so pasted settings and batches adapt to every picture.
+- Setting: **Smart edit new photos** (on by default).
+- Harness: `--smart` writes before | Auto | Smart edit and a picture of the found regions.
 
 ### Added
 - **Settings** (Home > Settings): Auto strength for new photos, haptic feedback, ask before

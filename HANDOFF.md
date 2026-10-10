@@ -1,6 +1,6 @@
 # HANDOFF
 
-_Last updated: 2026-10-09 (app icon) · algorithm version 1.1_
+_Last updated: 2026-10-10 (Smart edit) · algorithm version 1.1_
 
 ## Current status (2026-10-08)
 
@@ -24,7 +24,9 @@ _Last updated: 2026-10-09 (app icon) · algorithm version 1.1_
 - Face detection uses the legacy `android.media.FaceDetector` (upright faces, eyes visible); it only
   places a soft exposure region. Scene classifier and thresholds are tuned on synthetic images.
 - Not implemented: HEIC and colour-profile export. AI masks and
-  generative tools are excluded by the owner's choice ("no AI").
+  generative tools are excluded by the owner's choice ("no AI"); Smart edit's subject and sky
+  masks are rule-based and can miss (see USER_GUIDE.md, Smart edit). Sky replacement is not
+  possible without generating pixels.
 - Supply chain: actions use major-version tags (not commit SHAs); no Gradle dependency verification.
   Recommended owner actions are in SECURITY.md.
 
@@ -39,6 +41,29 @@ in review; PR 2 (speed baseline) is next. Each roadmap PR stacks on the previous
 stack is merged.
 
 ## What changed
+
+### 2026-10-10 — Smart edit (region-aware automatic editing)
+
+Owner feedback: Auto applied one correction to the whole photo ("just a filter"); the goal is an
+edit that treats the subject, sky and background differently, using the app's own tools.
+
+- `domain/regions/RegionDetector`: sky (colour + smoothness + position, grown from top seeds, gaps
+  between branches, then neighbouring clouds) and subject (focus energy, colour distinctness, skin,
+  centre prior; Otsu threshold, strongest blobs, holes filled, confidence from inside/outside
+  saliency). Detected at 256 px, refined with a guided filter on luma at 768 px, cached by a
+  pixel fingerprint, so preview and export get the same masks.
+- `MaskShape.Region(kind)`: masks that take their weights from the detector. Detected on the
+  unedited view (`LocalAdjustmentRenderer.apply(…, reference)`), so they don't move as sliders do.
+  Saved as `region-subject|sky|background`; older builds drop such masks when loading.
+- `domain/regions/SmartEdit`: measures each region on the globally corrected preview and sets mask
+  sliders by rules (subject to a target luma above the scene, sky highlights/contrast/colour,
+  background darker and calmer by the subject's confidence). `EnhanceImageUseCase.suggestSmartEdit`.
+- App: Smart edit button in Auto, automatic run on new photos (`smartEditNewPhotos` setting),
+  Subject/Sky/Background in the Masking add menu, Notice snackbar.
+- Tuned on the owner's five example photos (in-focus subject on bokeh, cyclist under branches,
+  backlit person at sunset, person on a misty gate, sunset clouds behind reeds) with
+  `harness --smart`. Known misses: tiny subjects, sharp branches taken as subject, fog as sky.
+- Tests: `regions/SmartEditTest` (8).
 
 ### 2026-10-09 — app icon
 

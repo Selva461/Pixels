@@ -18,9 +18,11 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.RotateLeft
 import androidx.compose.material.icons.automirrored.outlined.RotateRight
+import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.Colorize
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Flip
+import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -302,9 +304,27 @@ fun GeometryPanel(geometry: Geometry, actions: EditorActions) {
 }
 
 @Composable
-fun AutoPanel(edit: EditState, detectedScene: SceneType, actions: EditorActions) {
+fun AutoPanel(edit: EditState, detectedScene: SceneType, smartEditRunning: Boolean, actions: EditorActions) {
     val override = edit.sceneOverride
     PanelColumn {
+        Button(
+            onClick = actions::onSmartEdit,
+            enabled = !smartEditRunning,
+            shape = MaterialTheme.shapes.small,
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+        ) {
+            Icon(Icons.Outlined.AutoAwesome, contentDescription = null)
+            Text(
+                stringResource(if (smartEditRunning) R.string.smart_edit_running else R.string.smart_edit),
+                modifier = Modifier.padding(start = 8.dp),
+            )
+        }
+        Text(
+            stringResource(R.string.smart_edit_hint),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(horizontal = 20.dp),
+        )
         ProSlider(
             stringResource(R.string.auto_strength), edit.strength, "${(edit.strength * 100).roundToInt()}%",
             actions::onStrengthChanged, actions::onEditFinished, range = 0f..1f, resetValue = 0f,

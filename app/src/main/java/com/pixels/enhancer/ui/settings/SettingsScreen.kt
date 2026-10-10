@@ -91,6 +91,7 @@ fun SettingsScreen(
                 valueRange = 0f..1f,
                 modifier = Modifier.semantics { contentDescription = strengthName },
             )
+            Toggle(stringResource(R.string.settings_smart_edit), settings.smartEditNewPhotos) { onSettingsChanged(settings.copy(smartEditNewPhotos = it)) }
             Toggle(stringResource(R.string.settings_haptics), settings.hapticFeedback) { onSettingsChanged(settings.copy(hapticFeedback = it)) }
             Toggle(stringResource(R.string.settings_confirm_leave), settings.confirmBeforeLeaving) { onSettingsChanged(settings.copy(confirmBeforeLeaving = it)) }
 

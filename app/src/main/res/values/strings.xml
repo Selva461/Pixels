@@ -69,6 +69,10 @@
     <string name="crop_flip">Flip horizontal</string>
     <string name="crop_flip_vertical">Flip vertical</string>
     <string name="crop_reset">Reset</string>
+    <string name="smart_edit">Smart edit</string>
+    <string name="smart_edit_running">Looking at the photo…</string>
+    <string name="smart_edit_hint">Finds the subject, sky and background and edits each one on its own: subject brighter and crisper, sky deeper with its highlights back, background calmer. No AI and nothing added; the masks appear in Masking, where you can change every slider.</string>
+    <string name="smart_edit_nothing">Smart edit found no clear subject or sky in this photo.</string>
     <string name="editor_auto_hint">Automatic natural correction. Drag to make it subtler or stronger.</string>
     <string name="share_chooser">Share enhanced photo</string>
     <string name="share_report_chooser">Export debug report</string>
@@ -140,6 +144,9 @@
     <string name="local_tint">Tint</string>
     <string name="mask_add">Add mask</string>
     <string name="mask_adjustments">Adjustments</string>
+    <string name="mask_subject">Subject</string>
+    <string name="mask_sky">Sky</string>
+    <string name="mask_background">Background</string>
     <string name="mask_brush">Brush</string>
     <string name="mask_brush_add">Paint</string>
     <string name="mask_brush_erase">Erase</string>
@@ -207,7 +214,7 @@
     <string name="guide_basics_title">Basics</string>
     <string name="guide_basics_body">Open a photo, take one with the camera, or share one to Pixels from another app. Press and hold the photo to see the original. Drag anywhere along a slider to change it a little at a time, and double-tap a slider to reset it. Every finished change is one step in History. A dot under a tool means you changed something there.</string>
     <string name="guide_presets_title">Presets and Auto</string>
-    <string name="guide_presets_body">Tap a preset, then set its Amount (0 to 200%). Save your own look with More, Save as preset; long-press one of yours to delete it. Auto fixes exposure, colour and noise; lower Auto strength for a lighter touch, or pick the right scene if it guessed wrong.</string>
+    <string name="guide_presets_body">Tap a preset, then set its Amount (0 to 200%). Save your own look with More, Save as preset; long-press one of yours to delete it. Auto fixes exposure, colour and noise; lower Auto strength for a lighter touch, or pick the right scene if it guessed wrong. Smart edit finds the subject, sky and background and edits each on its own; the result is three masks in Masking you can change.</string>
     <string name="guide_light_title">Light</string>
     <string name="guide_light_body">Exposure moves everything; Highlights and Shadows recover bright and dark areas; Whites and Blacks set the end points. Show clipping marks pure white in red and pure black in blue. Curve: tap to add a point, drag it, double-tap it to remove.</string>
     <string name="guide_color_title">Colour</string>
@@ -217,7 +224,7 @@
     <string name="guide_geometry_title">Crop, Optics and Geometry</string>
     <string name="guide_geometry_body">Crop, Auto levels the horizon. Optics fixes lens bulge, colour fringes, dark corners and purple or green fringing along edges. Geometry, Auto upright straightens leaning buildings; fine-tune with Vertical and Horizontal. The photo zooms just enough to hide empty edges.</string>
     <string name="guide_masking_title">Masking</string>
-    <string name="guide_masking_body">Add a Brush, Linear or Radial gradient, Luminance range or Colour range mask. Turn on Show mask to see it in red. Paint and Erase work on any mask; Invert swaps inside and outside. Each mask has its own light and colour sliders.</string>
+    <string name="guide_masking_body">Add a Subject, Sky or Background mask (found in the photo), a Brush, Linear or Radial gradient, Luminance range or Colour range mask. Turn on Show mask to see it in red. Paint and Erase work on any mask; Invert swaps inside and outside. Each mask has its own light and colour sliders.</string>
     <string name="guide_healing_title">Healing and red eye</string>
     <string name="guide_healing_body">Tap a blemish to remove it. Drag the dashed circle to choose another source. Clone copies exactly, for patterns and hard edges. Red eye: tap each red pupil; only strongly red pixels change.</string>
     <string name="guide_saving_title">Saving, history and batches</string>
@@ -295,6 +302,7 @@
     <string name="settings_title">Settings</string>
     <string name="settings_editing">Editing</string>
     <string name="settings_default_strength">Auto strength for new photos: %1$d%%</string>
+    <string name="settings_smart_edit">Smart edit new photos (subject, sky and background)</string>
     <string name="settings_haptics">Haptic feedback on sliders</string>
     <string name="settings_confirm_leave">Ask before leaving an edit that was never saved</string>
     <string name="settings_export_defaults">Export defaults</string>

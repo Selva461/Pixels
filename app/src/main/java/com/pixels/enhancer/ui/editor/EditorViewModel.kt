@@ -9,6 +9,7 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.pixels.enhancer.AppContainer
+import com.pixels.enhancer.R
 import com.pixels.enhancer.core.error.EnhancerException
 import com.pixels.enhancer.core.error.ErrorCode
 import com.pixels.enhancer.core.error.OperationResult
@@ -63,6 +64,8 @@ import com.pixels.enhancer.domain.processing.ops.WhiteBalanceGains
 import com.pixels.enhancer.domain.project.EditVersion
 import com.pixels.enhancer.domain.project.Project
 import com.pixels.enhancer.domain.project.ProjectManager
+import com.pixels.enhancer.domain.regions.RegionKind
+import com.pixels.enhancer.domain.regions.SmartEdit
 import com.pixels.enhancer.domain.repository.EnhancerSettings
 import com.pixels.enhancer.domain.repository.SettingsRepository
 import com.pixels.enhancer.domain.retouch.RetouchMode
@@ -319,6 +322,8 @@ class EditorViewModel(
                     current = history.current
                     refreshHistoryLabels()
                     requestPreview()
+                    // A photo opened for the first time gets Smart edit; a resumed edit is left as it was.
+                    if (settings.smartEditNewPhotos && history.timeline.size == 1 && current.localAdjustments.items.isEmpty()) runSmartEdit(announce = false)
                 }
             }
         }
@@ -545,6 +550,9 @@ class EditorViewModel(
             MaskKind.LUMINANCE -> LocalAdjustment.luminanceRange(id)
             // Starts from the photo's centre colour; tapping the photo picks another.
             MaskKind.COLOR -> sampleColor(0.5f, 0.5f).let { (r, g, b) -> LocalAdjustment.colorRange(id, r, g, b) }
+            MaskKind.SUBJECT -> LocalAdjustment.region(id, RegionKind.SUBJECT)
+            MaskKind.SKY -> LocalAdjustment.region(id, RegionKind.SKY)
+            MaskKind.BACKGROUND -> LocalAdjustment.region(id, RegionKind.BACKGROUND)
         }
         selectedMaskId = id
         edit(current.copy(localAdjustments = current.localAdjustments.with(item)))
@@ -607,6 +615,8 @@ class EditorViewModel(
     }
 
     private var overlayJob: Job? = null
+    private var smartEditJob: Job? = null
+    private var smartEditRunning = false
 
     private fun refreshMaskOverlay() {
         overlayJob?.cancel()
@@ -621,7 +631,8 @@ class EditorViewModel(
         }
         overlayJob = viewModelScope.launch {
             maskOverlay = withContext(Dispatchers.Default) {
-                val weights = LocalAdjustmentRenderer.maskOf(output, item)
+                // Subject and sky are found on the unedited view, as when rendering.
+                val weights = LocalAdjustmentRenderer.maskOf(output, item, outcome?.originalView ?: output)
                 val pixels = IntArray(weights.size) { i -> ((weights[i] * OVERLAY_ALPHA).toInt() shl 24) or OVERLAY_RGB }
                 BitmapConversions.toBitmap(PixelBuffer(output.width, output.height, pixels)).asImageBitmap()
             }
@@ -630,6 +641,37 @@ class EditorViewModel(
     }
 
     // --- Automatic tools and clipping ---
+
+    override fun onSmartEdit() = runSmartEdit(announce = true)
+
+    /**
+     * Finds the subject, sky and background and replaces earlier Smart edit masks with new ones
+     * (the user's own masks are kept). One undo step. [announce] reports when nothing was found.
+     */
+    private fun runSmartEdit(announce: Boolean) {
+        val currentSession = session ?: return
+        smartEditJob?.cancel()
+        smartEditJob = viewModelScope.launch {
+            smartEditRunning = true
+            publishEdit()
+            val result = enhanceImage.suggestSmartEdit(currentSession, request(RenderTarget.PREVIEW))
+            smartEditRunning = false
+            when {
+                result is OperationResult.Failure -> {
+                    publishEdit()
+                    setActivity(EditorActivity.Failed(result.code))
+                }
+                result is OperationResult.Success && result.value.isNotEmpty() -> {
+                    edit(current.copy(localAdjustments = SmartEdit.merge(current.localAdjustments, result.value)))
+                    onEditFinished()
+                }
+                else -> {
+                    publishEdit()
+                    if (announce) setActivity(EditorActivity.Notice(R.string.smart_edit_nothing))
+                }
+            }
+        }
+    }
 
     /** Sets temperature and tint so the tapped spot (normalised x, y on the edited photo) turns neutral grey. */
     override fun onPickWhiteBalance(x: Float, y: Float) {
@@ -1029,6 +1071,7 @@ class EditorViewModel(
         selectedSpotId = selectedSpotId?.takeIf { id -> current.retouch.spots.any { it.id == id } },
         healSettings = healSettings,
         showClipping = showClipping,
+        smartEditRunning = smartEditRunning,
         historyLabels = historyLabelCache,
         historyPosition = history.position,
         batch = batch,

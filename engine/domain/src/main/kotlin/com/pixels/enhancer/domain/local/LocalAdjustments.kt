@@ -1,6 +1,7 @@
 package com.pixels.enhancer.domain.local
 
 import com.pixels.enhancer.domain.image.smoothstep
+import com.pixels.enhancer.domain.regions.RegionKind
 import kotlin.math.sqrt
 
 /**
@@ -20,6 +21,15 @@ sealed interface MaskShape {
     /** The whole photo; used with a luminance or colour range to select tones or colours everywhere. */
     data object Full : MaskShape {
         override fun weightAt(x: Float, y: Float, aspect: Float) = 1f
+    }
+
+    /**
+     * A part of the photo found by [com.pixels.enhancer.domain.regions.RegionDetector] (subject,
+     * sky or background). It depends on the pixels, so [weightAt] is 0 and the renderer supplies
+     * the map; it is re-detected for each photo, so it also fits when settings are pasted.
+     */
+    data class Region(val kind: RegionKind) : MaskShape {
+        override fun weightAt(x: Float, y: Float, aspect: Float) = 0f
     }
 
     /** Full effect on the [startX],[startY] side, fading to none at [endX],[endY]. */
@@ -170,6 +180,9 @@ data class LocalAdjustment(
 
         /** Empty brush mask: nothing is selected until the user paints. */
         fun brush(id: Int) = LocalAdjustment(id, MaskShape.None)
+
+        /** The detected subject, sky or background. */
+        fun region(id: Int, kind: RegionKind) = LocalAdjustment(id, MaskShape.Region(kind))
 
         /** Whole-photo mask narrowed to a tone range (default: the brightest quarter, e.g. skies). */
         fun luminanceRange(id: Int, low: Float = 0.7f, high: Float = 1f) = LocalAdjustment(id, MaskShape.Full, range = RangeMask.Luminance(low, high))

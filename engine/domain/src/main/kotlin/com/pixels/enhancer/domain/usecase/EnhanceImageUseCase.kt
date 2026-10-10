@@ -23,7 +23,9 @@ import com.pixels.enhancer.domain.export.ExportOptions
 import com.pixels.enhancer.domain.geometry.GeometryOps
 import com.pixels.enhancer.domain.image.PixelBuffer
 import com.pixels.enhancer.domain.image.PixelResampler
+import com.pixels.enhancer.domain.local.LocalAdjustment
 import com.pixels.enhancer.domain.local.LocalAdjustmentRenderer
+import com.pixels.enhancer.domain.local.LocalAdjustments
 import com.pixels.enhancer.domain.model.ImageSource
 import com.pixels.enhancer.domain.model.OutputNaming
 import com.pixels.enhancer.domain.model.SupportedFormats
@@ -35,6 +37,7 @@ import com.pixels.enhancer.domain.planning.QualityPreset
 import com.pixels.enhancer.domain.processing.ImageProcessor
 import com.pixels.enhancer.domain.processing.ProcessingContext
 import com.pixels.enhancer.domain.processing.ProcessingListener
+import com.pixels.enhancer.domain.regions.SmartEdit
 import com.pixels.enhancer.domain.repository.ImageRepository
 import com.pixels.enhancer.domain.repository.ImageSaver
 import com.pixels.enhancer.domain.repository.SaveRequest
@@ -198,9 +201,10 @@ class EnhanceImageUseCase(
         val geometry = clock.measure {
             // Retouch spots and local masks are placed on the photo as the user sees it, so they apply
             // after geometry: first repairs, then masked adjustments on the repaired picture.
+            // Subject and sky masks are detected on the unedited view, so they don't shift as sliders move.
             val shaped = GeometryOps.apply(processed.image, request.geometry)
-            LocalAdjustmentRenderer.apply(RetouchRenderer.apply(shaped, request.retouch), request.localAdjustments) to
-                GeometryOps.apply(source, request.geometry)
+            val originalView = GeometryOps.apply(source, request.geometry)
+            LocalAdjustmentRenderer.apply(RetouchRenderer.apply(shaped, request.retouch), request.localAdjustments, originalView) to originalView
         }
         val (output, originalView) = geometry.value
 
@@ -214,6 +218,31 @@ class EnhanceImageUseCase(
         )
         return OperationResult.Success(EnhancementOutcome(processingId, request, planned.value, processed, validation, output, originalView, timings))
     }
+
+    /**
+     * Smart edit: renders [request] at preview size without masks, finds the subject, sky and
+     * background, and returns masks with slider values set for each (see [SmartEdit]).
+     */
+    suspend fun suggestSmartEdit(session: EnhancementSession, request: EnhanceRequest): OperationResult<List<LocalAdjustment>> =
+        withContext(dispatcher) {
+            val base = request.copy(
+                target = RenderTarget.PREVIEW,
+                localAdjustments = LocalAdjustments.NONE,
+                runUntilStageId = null,
+                stageConfigs = emptyMap(),
+            )
+            when (val rendered = runControlled(ErrorCode.PROCESSING_FAILED) { render(session, base, session.preview, null) }) {
+                is OperationResult.Failure -> logFailure("SMART_EDIT_FAILED", null, rendered)
+                is OperationResult.Success -> when (val outcome = rendered.value) {
+                    is OperationResult.Failure -> outcome
+                    is OperationResult.Success -> runControlled(ErrorCode.ANALYSIS_FAILED) {
+                        SmartEdit.suggest(outcome.value.output, outcome.value.originalView).also { masks ->
+                            logger.event("SMART_EDIT", mapOf("processingId" to outcome.value.processingId, "masks" to masks.joinToString { it.name }))
+                        }
+                    }
+                }
+            }
+        }
 
     /**
      * Full export: decodes the source at the resolution [options] needs (up to full size), renders

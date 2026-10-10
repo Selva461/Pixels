@@ -30,6 +30,7 @@ import com.pixels.enhancer.domain.planning.HueBand
 import com.pixels.enhancer.domain.planning.ManualAdjustments
 import com.pixels.enhancer.domain.planning.ManualControl
 import com.pixels.enhancer.domain.planning.ToneCurves
+import com.pixels.enhancer.domain.regions.RegionKind
 import com.pixels.enhancer.domain.retouch.Retouch
 import com.pixels.enhancer.domain.retouch.RetouchMode
 import com.pixels.enhancer.domain.retouch.RetouchSpot
@@ -270,6 +271,8 @@ internal data class LocalFile(
             shape == RADIAL && geometry.size == RADIAL_VALUES -> MaskShape.Radial(geometry[0], geometry[1], geometry[2], geometry[3], geometry[4])
             shape == BRUSH -> MaskShape.None
             shape == FULL -> MaskShape.Full
+            shape.startsWith(REGION_PREFIX) ->
+                RegionKind.entries.firstOrNull { it.name.lowercase() == shape.removePrefix(REGION_PREFIX) }?.let(MaskShape::Region) ?: return null
             else -> return null
         }
         val rangeMask = when {
@@ -288,6 +291,7 @@ internal data class LocalFile(
         private const val RADIAL = "radial"
         private const val BRUSH = "brush"
         private const val FULL = "full"
+        private const val REGION_PREFIX = "region-"
         private const val LUMINANCE = "luminance"
         private const val COLOR = "color"
         private const val LINEAR_VALUES = 4
@@ -299,6 +303,7 @@ internal data class LocalFile(
                 is MaskShape.Radial -> RADIAL to listOf(mask.centerX, mask.centerY, mask.radiusX, mask.radiusY, mask.feather)
                 MaskShape.None -> BRUSH to emptyList()
                 MaskShape.Full -> FULL to emptyList()
+                is MaskShape.Region -> REGION_PREFIX + mask.kind.name.lowercase() to emptyList()
             }
             val (rangeType, range) = when (val r = item.range) {
                 is RangeMask.Luminance -> LUMINANCE to listOf(r.low, r.high, r.smoothness)

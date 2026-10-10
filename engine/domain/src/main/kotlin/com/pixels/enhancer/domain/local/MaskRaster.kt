@@ -3,6 +3,7 @@ package com.pixels.enhancer.domain.local
 import com.pixels.enhancer.domain.image.Argb
 import com.pixels.enhancer.domain.image.Luma
 import com.pixels.enhancer.domain.image.smoothstep
+import com.pixels.enhancer.domain.regions.RegionKind
 import kotlin.math.ceil
 import kotlin.math.max
 import kotlin.math.min
@@ -11,12 +12,18 @@ import kotlin.math.sqrt
 /** Turns a [LocalAdjustment]'s shape and brush strokes into a per-pixel weight map. */
 object MaskRaster {
 
-    /** Weights 0..1 for a [width]×[height] image: shape, plus/minus brush strokes, then inversion. Range is applied by the renderer. */
-    fun weights(adjustment: LocalAdjustment, width: Int, height: Int): FloatArray {
-        val mask = FloatArray(width * height)
+    /**
+     * Weights 0..1 for a [width]×[height] image: shape, plus/minus brush strokes, then inversion.
+     * Range is applied by the renderer. [region] supplies detected maps at this size; without it a
+     * region mask is empty.
+     */
+    fun weights(adjustment: LocalAdjustment, width: Int, height: Int, region: ((RegionKind) -> FloatArray)? = null): FloatArray {
+        val shape = adjustment.shape
+        // A region map is already a fresh array of this size; use it rather than copying.
+        val mask = (if (shape is MaskShape.Region) region?.invoke(shape.kind) else null) ?: FloatArray(width * height)
         val aspect = width.toFloat() / height
-        when (val shape = adjustment.shape) {
-            MaskShape.None -> Unit
+        when (shape) {
+            MaskShape.None, is MaskShape.Region -> Unit
             MaskShape.Full -> mask.fill(1f)
             else -> for (y in 0 until height) {
                 val ny = (y + 0.5f) / height
