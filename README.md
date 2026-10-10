@@ -51,6 +51,8 @@ Documentation:
 | | |
 |---|---|
 | [USER_GUIDE.md](USER_GUIDE.md) | How to use every tool (also in the app: Home > Guide) |
+| [FEATURE_SPEC.md](FEATURE_SPEC.md) | Feature specification: 137 features with acceptance tests, status and priority |
+| [ROADMAP.md](ROADMAP.md) | The open features split into 22 pull requests, in order |
 | [REQUIREMENTS.md](REQUIREMENTS.md) | Product spec; § 16 lists requirements added during development with evidence |
 | [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md) | Requirement status matrix |
 | [ARCHITECTURE.md](ARCHITECTURE.md) | Modules, data flow, render order, trust boundaries |

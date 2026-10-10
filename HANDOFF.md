@@ -1,6 +1,6 @@
 # HANDOFF
 
-_Last updated: 2026-10-08 (strict development, QA, security, audit and docs pass) · algorithm version 1.1_
+_Last updated: 2026-10-09 (feature specification and roadmap) · algorithm version 1.1_
 
 ## Current status (2026-10-08)
 
@@ -30,11 +30,23 @@ _Last updated: 2026-10-08 (strict development, QA, security, audit and docs pass
 
 ## Next single action
 
-Owner: review and merge the pull request that supersedes #2, then install the debug APK from its
-CI run on a phone and work through the manual checklist in TESTING.md (especially camera,
-sharing from a gallery app, landscape and TalkBack).
+Owner: review and merge PR #3 (it supersedes #1 and #2), then the roadmap PR, then install the
+debug APK from the CI run on a phone and work through the manual checklist in TESTING.md
+(especially camera, sharing from a gallery app, landscape and TalkBack).
+
+Development: work through [ROADMAP.md](ROADMAP.md) in order. PR 1 (accessibility must-haves) is
+in progress; each roadmap PR stacks on the previous one until the stack is merged.
 
 ## What changed
+
+### 2026-10-09 — feature specification and roadmap
+
+- `FEATURE_SPEC.md`: 137 features from established editors (Lightroom, Snapseed, Capture One,
+  Photoshop, darktable and others), each with what it does, a "Done when" acceptance test, where
+  it is seen, its status in Pixels and a priority (63 built, 11 partial, 63 planned), plus 5 left
+  out on purpose. Generated from the design canvas that also holds five screen designs.
+- `ROADMAP.md`: the 74 open features split into 22 pull requests, ordered by priority and
+  dependency: PRs 1–2 finish the release 1.0 must-haves (accessibility checks, speed baseline).
 
 ### 2026-10-08 — strict pass: features, QA, security, audit, documentation
 
