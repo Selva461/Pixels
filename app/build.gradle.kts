@@ -32,6 +32,11 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
+    androidResources {
+        // The segmentation model is read whole into memory; compressing it would only slow that down.
+        noCompress += "tflite"
+    }
+
     buildFeatures {
         compose = true
         buildConfig = true
@@ -67,6 +72,8 @@ dependencies {
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.androidx.exifinterface)
+    // On-device people segmentation for Smart edit (model in assets/models; runs offline).
+    implementation(libs.tensorflow.lite)
 
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.compose.ui)

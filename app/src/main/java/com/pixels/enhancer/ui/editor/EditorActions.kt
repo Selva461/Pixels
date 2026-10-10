@@ -96,6 +96,9 @@ interface EditorActions {
     fun onPickWhiteBalance(x: Float, y: Float)
     fun onAutoStraighten()
     fun onAutoUpright()
+
+    /** Finds the subject, sky and background and sets masks with their own sliders for each. */
+    fun onSmartEdit()
     fun onShowClippingChanged(show: Boolean)
 
     fun onCalibrationChanged(calibration: Calibration)

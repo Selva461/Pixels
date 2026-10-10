@@ -1,6 +1,7 @@
 package com.pixels.enhancer.ui.editor
 
 import android.net.Uri
+import androidx.annotation.StringRes
 import androidx.compose.ui.graphics.ImageBitmap
 import com.pixels.enhancer.core.error.ErrorCode
 import com.pixels.enhancer.domain.analysis.Histogram
@@ -59,6 +60,8 @@ sealed interface EditorUiState {
         val healSettings: HealSettings = HealSettings(),
         /** Clipped highlights/shadows are marked on [enhanced]. */
         val showClipping: Boolean = false,
+        /** Smart edit is looking at the photo. */
+        val smartEditRunning: Boolean = false,
         /** What each history step changed, oldest first; [historyPosition] is the current step. */
         val historyLabels: List<String> = emptyList(),
         val historyPosition: Int = 0,
@@ -76,6 +79,9 @@ sealed interface EditorActivity {
     data class Saving(val progress: Float) : EditorActivity
     data class Saved(val displayName: String, val uri: Uri, val width: Int, val height: Int) : EditorActivity
     data class Failed(val code: ErrorCode) : EditorActivity
+
+    /** A short message for the user, e.g. that Smart edit found nothing to change. */
+    data class Notice(@StringRes val message: Int) : EditorActivity
 }
 
 /** Progress and outcome of "apply these settings to other photos". */
@@ -96,7 +102,7 @@ data class AppliedPreset(val preset: Preset, val amount: Float)
 data class HealSettings(val mode: RetouchMode = RetouchMode.HEAL, val radius: Float = RetouchSpot.DEFAULT_RADIUS, val feather: Float = RetouchSpot.DEFAULT_FEATHER)
 
 /** Kinds of mask the user can add. */
-enum class MaskKind { BRUSH, LINEAR, RADIAL, LUMINANCE, COLOR }
+enum class MaskKind { BRUSH, LINEAR, RADIAL, LUMINANCE, COLOR, SUBJECT, SKY, BACKGROUND }
 
 data class ExportDialogState(val options: ExportOptions, val width: Int, val height: Int)
 

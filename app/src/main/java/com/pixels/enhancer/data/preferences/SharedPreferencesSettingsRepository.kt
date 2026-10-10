@@ -23,6 +23,7 @@ class SharedPreferencesSettingsRepository(context: Context, fileName: String = F
             export = loadExport(),
             confirmBeforeLeaving = boolean(KEY_CONFIRM_LEAVE, defaults.confirmBeforeLeaving),
             hapticFeedback = boolean(KEY_HAPTICS, defaults.hapticFeedback),
+            smartEditNewPhotos = boolean(KEY_SMART_EDIT, defaults.smartEditNewPhotos),
         )
     }
 
@@ -33,6 +34,7 @@ class SharedPreferencesSettingsRepository(context: Context, fileName: String = F
             .putString(KEY_EXPORT_JSON, ExportOptionsCodec.encode(settings.export))
             .putBoolean(KEY_CONFIRM_LEAVE, settings.confirmBeforeLeaving)
             .putBoolean(KEY_HAPTICS, settings.hapticFeedback)
+            .putBoolean(KEY_SMART_EDIT, settings.smartEditNewPhotos)
             .remove(LEGACY_FORMAT)
             .remove(LEGACY_QUALITY)
             .remove(LEGACY_SIZE)
@@ -76,6 +78,7 @@ class SharedPreferencesSettingsRepository(context: Context, fileName: String = F
         private const val KEY_EXPORT_JSON = "export_options"
         private const val KEY_CONFIRM_LEAVE = "confirm_before_leaving"
         private const val KEY_HAPTICS = "haptic_feedback"
+        private const val KEY_SMART_EDIT = "smart_edit_new_photos"
         private const val LEGACY_FORMAT = "export_format"
         private const val LEGACY_QUALITY = "export_quality"
         private const val LEGACY_SIZE = "export_size"

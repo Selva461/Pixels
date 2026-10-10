@@ -50,6 +50,8 @@ data class EnhancerSettings(
     val confirmBeforeLeaving: Boolean = true,
     /** Light vibration when a slider snaps to zero or is reset. */
     val hapticFeedback: Boolean = true,
+    /** Run Smart edit (subject, sky and background masks) when a new photo is opened. */
+    val smartEditNewPhotos: Boolean = true,
 )
 
 interface SettingsRepository {

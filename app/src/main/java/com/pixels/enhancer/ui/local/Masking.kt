@@ -18,6 +18,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Brush
+import androidx.compose.material.icons.outlined.Cloud
 import androidx.compose.material.icons.outlined.Colorize
 import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.outlined.Delete
@@ -25,6 +26,8 @@ import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.Exposure
 import androidx.compose.material.icons.outlined.Gradient
 import androidx.compose.material.icons.outlined.InvertColors
+import androidx.compose.material.icons.outlined.Landscape
+import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.RadioButtonUnchecked
 import androidx.compose.material.icons.outlined.Visibility
 import androidx.compose.material3.AlertDialog
@@ -71,6 +74,7 @@ import com.pixels.enhancer.domain.local.LocalAdjustment
 import com.pixels.enhancer.domain.local.LocalAdjustments
 import com.pixels.enhancer.domain.local.MaskShape
 import com.pixels.enhancer.domain.local.RangeMask
+import com.pixels.enhancer.domain.regions.RegionKind
 import com.pixels.enhancer.ui.components.ChoiceChip
 import com.pixels.enhancer.ui.components.PanelHeading
 import com.pixels.enhancer.ui.components.ProSlider
@@ -97,6 +101,7 @@ enum class BrushMode { OFF, ADD, ERASE }
 data class BrushSettings(val mode: BrushMode = BrushMode.OFF, val size: Float = BrushStroke.DEFAULT_RADIUS, val feather: Float = BrushStroke.DEFAULT_FEATHER, val flow: Float = 1f)
 
 fun LocalAdjustment.kindLabelRes(): Int = when {
+    shape is MaskShape.Region -> (shape as MaskShape.Region).kind.labelRes()
     range is RangeMask.Luminance -> R.string.mask_luminance
     range is RangeMask.Color -> R.string.mask_color
     shape is MaskShape.Radial -> R.string.mask_radial
@@ -104,7 +109,20 @@ fun LocalAdjustment.kindLabelRes(): Int = when {
     else -> R.string.mask_brush
 }
 
+private fun RegionKind.labelRes(): Int = when (this) {
+    RegionKind.SUBJECT -> R.string.mask_subject
+    RegionKind.SKY -> R.string.mask_sky
+    RegionKind.BACKGROUND -> R.string.mask_background
+}
+
+private fun RegionKind.icon(): ImageVector = when (this) {
+    RegionKind.SUBJECT -> Icons.Outlined.Person
+    RegionKind.SKY -> Icons.Outlined.Cloud
+    RegionKind.BACKGROUND -> Icons.Outlined.Landscape
+}
+
 private fun LocalAdjustment.kindIcon(): ImageVector = when {
+    shape is MaskShape.Region -> (shape as MaskShape.Region).kind.icon()
     range is RangeMask.Luminance -> Icons.Outlined.Exposure
     range is RangeMask.Color -> Icons.Outlined.Colorize
     shape is MaskShape.Radial -> Icons.Outlined.RadioButtonUnchecked
@@ -164,6 +182,9 @@ fun MaskingPanel(
                 }
                 DropdownMenu(expanded = addMenu, onDismissRequest = { addMenu = false }) {
                     listOf(
+                        Triple(MaskKind.SUBJECT, R.string.mask_subject, Icons.Outlined.Person),
+                        Triple(MaskKind.SKY, R.string.mask_sky, Icons.Outlined.Cloud),
+                        Triple(MaskKind.BACKGROUND, R.string.mask_background, Icons.Outlined.Landscape),
                         Triple(MaskKind.BRUSH, R.string.mask_brush, Icons.Outlined.Brush),
                         Triple(MaskKind.LINEAR, R.string.mask_linear, Icons.Outlined.Gradient),
                         Triple(MaskKind.RADIAL, R.string.mask_radial, Icons.Outlined.RadioButtonUnchecked),
@@ -407,7 +428,7 @@ fun MaskCanvas(
                     handleAt(start, 7.dp.toPx())
                     handleAt(end, 6.dp.toPx())
                 }
-                MaskShape.None, MaskShape.Full -> Unit
+                MaskShape.None, MaskShape.Full, is MaskShape.Region -> Unit
             }
         }
     }
@@ -422,7 +443,7 @@ private fun hitTest(shape: MaskShape, position: Offset, frame: Rect, slop: Float
             Handle.CENTER to screen(shape.centerX, shape.centerY),
         )
         is MaskShape.Linear -> listOf(Handle.START to screen(shape.startX, shape.startY), Handle.END to screen(shape.endX, shape.endY))
-        MaskShape.None, MaskShape.Full -> emptyList()
+        MaskShape.None, MaskShape.Full, is MaskShape.Region -> emptyList()
     }
     return candidates.map { it.first to (it.second - position).getDistance() }.filter { it.second <= slop }.minByOrNull { it.second }?.first
 }
@@ -442,5 +463,5 @@ private fun moved(shape: MaskShape, handle: Handle, dx: Float, dy: Float): MaskS
         Handle.END -> shape.copy(endX = (shape.endX + dx).coerceIn(0f, 1f), endY = (shape.endY + dy).coerceIn(0f, 1f))
         else -> shape
     }
-    MaskShape.None, MaskShape.Full -> shape
+    MaskShape.None, MaskShape.Full, is MaskShape.Region -> shape
 }

@@ -23,7 +23,9 @@ import com.pixels.enhancer.domain.export.ExportOptions
 import com.pixels.enhancer.domain.geometry.GeometryOps
 import com.pixels.enhancer.domain.image.PixelBuffer
 import com.pixels.enhancer.domain.image.PixelResampler
+import com.pixels.enhancer.domain.local.LocalAdjustment
 import com.pixels.enhancer.domain.local.LocalAdjustmentRenderer
+import com.pixels.enhancer.domain.local.LocalAdjustments
 import com.pixels.enhancer.domain.model.ImageSource
 import com.pixels.enhancer.domain.model.OutputNaming
 import com.pixels.enhancer.domain.model.SupportedFormats
@@ -35,6 +37,8 @@ import com.pixels.enhancer.domain.planning.QualityPreset
 import com.pixels.enhancer.domain.processing.ImageProcessor
 import com.pixels.enhancer.domain.processing.ProcessingContext
 import com.pixels.enhancer.domain.processing.ProcessingListener
+import com.pixels.enhancer.domain.regions.SmartEdit
+import com.pixels.enhancer.domain.regions.SubjectSegmenter
 import com.pixels.enhancer.domain.repository.ImageRepository
 import com.pixels.enhancer.domain.repository.ImageSaver
 import com.pixels.enhancer.domain.repository.SaveRequest
@@ -69,6 +73,8 @@ class EnhanceImageUseCase(
     private val faceLocator: FaceLocator = FaceLocator.NONE,
     /** Platform drawing on finished exports (watermark text); none by default. */
     private val exportDecorator: ExportDecorator = ExportDecorator.NONE,
+    /** Platform people segmentation for Smart edit; none by default (rules find the subject). */
+    private val subjectSegmenter: SubjectSegmenter = SubjectSegmenter.NONE,
 ) {
     val stageIds: List<String> get() = processor.stageIds
 
@@ -104,6 +110,11 @@ class EnhanceImageUseCase(
                 value = measured.value.copy(faces = faces, faceLuma = FaceMetrics.meanLuma(working.value, faces)),
             )
             logAnalysis(analysis.value)
+            // Optional and best effort: without it Smart edit finds the subject by rules.
+            val people = clock.measure {
+                runControlled(ErrorCode.ANALYSIS_FAILED) { subjectSegmenter.segment(working.value) }
+                    .let { if (it is OperationResult.Success) it.value else null }
+            }
             val scene = clock.measure { SceneClassifier.classify(working.value, analysis.value) }
             logger.event("SCENE_DETECTED", mapOf("scene" to scene.value.scene, "confidence" to scene.value.confidence))
 
@@ -119,9 +130,11 @@ class EnhanceImageUseCase(
                         listOf(
                             StageTiming("Decode", working.durationMs),
                             StageTiming("Analyze", analysis.durationMs),
+                            StageTiming("People", people.durationMs),
                             StageTiming("Scene", scene.durationMs),
                         ),
                     ),
+                    subjectHint = people.value,
                 ),
             )
         }
@@ -198,11 +211,13 @@ class EnhanceImageUseCase(
         val geometry = clock.measure {
             // Retouch spots and local masks are placed on the photo as the user sees it, so they apply
             // after geometry: first repairs, then masked adjustments on the repaired picture.
+            // Subject and sky masks are detected on the unedited view, so they don't shift as sliders move.
             val shaped = GeometryOps.apply(processed.image, request.geometry)
-            LocalAdjustmentRenderer.apply(RetouchRenderer.apply(shaped, request.retouch), request.localAdjustments) to
-                GeometryOps.apply(source, request.geometry)
+            val originalView = GeometryOps.apply(source, request.geometry)
+            val hint = session.subjectHint?.takeIf { it.hasSubject }?.transformed(source.width, source.height, request.geometry)
+            Triple(LocalAdjustmentRenderer.apply(RetouchRenderer.apply(shaped, request.retouch), request.localAdjustments, originalView, hint), originalView, hint)
         }
-        val (output, originalView) = geometry.value
+        val (output, originalView, hint) = geometry.value
 
         val timings = session.loadTimings +
             TimingReport(listOf(StageTiming("Plan", planned.durationMs))) +
@@ -212,8 +227,33 @@ class EnhanceImageUseCase(
             "PROCESS_COMPLETE",
             mapOf("processingId" to processingId, "outputWidth" to output.width, "outputHeight" to output.height, "totalMs" to timings.totalMs),
         )
-        return OperationResult.Success(EnhancementOutcome(processingId, request, planned.value, processed, validation, output, originalView, timings))
+        return OperationResult.Success(EnhancementOutcome(processingId, request, planned.value, processed, validation, output, originalView, timings, hint))
     }
+
+    /**
+     * Smart edit: renders [request] at preview size without masks, finds the subject, sky and
+     * background, and returns masks with slider values set for each (see [SmartEdit]).
+     */
+    suspend fun suggestSmartEdit(session: EnhancementSession, request: EnhanceRequest): OperationResult<List<LocalAdjustment>> =
+        withContext(dispatcher) {
+            val base = request.copy(
+                target = RenderTarget.PREVIEW,
+                localAdjustments = LocalAdjustments.NONE,
+                runUntilStageId = null,
+                stageConfigs = emptyMap(),
+            )
+            when (val rendered = runControlled(ErrorCode.PROCESSING_FAILED) { render(session, base, session.preview, null) }) {
+                is OperationResult.Failure -> logFailure("SMART_EDIT_FAILED", null, rendered)
+                is OperationResult.Success -> when (val outcome = rendered.value) {
+                    is OperationResult.Failure -> outcome
+                    is OperationResult.Success -> runControlled(ErrorCode.ANALYSIS_FAILED) {
+                        SmartEdit.suggest(outcome.value.output, outcome.value.originalView, outcome.value.subjectHint).also { masks ->
+                            logger.event("SMART_EDIT", mapOf("processingId" to outcome.value.processingId, "masks" to masks.joinToString { it.name }))
+                        }
+                    }
+                }
+            }
+        }
 
     /**
      * Full export: decodes the source at the resolution [options] needs (up to full size), renders

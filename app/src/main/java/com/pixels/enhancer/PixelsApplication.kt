@@ -5,6 +5,7 @@ import android.content.Context
 import com.pixels.enhancer.core.logging.LogcatLogger
 import com.pixels.enhancer.data.decoder.AndroidFaceLocator
 import com.pixels.enhancer.data.decoder.AndroidImageRepository
+import com.pixels.enhancer.data.decoder.TfLitePeopleSegmenter
 import com.pixels.enhancer.data.preferences.SharedPreferencesSettingsRepository
 import com.pixels.enhancer.data.storage.AndroidWatermarkDecorator
 import com.pixels.enhancer.data.storage.AppStorage
@@ -68,6 +69,7 @@ class AppContainer(context: Context) {
         logger = logger,
         faceLocator = AndroidFaceLocator(),
         exportDecorator = AndroidWatermarkDecorator(),
+        subjectSegmenter = TfLitePeopleSegmenter(appContext.assets, logger),
     )
 
     val batchExport = BatchExportUseCase(enhanceImageUseCase, projectManager)

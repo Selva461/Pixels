@@ -14,6 +14,7 @@ What it enforces, and why (see SECURITY.md for the threat model):
 
 Standard library only, so it runs before Gradle and needs nothing installed.
 """
+import hashlib
 import os
 import re
 import subprocess
@@ -121,7 +122,7 @@ SECRETS = [
     (r'(?i)(password|passwd|secret|api_?key)\s*[:=]\s*["\'][^"\'\s]{8,}["\']', 'hard-coded credential'),
     (r'storePassword|keyPassword', 'signing password in build files'),
 ]
-BINARY_SUFFIXES = ('.jar', '.png', '.jpg', '.jpeg', '.webp', '.gif', '.ico', '.zip')
+BINARY_SUFFIXES = ('.jar', '.png', '.jpg', '.jpeg', '.webp', '.gif', '.ico', '.zip', '.tflite')
 
 
 def tracked_files():
@@ -162,14 +163,32 @@ def check_build_and_ci():
             finding(f'.github/workflows/{name}: untrusted event text interpolated into a script')
 
 
+MODELS_DIR = 'app/src/main/assets/models'
+
+
+def check_models():
+    """Every bundled model must match the checksum recorded in its README (supply-chain pin)."""
+    directory = os.path.join(ROOT, MODELS_DIR)
+    if not os.path.isdir(directory):
+        return
+    readme = read(os.path.join(MODELS_DIR, 'README.md')) if os.path.exists(os.path.join(directory, 'README.md')) else ''
+    for name in sorted(os.listdir(directory)):
+        if name == 'README.md':
+            continue
+        with open(os.path.join(directory, name), 'rb') as handle:
+            digest = hashlib.sha256(handle.read()).hexdigest()
+        if f'`{name}`' not in readme or digest not in readme:
+            finding(f'{MODELS_DIR}/{name}: checksum {digest} is not recorded in {MODELS_DIR}/README.md')
+
+
 def main():
-    for check in (check_manifest, check_file_provider_paths, check_backup_rules, check_code, check_secrets, check_build_and_ci):
+    for check in (check_manifest, check_file_provider_paths, check_backup_rules, check_code, check_secrets, check_build_and_ci, check_models):
         check()
     if findings:
         print('Security gate FAILED:')
         print('\n'.join(f'  - {item}' for item in findings))
         return 1
-    print('Security gate passed: no permissions, private provider, no backups, no risky APIs, no secrets, least-privilege CI.')
+    print('Security gate passed: no permissions, private provider, no backups, no risky APIs, no secrets, least-privilege CI, pinned models.')
     return 0
 
 

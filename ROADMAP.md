@@ -9,8 +9,8 @@ The 74 open features in [FEATURE_SPEC.md](FEATURE_SPEC.md) (63 planned, 11 partl
 - **Green CI:** security gate, string check, engine tests (warnings are errors), lint, unit tests,
   APK and device tests. Run `tools/offline-typecheck/run.sh` and the engine tests before pushing.
 - **Docs:** update FEATURE_SPEC.md statuses, USER_GUIDE.md, CHANGELOG.md and HANDOFF.md in the same PR.
-- **Hard limits:** no AI or generated pixels, no new permissions, no network, no new dependency
-  without a written reason.
+- **Hard limits:** no generated pixels and nothing that looks AI-made (an on-device model may only
+  *find* regions), no new permissions, no network, no new dependency without a written reason.
 - **Branches:** the repository ruleset refuses pushes to existing branches, so every update goes out
   on a new branch and the PR is opened from the final green one. PRs stack on the previous one until
   the stack is merged; after that they target the default branch.
