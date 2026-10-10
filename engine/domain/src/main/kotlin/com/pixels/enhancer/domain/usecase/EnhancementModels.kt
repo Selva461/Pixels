@@ -18,6 +18,7 @@ import com.pixels.enhancer.domain.planning.QualityPreset
 import com.pixels.enhancer.domain.planning.ToneCurves
 import com.pixels.enhancer.domain.processing.ProcessedImage
 import com.pixels.enhancer.domain.processing.StageConfig
+import com.pixels.enhancer.domain.regions.SubjectHint
 import com.pixels.enhancer.domain.retouch.Retouch
 import com.pixels.enhancer.domain.validation.ValidationResult
 
@@ -36,6 +37,8 @@ data class EnhancementSession(
     val preset: QualityPreset,
     /** Decode and analysis durations. */
     val loadTimings: TimingReport,
+    /** Where people are in [original] (on-device segmentation), or null when unavailable. */
+    val subjectHint: SubjectHint? = null,
 )
 
 data class EnhanceRequest(
@@ -104,6 +107,8 @@ data class EnhancementOutcome(
     val originalView: PixelBuffer,
     /** Full timing breakdown: decode, analysis, planning, each stage, validation. */
     val timings: TimingReport,
+    /** The session's people segmentation in the frame of [output], or null. */
+    val subjectHint: SubjectHint? = null,
 )
 
 data class ExportResult(val saved: com.pixels.enhancer.domain.repository.SavedImage, val width: Int, val height: Int)

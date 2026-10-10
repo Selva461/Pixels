@@ -64,6 +64,14 @@ edit that treats the subject, sky and background differently, using the app's ow
   backlit person at sunset, person on a misty gate, sunset clouds behind reeds) with
   `harness --smart`. Known misses: tiny subjects, sharp branches taken as subject, fog as sky.
 - Tests: `regions/SmartEditTest` (8).
+- Owner then allowed AI "if it makes a better image without looking AI". Added `SubjectSegmenter`
+  / `SubjectHint`: the app runs DeepLab v3 (PASCAL VOC, `assets/models/deeplab_v3.tflite`, pinned
+  by SHA-256 in the security gate) with TensorFlow Lite 2.17.0 at open; only "person" (plus a
+  ridden bicycle/motorbike) is used, because its other labels were wrong on the owner's photos
+  (reeds as horse, clouds as bus). The hint follows the user's geometry and replaces the rule-based
+  subject when it found a person. `harness` reads `<name>.people.png` as a stand-in. Tests:
+  `regions/SubjectHintTest` (7), device `PeopleSegmenterTest` (model loads and runs offline).
+  Known: backlit silhouettes are only partly found; a larger person model would do better.
 
 ### 2026-10-09 — app icon
 

@@ -16,6 +16,7 @@ import com.pixels.enhancer.domain.processing.stages.DefaultPipeline
 import com.pixels.enhancer.domain.regions.RegionDetector
 import com.pixels.enhancer.domain.regions.RegionKind
 import com.pixels.enhancer.domain.regions.SmartEdit
+import com.pixels.enhancer.domain.regions.SubjectHint
 import com.pixels.enhancer.domain.usecase.EnhanceImageUseCase
 import com.pixels.enhancer.domain.usecase.EnhanceRequest
 import com.pixels.enhancer.domain.usecase.EnhancementOutcome
@@ -36,7 +37,8 @@ import kotlinx.coroutines.runBlocking
  * For each input it writes <name>_enhanced.png, <name>_compare.png (before | after) and
  * <name>_report.txt (the same debug report as the app's debug screen). With --smart it also runs
  * Smart edit and writes <name>_smart.png (before | Auto only | Smart edit) and <name>_regions.png
- * (sky tinted blue, subject tinted red).
+ * (sky tinted blue, subject tinted red). A greyscale `<name>.people.png` next to an input stands in
+ * for the phone's people segmentation.
  */
 fun main(args: Array<String>) {
     val options = HarnessOptions.parse(args) ?: run {
@@ -54,7 +56,7 @@ fun main(args: Array<String>) {
     exitProcess(if (failures == 0) 0 else 2)
 }
 
-private fun buildUseCase(outputDirectory: File) = EnhanceImageUseCase(
+private fun buildUseCase(outputDirectory: File, people: SubjectHint? = null) = EnhanceImageUseCase(
     imageRepository = FileImageRepository(),
     analyzer = StatisticalImageAnalyzer(),
     planner = NaturalEnhancementPlanner(),
@@ -62,10 +64,18 @@ private fun buildUseCase(outputDirectory: File) = EnhanceImageUseCase(
     validator = NaturalOutputValidator(),
     saver = DirectoryImageSaver(outputDirectory),
     logger = ConsoleLogger,
+    subjectSegmenter = { people },
 )
 
+/** `<name>.people.png` next to an input: a greyscale people mask (white = person), standing in for the phone's model. */
+private fun peopleHintFor(file: File): SubjectHint? {
+    val mask = File(file.parentFile, "${file.nameWithoutExtension}.people.png").takeIf { it.exists() } ?: return null
+    val image = ImageIoConversions.toPixelBuffer(ImageIO.read(mask))
+    return SubjectHint(image.width, image.height, FloatArray(image.pixelCount) { i -> Argb.green(image.pixels[i]) / 255f })
+}
+
 private suspend fun processFile(file: File, options: HarnessOptions): Boolean {
-    val useCase = buildUseCase(options.outputDirectory)
+    val useCase = buildUseCase(options.outputDirectory, peopleHintFor(file))
     val session = when (val opened = useCase.open(file.path)) {
         is OperationResult.Failure -> return reportFailure(file, opened)
         is OperationResult.Success -> opened.value
@@ -122,7 +132,7 @@ private suspend fun writeSmartEdit(
     val autoAndSmart = ImageIoConversions.toPixelBuffer(ImageIoConversions.sideBySide(auto.output, smart.output))
     val before = PixelResampler.downscaleToFit(auto.originalView, maxOf(auto.output.width, auto.output.height))
     ImageIO.write(ImageIoConversions.sideBySide(before, autoAndSmart), "png", File(options.outputDirectory, "${stem}_smart.png"))
-    val maps = RegionDetector.detect(auto.originalView)
+    val maps = RegionDetector.detect(auto.originalView, auto.subjectHint)
     val sky = maps.weights(RegionKind.SKY, auto.originalView.width, auto.originalView.height)
     val subject = maps.weights(RegionKind.SUBJECT, auto.originalView.width, auto.originalView.height)
     val tinted = PixelBuffer(

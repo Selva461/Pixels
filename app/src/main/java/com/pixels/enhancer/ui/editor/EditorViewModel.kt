@@ -632,7 +632,7 @@ class EditorViewModel(
         overlayJob = viewModelScope.launch {
             maskOverlay = withContext(Dispatchers.Default) {
                 // Subject and sky are found on the unedited view, as when rendering.
-                val weights = LocalAdjustmentRenderer.maskOf(output, item, outcome?.originalView ?: output)
+                val weights = LocalAdjustmentRenderer.maskOf(output, item, outcome?.originalView ?: output, outcome?.subjectHint)
                 val pixels = IntArray(weights.size) { i -> ((weights[i] * OVERLAY_ALPHA).toInt() shl 24) or OVERLAY_RGB }
                 BitmapConversions.toBitmap(PixelBuffer(output.width, output.height, pixels)).asImageBitmap()
             }

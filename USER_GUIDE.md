@@ -72,10 +72,12 @@ as well as by dragging. Selection never relies on colour alone.
 
 ## Smart edit
 
-Smart edit looks at the photo the way a retoucher would, without AI and without adding anything
-that isn't in the photo:
+Smart edit looks at the photo the way a retoucher would, without adding anything that isn't in the
+photo:
 
-- **Subject**: what is sharp, stands out in colour, or is skin, near the middle. Brightened if it
+- **Subject**: the person in the photo, found by a small AI model that runs on your phone (it
+  only finds where people are; it never draws or changes anything, and works without internet).
+  In photos without people: what is sharp, stands out in colour, or is skin, near the middle. Brightened if it
   is darker than the scene, shadows opened, detail and a little colour added (gently on skin).
 - **Sky**: blue, overcast, hazy or sunset sky and its clouds. Highlights recovered, clouds given
   contrast and detail, its colour deepened: bluer for blue, grey or hazy skies, warmer for sunsets.
@@ -87,8 +89,8 @@ Change any slider, paint or erase to fix the edge, or delete a mask. Tapping **S
 replaces those three and keeps masks you added yourself. Masks are found again for each photo, so
 they also work with Paste settings and Apply to other photos.
 
-Limits: it can miss a very small subject, take sharp branches or a busy foreground for the
-subject, or count fog as sky. Check with **Show mask** and paint or erase. It cannot turn a white
+Limits: it can miss part of a backlit person (a dark silhouette against the sun), take sharp
+branches or a busy foreground for the subject in photos without people, or count fog as sky. Check with **Show mask** and paint or erase. It cannot turn a white
 sky blue; it only deepens the colour that is there.
 
 ## Settings (Home > Settings)

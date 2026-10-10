@@ -73,10 +73,11 @@ object SmartEdit {
 
     /**
      * Masks for [edited] (the photo after global corrections). [reference] is the same frame
-     * before edits, where regions are detected, so masks stay put as sliders move.
+     * before edits, where regions are detected, so masks stay put as sliders move. [hint] is the
+     * people segmentation in the same frame, if the platform has one.
      */
-    fun suggest(edited: PixelBuffer, reference: PixelBuffer = edited): List<LocalAdjustment> {
-        val maps = RegionDetector.detect(reference)
+    fun suggest(edited: PixelBuffer, reference: PixelBuffer = edited, hint: SubjectHint? = null): List<LocalAdjustment> {
+        val maps = RegionDetector.detect(reference, hint)
         val small = PixelResampler.downscaleToFit(edited, RegionDetector.REFINE_LONG_EDGE)
         val luma = LumaPlane.extract(small)
         val detail = FloatArray(luma.size).also {

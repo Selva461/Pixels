@@ -128,7 +128,7 @@ Edits limited to part of the photo, repairs that copy real pixels, and tools tha
 
 ### Masks
 
-Masks limit an adjustment to part of the photo. Every mask here is drawn or sampled by you; none relies on AI detection.
+Masks limit an adjustment to part of the photo. Most are drawn or sampled by you; Subject, Sky and Background are found in the photo (Smart edit), with a small on-device model used only to find people.
 
 | ID | Feature | What it does | Done when | Seen in | Status | Priority |
 |---|---|---|---|---|---|---|
@@ -353,7 +353,7 @@ Common in other editors and left out of Pixels on purpose. Each row says what Pi
 | ID | Feature | Why it is left out | Instead | Seen in |
 |---|---|---|---|---|
 | N-01 | Generative fill, removal and expand | Every pixel in a saved photo must come from the photo itself. | Spot heal, Clone and content-aware removal copy real texture from the photo (R-01, R-02, R-05). | Photoshop, Lightroom, Google Photos |
-| N-02 | AI masks, AI denoise and upscaling | Pixels uses no machine-learning models, so results are predictable and nothing is invented. | Brush, gradient, colour and luminance range masks, and classic noise reduction (M-01 to M-03, D-02). | Lightroom, Photoshop |
+| N-02 | AI denoise and upscaling | They invent detail that was not in the photo. (An on-device model is allowed to *find* people for Smart edit's masks, because it changes no pixels.) | Classic noise reduction and sharpening (D-01, D-02); Subject, Sky and Background masks with ordinary sliders. | Lightroom, Photoshop |
 | N-03 | Face and body reshaping | It changes how a person looks, and can change who they appear to be. | Spot heal removes dust and blemishes without changing any shapes (R-01). | Photoshop, Facetune |
 | N-04 | Cloud sync, accounts and social feeds | Pixels has no internet permission, so photos cannot leave the phone without you (S-01). | Save a copy, or share it to any app you choose (O-10). | Lightroom, VSCO |
 | N-05 | Plug-ins and scripts | Pixels runs no downloaded or dynamic code, which keeps its security easy to check. | Presets, copy and paste settings, and batch apply (W-06 to W-08). | Photoshop, GIMP, darktable |

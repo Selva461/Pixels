@@ -73,11 +73,15 @@ object RegionDetector {
     private var cachedKey: Long = 0L
     private var cached: RegionMaps? = null
 
-    /** Maps for [image]; the last result is cached, so repeated renders of one photo detect once. */
-    fun detect(image: PixelBuffer): RegionMaps {
-        val key = fingerprint(image)
+    /**
+     * Maps for [image]; the last result is cached, so repeated renders of one photo detect once.
+     * With a [hint] that found a person (same frame as [image]), the subject is the person;
+     * otherwise the rules below find it.
+     */
+    fun detect(image: PixelBuffer, hint: SubjectHint? = null): RegionMaps {
+        val key = fingerprint(image) * 31 + (hint?.fingerprint() ?: 0L)
         synchronized(cacheLock) { if (key == cachedKey) cached?.let { return it } }
-        val maps = compute(image)
+        val maps = compute(image, hint)
         synchronized(cacheLock) {
             cachedKey = key
             cached = maps
@@ -85,11 +89,25 @@ object RegionDetector {
         return maps
     }
 
-    private fun compute(image: PixelBuffer): RegionMaps {
+    private fun compute(image: PixelBuffer, hint: SubjectHint?): RegionMaps {
         val small = PixelResampler.downscaleToFit(image, DETECT_LONG_EDGE)
         val planes = Planes.of(small)
         val sky = detectSky(planes)
-        val (subject, confidence) = detectSubject(planes, sky)
+        val (subject, confidence) = if (hint != null && hint.hasSubject) {
+            // A person is never sky, even a dark silhouette against it.
+            val person = resize(hint.weights, hint.width, hint.height, small.width, small.height)
+            // Keep the main person (and anyone as prominent), not stray patches the model is unsure of.
+            val core = FloatArray(person.size) { i -> if (person[i] > SubjectHint.CONFIDENT) 1f else 0f }
+            keepStrongestBlobs(core, person, small.width, small.height)
+            val near = FloatArray(core.size).also { BoxBlur.blur(core, it, small.width, small.height, MORPH_RADIUS, FloatArray(core.size)) }
+            for (i in person.indices) {
+                person[i] = if (near[i] > 0f) smoothstep(HINT_LOW, HINT_HIGH, person[i]) else 0f
+                sky[i] *= 1f - person[i]
+            }
+            person to HINT_CONFIDENCE
+        } else {
+            detectSubject(planes, sky)
+        }
 
         val refine = PixelResampler.downscaleToFit(image, REFINE_LONG_EDGE)
         val guide = FloatArray(refine.pixelCount) { Luma.ofPixel(refine.pixels[it]) }
@@ -515,6 +533,9 @@ object RegionDetector {
     }
 
     private const val EPS = 1e-4f
+    private const val HINT_LOW = 0.25f
+    private const val HINT_HIGH = 0.6f
+    private const val HINT_CONFIDENCE = 0.9f
     private const val CB_SCALE = 0.5389f
     private const val CR_SCALE = 0.6350f
     private const val TEXTURE_RADIUS = 2

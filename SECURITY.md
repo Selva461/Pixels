@@ -29,6 +29,7 @@ the About screen), the Android version and steps to reproduce.
 | A hostile or broken sender fills storage | Shared images are type-checked against the supported list and capped at 200 MB (declared size and actual bytes copied) | `IncomingImages.importShared`, `IncomingImagesTest` |
 | Malformed images or files crash or exhaust memory | Bounds-first decode, size limits (working ≤2560 px, export ≤24 MP), every failure mapped to an `ErrorCode` and shown as a message | Engine tests, fuzz tests (`EditFuzzTest`) |
 | Damaged or tampered project / settings files | Versioned JSON with defaults for unknown or broken values; wrongly typed preferences fall back to defaults; path-safe ids | `ProjectPersistenceTest`, `SettingsRepositoryTest` |
+| A swapped or tampered bundled model | The people model (`assets/models/deeplab_v3.tflite`) is pinned by SHA-256 in `assets/models/README.md`; it runs offline in TensorFlow Lite and only returns a mask | `scripts/security_gate.py` (checksum) |
 | Exported components abused | Only the launcher activity is exported (it handles MAIN, SEND image/\*, EDIT image/\*); the FileProvider is private and grants per-URI read access only; it serves three folders: `cache/shared`, `files/captures`, `files/imports` | Security gate (manifest + `file_paths.xml`) |
 | Personal data in backups | `allowBackup="false"` and data-extraction rules excluding every domain for cloud backup and device transfer | Security gate |
 | Sensitive data in logs | One logger (`LogcatLogger`); events carry ids and numbers, never pixels, file names, URIs or GPS | Security gate (no `android.util.Log` elsewhere), code review |
@@ -69,5 +70,6 @@ the gallery or camera app the user chooses.
 ## Privacy
 
 The in-app privacy policy (About) describes exactly this behaviour: no account, no analytics, no
-network, no data collection. Any future online or AI feature must be opt-in, separate from local
-processing, and reflected in that policy and this page before it ships.
+network, no data collection. The bundled people model runs on the device and needs no network.
+Any future online feature must be opt-in, separate from local processing, and reflected in that
+policy and this page before it ships.

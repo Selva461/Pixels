@@ -13,6 +13,9 @@ published to a store yet. Detailed engineering notes for each entry are in HANDO
   out. Everything lands as three normal masks in Masking whose sliders you can change.
 - **Subject, Sky and Background masks** can also be added by hand in Masking; they are found
   again on each photo, so pasted settings and batches adapt to every picture.
+- **People found by an on-device model**: a bundled DeepLab v3 model (2.7 MB, TensorFlow Lite,
+  offline) finds people, so "focus on me" works on the person, not the brightest object. It only
+  marks where people are; edits are still ordinary sliders. Without a person the rules decide.
 - Setting: **Smart edit new photos** (on by default).
 - Harness: `--smart` writes before | Auto | Smart edit and a picture of the found regions.
 

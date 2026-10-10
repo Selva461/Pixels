@@ -12,6 +12,7 @@ import com.pixels.enhancer.domain.processing.ops.ToneCurve
 import com.pixels.enhancer.domain.processing.ops.WhiteBalanceGains
 import com.pixels.enhancer.domain.regions.RegionDetector
 import com.pixels.enhancer.domain.regions.RegionKind
+import com.pixels.enhancer.domain.regions.SubjectHint
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.pow
@@ -29,23 +30,23 @@ object LocalAdjustmentRenderer {
      * [reference] is the unedited photo in the same frame (same size as [image]); subject and sky
      * are found on it, so region masks don't move as the user's edits change the picture.
      */
-    fun apply(image: PixelBuffer, adjustments: LocalAdjustments, reference: PixelBuffer = image): PixelBuffer {
+    fun apply(image: PixelBuffer, adjustments: LocalAdjustments, reference: PixelBuffer = image, hint: SubjectHint? = null): PixelBuffer {
         val active = adjustments.items.filterNot { it.isNeutral }
         if (active.isEmpty()) return image
         val out = image.copy()
-        val regions = regionsFor(active, reference, image.width, image.height)
+        val regions = regionsFor(active, reference, hint, image.width, image.height)
         active.forEach { applyOne(out, it, regions) }
         return out
     }
 
     /** The final weight map of one adjustment on [image] — also used by the editor's mask overlay. */
-    fun maskOf(image: PixelBuffer, adjustment: LocalAdjustment, reference: PixelBuffer = image): FloatArray =
-        maskOf(image, adjustment, regionsFor(listOf(adjustment), reference, image.width, image.height))
+    fun maskOf(image: PixelBuffer, adjustment: LocalAdjustment, reference: PixelBuffer = image, hint: SubjectHint? = null): FloatArray =
+        maskOf(image, adjustment, regionsFor(listOf(adjustment), reference, hint, image.width, image.height))
 
     /** Detects regions once per render, only when a mask needs them. */
-    private fun regionsFor(items: List<LocalAdjustment>, reference: PixelBuffer, width: Int, height: Int): ((RegionKind) -> FloatArray)? {
+    private fun regionsFor(items: List<LocalAdjustment>, reference: PixelBuffer, hint: SubjectHint?, width: Int, height: Int): ((RegionKind) -> FloatArray)? {
         if (items.none { it.shape is MaskShape.Region }) return null
-        val maps = RegionDetector.detect(reference)
+        val maps = RegionDetector.detect(reference, hint)
         // Resized per use rather than kept: at export size each map is tens of megabytes.
         return { kind -> maps.weights(kind, width, height) }
     }

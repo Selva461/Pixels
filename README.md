@@ -11,8 +11,10 @@ straighten, light and tone curves, colour mixer, grading wheels and calibration,
 effects, detail, lens, defringe and perspective correction, brush/gradient/range masks, spot
 healing and cloning, named history, copy/paste of settings, versions, and applying settings to
 many photos at once. Photos come from the picker, the camera or "Share to Pixels"; exports are
-JPEG, PNG or WebP with optional border and watermark. No AI or generated pixels: every result
-comes from the photo's own pixels. No permissions, no network.
+JPEG, PNG or WebP with optional border and watermark. No generated pixels: every result comes
+from the photo's own pixels. **Smart edit** finds the subject, sky and background and gives each
+its own sliders; a small bundled model (DeepLab v3, run on the phone) only helps find people.
+No permissions, no network.
 
 ## Layout
 

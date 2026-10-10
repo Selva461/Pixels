@@ -71,7 +71,7 @@
     <string name="crop_reset">Reset</string>
     <string name="smart_edit">Smart edit</string>
     <string name="smart_edit_running">Looking at the photo…</string>
-    <string name="smart_edit_hint">Finds the subject, sky and background and edits each one on its own: subject brighter and crisper, sky deeper with its highlights back, background calmer. No AI and nothing added; the masks appear in Masking, where you can change every slider.</string>
+    <string name="smart_edit_hint">Finds the subject, sky and background and edits each one on its own: subject brighter and crisper, sky deeper with its highlights back, background calmer. People are found by a small model that runs on your phone; nothing is added or generated. The masks appear in Masking, where you can change every slider.</string>
     <string name="smart_edit_nothing">Smart edit found no clear subject or sky in this photo.</string>
     <string name="editor_auto_hint">Automatic natural correction. Drag to make it subtler or stronger.</string>
     <string name="share_chooser">Share enhanced photo</string>
