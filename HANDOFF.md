@@ -1,6 +1,6 @@
 # HANDOFF
 
-_Last updated: 2026-10-09 (roadmap PR 1: accessibility must-haves) · algorithm version 1.1_
+_Last updated: 2026-10-09 (app icon) · algorithm version 1.1_
 
 ## Current status (2026-10-08)
 
@@ -39,6 +39,19 @@ in review; PR 2 (speed baseline) is next. Each roadmap PR stacks on the previous
 stack is merged.
 
 ## What changed
+
+### 2026-10-09 — app icon
+
+The app had no launcher icon (the manifest set none, so phones showed the system default).
+
+- Adaptive icon in `res/mipmap-anydpi/ic_launcher.xml` and `ic_launcher_round.xml`: ink
+  background (`values/ic_launcher_background.xml`), vector foreground (a mountain in 6 dp pixel
+  steps under a burnt-orange sun; apex and sun inside the 66 dp safe circle) and a monochrome
+  layer for themed icons. No bitmaps: minSdk 29 always uses the adaptive icon.
+- `ic_logo_mark.xml`: the same mark clipped to a circle, shown beside the Home title.
+- `docs/brand/pixels-icon.svg` (source) and `pixels-icon-512.png` (Play Store icon).
+- `tools/offline-typecheck`: `R.drawable`/`R.mipmap` are generated from the res folders, and
+  `painterResource(id)` has a stub.
 
 ### 2026-10-09 — roadmap PR 1: accessibility must-haves
 

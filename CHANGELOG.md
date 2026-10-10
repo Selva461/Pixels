@@ -42,6 +42,12 @@ published to a store yet. Detailed engineering notes for each entry are in HANDO
 - "1 photos" / "1 spots" wording; WebP quality was labelled "JPEG quality"; Home was clipped in
   landscape.
 
+### App icon
+- Pixels has its own icon instead of the system default: a mountain drawn in pixel steps under a
+  burnt-orange sun, on ink. It adapts to every launcher shape, has a one-colour version for themed
+  icons (Android 13+), and also appears next to the title on Home. Source and the 512 px store
+  icon are in `docs/brand/`.
+
 ### Accessibility (roadmap PR 1)
 - Works with TalkBack: every control has a name; sliders, the before/after divider and the colour
   wheel read their value; tools, curve channels and colour bands with changes are read as

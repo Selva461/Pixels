@@ -56,6 +56,7 @@ val generateR by tasks.registering(Exec::class) {
     val strings = app.resolve("main/res/values/strings.xml")
     val output = layout.buildDirectory.file("generated/r/com/pixels/enhancer/R.kt")
     inputs.file(strings)
+    inputs.dir(app.resolve("main/res/drawable"))
     outputs.file(output)
     commandLine("python3", file("generate_r.py").path, strings.path, output.get().asFile.path)
     doFirst { output.get().asFile.parentFile.mkdirs() }

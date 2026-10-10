@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
@@ -49,6 +50,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
@@ -121,7 +123,16 @@ fun HomeScreen(
 @Composable
 private fun Intro(onPickImage: () -> Unit, onTakePhoto: () -> Unit) {
     Spacer(Modifier.height(32.dp))
-    Text(stringResource(R.string.home_title), style = MaterialTheme.typography.displaySmall, modifier = Modifier.semantics { heading() })
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        // The app icon's mark; decorative, the title next to it names the app.
+        Image(painterResource(R.drawable.ic_logo_mark), contentDescription = null, modifier = Modifier.size(48.dp))
+        Spacer(Modifier.width(12.dp))
+        Text(
+            stringResource(R.string.home_title),
+            style = MaterialTheme.typography.displaySmall,
+            modifier = Modifier.weight(1f, fill = false).semantics { heading() },
+        )
+    }
     Spacer(Modifier.height(8.dp))
     Text(stringResource(R.string.home_subtitle), style = MaterialTheme.typography.bodyLarge)
     Spacer(Modifier.height(24.dp))

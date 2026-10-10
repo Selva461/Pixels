@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Ink, the app's darkest neutral (Theme.kt Palette.Ink). -->
+    <color name="ic_launcher_background">#1C1B19</color>
+</resources>
