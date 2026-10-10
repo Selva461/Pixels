@@ -5,6 +5,7 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -20,8 +21,6 @@ import androidx.compose.material.icons.automirrored.outlined.RotateRight
 import androidx.compose.material.icons.outlined.Colorize
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Flip
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -38,8 +37,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.text.font.FontStyle
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.pixels.enhancer.R
 import com.pixels.enhancer.domain.analysis.Histogram
@@ -53,6 +57,7 @@ import com.pixels.enhancer.domain.project.EditVersion
 import com.pixels.enhancer.ui.adjust.ColorMixerPanel
 import com.pixels.enhancer.ui.adjust.CurvePanel
 import com.pixels.enhancer.ui.adjust.HistogramView
+import com.pixels.enhancer.ui.components.ChoiceChip
 import com.pixels.enhancer.ui.components.PanelHeading
 import com.pixels.enhancer.ui.components.ProSlider
 import com.pixels.enhancer.ui.components.Tracks
@@ -110,17 +115,7 @@ fun <T> SegmentRow(options: List<T>, selected: T, label: @Composable (T) -> Stri
         Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 6.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        options.forEach { option ->
-            FilterChip(
-                selected = option == selected,
-                onClick = { onSelect(option) },
-                label = { Text(label(option)) },
-                colors = FilterChipDefaults.filterChipColors(
-                    selectedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
-                    selectedLabelColor = MaterialTheme.colorScheme.onSurface,
-                ),
-            )
-        }
+        options.forEach { option -> ChoiceChip(option == selected, { onSelect(option) }, label(option)) }
     }
 }
 
@@ -138,9 +133,9 @@ fun LightPanel(edit: EditState, histogram: Histogram?, showClipping: Boolean, ac
             )
             LightView.SLIDERS -> PanelColumn {
                 histogram?.let { HistogramView(it, Modifier.fillMaxWidth().height(44.dp).padding(horizontal = 20.dp), rgb = rgbHistogram) }
-                Row(Modifier.padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    FilterChip(showClipping, { actions.onShowClippingChanged(!showClipping) }, { Text(stringResource(R.string.light_show_clipping)) })
-                    FilterChip(rgbHistogram, { rgbHistogram = !rgbHistogram }, { Text(stringResource(R.string.light_rgb_histogram)) })
+                FlowRow(Modifier.padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    ChoiceChip(showClipping, { actions.onShowClippingChanged(!showClipping) }, stringResource(R.string.light_show_clipping))
+                    ChoiceChip(rgbHistogram, { rgbHistogram = !rgbHistogram }, stringResource(R.string.light_rgb_histogram))
                 }
                 ControlSliders(PanelControls.LIGHT_MAIN, edit, actions)
                 PanelHeading(stringResource(R.string.panel_fine_tune))
@@ -180,19 +175,14 @@ fun ColorPanel(edit: EditState, picking: Boolean, onPick: () -> Unit, actions: E
 private fun ColorAdjust(edit: EditState, picking: Boolean, onPick: () -> Unit, actions: EditorActions) {
     PanelColumn {
         Row(Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            FilterChip(!edit.colorGrading.monochrome, { actions.onMonochromeChanged(false) }, { Text(stringResource(R.string.color_treatment_color)) })
-            FilterChip(edit.colorGrading.monochrome, { actions.onMonochromeChanged(true) }, { Text(stringResource(R.string.color_treatment_bw)) })
+            ChoiceChip(!edit.colorGrading.monochrome, { actions.onMonochromeChanged(false) }, stringResource(R.string.color_treatment_color))
+            ChoiceChip(edit.colorGrading.monochrome, { actions.onMonochromeChanged(true) }, stringResource(R.string.color_treatment_bw))
         }
         PanelHeading(stringResource(R.string.color_white_balance))
         Row(Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            FilterChip(edit.autoWhiteBalance, { actions.onAutoWhiteBalanceChanged(true) }, { Text(stringResource(R.string.color_wb_auto)) })
-            FilterChip(!edit.autoWhiteBalance, { actions.onAutoWhiteBalanceChanged(false) }, { Text(stringResource(R.string.color_wb_as_shot)) })
-            FilterChip(
-                selected = picking,
-                onClick = onPick,
-                leadingIcon = { Icon(Icons.Outlined.Colorize, contentDescription = null) },
-                label = { Text(stringResource(R.string.color_pick_wb)) },
-            )
+            ChoiceChip(edit.autoWhiteBalance, { actions.onAutoWhiteBalanceChanged(true) }, stringResource(R.string.color_wb_auto))
+            ChoiceChip(!edit.autoWhiteBalance, { actions.onAutoWhiteBalanceChanged(false) }, stringResource(R.string.color_wb_as_shot))
+            ChoiceChip(picking, onPick, stringResource(R.string.color_pick_wb), icon = Icons.Outlined.Colorize)
         }
         ControlSliders(PanelControls.COLOR, edit, actions)
         if (edit.colorGrading.monochrome) {
@@ -330,8 +320,8 @@ fun AutoPanel(edit: EditState, detectedScene: SceneType, actions: EditorActions)
             Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            FilterChip(override == null, { actions.onSceneSelected(null) }, { Text(stringResource(R.string.editor_scene_auto)) })
-            SceneType.entries.forEach { scene -> FilterChip(override == scene, { actions.onSceneSelected(scene) }, { Text(scene.label) }) }
+            ChoiceChip(override == null, { actions.onSceneSelected(null) }, stringResource(R.string.editor_scene_auto))
+            SceneType.entries.forEach { scene -> ChoiceChip(override == scene, { actions.onSceneSelected(scene) }, scene.label) }
         }
         Row(Modifier.padding(horizontal = 8.dp, vertical = 8.dp)) {
             TextButton(onClick = actions::onResetAll) { Text(stringResource(R.string.editor_reset_all)) }
@@ -349,10 +339,10 @@ fun CropPanel(edit: EditState, aspect: CropAspect, actions: EditorActions) {
             horizontalArrangement = Arrangement.SpaceEvenly,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            ToolIconButton(Icons.AutoMirrored.Outlined.RotateLeft, stringResource(R.string.crop_rotate_left), actions::onRotateCounterClockwise)
-            ToolIconButton(Icons.AutoMirrored.Outlined.RotateRight, stringResource(R.string.crop_rotate_right), actions::onRotateClockwise)
-            ToolIconButton(Icons.Outlined.Flip, stringResource(R.string.crop_flip), actions::onFlip)
-            ToolIconButton(Icons.Outlined.Flip, stringResource(R.string.crop_flip_vertical), actions::onFlipVertical, Modifier.rotate(90f))
+            ToolIconButton(Icons.AutoMirrored.Outlined.RotateLeft, stringResource(R.string.crop_rotate_left), actions::onRotateCounterClockwise, Modifier.weight(1f))
+            ToolIconButton(Icons.AutoMirrored.Outlined.RotateRight, stringResource(R.string.crop_rotate_right), actions::onRotateClockwise, Modifier.weight(1f))
+            ToolIconButton(Icons.Outlined.Flip, stringResource(R.string.crop_flip), actions::onFlip, Modifier.weight(1f))
+            ToolIconButton(Icons.Outlined.Flip, stringResource(R.string.crop_flip_vertical), actions::onFlipVertical, Modifier.weight(1f), Modifier.rotate(90f))
         }
         ProSlider(
             stringResource(R.string.crop_straighten_label), straighten, String.format(Locale.ROOT, "%.1f°", straighten),
@@ -368,16 +358,24 @@ fun CropPanel(edit: EditState, aspect: CropAspect, actions: EditorActions) {
             Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            CropAspect.entries.forEach { option -> FilterChip(option == aspect, { actions.onCropAspectSelected(option) }, { Text(option.label) }) }
+            CropAspect.entries.forEach { option -> ChoiceChip(option == aspect, { actions.onCropAspectSelected(option) }, option.label) }
         }
     }
 }
 
+/** Icon button with its name written underneath; the name wraps at large text sizes. */
 @Composable
-fun ToolIconButton(icon: ImageVector, label: String, onClick: () -> Unit, iconModifier: Modifier = Modifier) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+fun ToolIconButton(icon: ImageVector, label: String, onClick: () -> Unit, modifier: Modifier = Modifier, iconModifier: Modifier = Modifier) {
+    Column(modifier, horizontalAlignment = Alignment.CenterHorizontally) {
         IconButton(onClick = onClick) { Icon(icon, contentDescription = label, modifier = iconModifier) }
-        Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+        Text(
+            label,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+            // The button above already carries the name; reading it twice helps nobody.
+            modifier = Modifier.clearAndSetSemantics {},
+        )
     }
 }
 
@@ -414,9 +412,14 @@ private fun HistoryList(historyLabels: List<String>, historyPosition: Int, actio
         // Newest first; steps after the current one are undone steps that Redo would bring back.
         historyLabels.indices.reversed().forEach { index ->
             val isCurrent = index == historyPosition
+            val undone = index > historyPosition
+            val undoneLabel = stringResource(R.string.history_undone)
             TextButton(
                 onClick = { actions.onJumpToHistory(index) },
-                modifier = Modifier.fillMaxWidth().semantics { selected = isCurrent },
+                modifier = Modifier.fillMaxWidth().semantics {
+                    selected = isCurrent
+                    if (undone) stateDescription = undoneLabel
+                },
             ) {
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     Box(
@@ -431,7 +434,9 @@ private fun HistoryList(historyLabels: List<String>, historyPosition: Int, actio
                     Text(
                         "${index + 1}. ${historyLabels[index]}",
                         style = MaterialTheme.typography.bodyMedium,
-                        color = if (index > historyPosition) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface,
+                        color = if (undone) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface,
+                        fontWeight = if (isCurrent) FontWeight.Bold else null,
+                        fontStyle = if (undone) FontStyle.Italic else null,
                     )
                 }
             }

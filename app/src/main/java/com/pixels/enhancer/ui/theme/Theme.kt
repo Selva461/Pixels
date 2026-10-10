@@ -1,6 +1,7 @@
 package com.pixels.enhancer.ui.theme
 
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Shapes
 import androidx.compose.material3.Typography
@@ -47,6 +48,19 @@ val PhotoCanvas = Color(0xFF101010)
 
 /** Text drawn on [PhotoCanvas], in both light and dark themes. */
 val OnPhotoCanvas = Color(0xFFE8E4DD)
+
+/**
+ * Backing for labels drawn over the photo. Nearly opaque, so [OnPhotoCanvas] text keeps at least
+ * 4.5:1 contrast even over a white sky (ContrastTest checks both extremes).
+ */
+val PhotoLabelBacking = Color(0xE6101010)
+
+/** Tone-curve lines for the red, green and blue channels; light enough for 3:1 on the dark panels. */
+object CurveInk {
+    val Red = Color(0xFFFF7A6B)
+    val Green = Color(0xFF5CC98A)
+    val Blue = Color(0xFF7EA6F2)
+}
 
 private val LightColors = lightColorScheme(
     primary = Palette.Accent,
@@ -113,6 +127,9 @@ private val PixelsTypography = Typography().let { base ->
     )
 }
 
+/** The colour scheme [PixelsTheme] uses; ContrastTest checks every pair the app draws with it. */
+internal fun pixelsColorScheme(darkTheme: Boolean): ColorScheme = if (darkTheme) DarkColors else LightColors
+
 /**
  * The app is dark like a darkroom or a pro editor: photos are judged against a neutral dark
  * surround, whatever the system theme. The light scheme is kept for previews and tests.
@@ -120,7 +137,7 @@ private val PixelsTypography = Typography().let { base ->
 @Composable
 fun PixelsTheme(darkTheme: Boolean = true, content: @Composable () -> Unit) {
     MaterialTheme(
-        colorScheme = if (darkTheme) DarkColors else LightColors,
+        colorScheme = pixelsColorScheme(darkTheme),
         shapes = PixelsShapes,
         typography = PixelsTypography,
         content = content,

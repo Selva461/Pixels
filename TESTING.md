@@ -17,7 +17,7 @@ type-check on every push, and uploads the debug APK (`pixels-debug-apk`), the en
 (`build-reports`) and the device test report (`device-test-reports`). Any lint **error** fails the
 build; lint warnings are in the report.
 
-## Coverage (222 engine tests · 5 app unit tests · 28 device tests, 10 of them Compose UI)
+## Coverage (222 engine tests · 9 app unit tests · 33 device tests, 15 of them Compose UI)
 
 | Category | Where |
 |---|---|
@@ -27,11 +27,13 @@ build; lint warnings are in the report.
 | Golden — 9 synthetic degradations with measurable expectations | `golden/GoldenScenarioTest` |
 | Storage — project round trip, duplicate/rename, corrupt/future files, atomic writes, path safety | `ProjectPersistenceTest`, `ProEditorExtrasTest` |
 | App unit — every slider in exactly one panel; panel resets clear only their panel | `app/src/test/.../PanelControlsTest` |
+| Contrast (app unit) — every colour pair the app draws meets WCAG 2.2: 4.5:1 text, 3:1 borders, slider rails, thumbs and curve lines, in both schemes; photo labels stay readable over white and black | `app/src/test/.../theme/ContrastTest` |
 | Export (device) — save + verify, full resolution above working size, PNG at size, rotate+crop, metadata location removal, WebP, border size and colour, watermark drawn on the export but never on the open photo | `app/src/androidTest/.../SaveFlowTest` |
 | Watermark (device) — input never modified, text lands in the chosen corner, long text shrinks, blank text draws nothing | `WatermarkDecoratorTest` |
 | Import (device) — `file://` and Pixels' own URIs refused; a shared photo is copied in and opens | `IncomingImagesTest` |
 | Settings (device) — every field round-trips; old export keys migrate; damaged/wrongly typed values fall back | `SettingsRepositoryTest` |
 | UI (device, Compose) — every tool opens, slider set-progress reaches the edit and finishes one step, top-bar actions, panel Reset enabled only when edited, history jump, batch progress/summary/cancel, home start actions, remove-edit confirmation, settings toggle and delete confirmation | `ui/EditorScreenTest`, `ui/HomeAndSettingsTest` (fake `EditorActions` records calls) |
+| Accessibility (device, Compose) — on every screen, editor tool, panel sub-view and dialog, laid out at 320 × 560 dp: every control has a spoken name, every tap target is at least 48 × 48 dp, and at 200 % text nothing is cut off or ellipsised. Failures are listed together | `ui/AccessibilityTest` |
 | Security | `scripts/security_gate.py` (self-tested against injected problems) |
 | Performance | desktop JVM timings only (2560×1920 noisy scene ≈ 2.3 s total; denoise ≈ 1 s); device benchmark ⬜ |
 
@@ -70,6 +72,10 @@ build; lint warnings are in the report.
 - Calibration, Defringe (purple fringe on a backlit branch), As shot vs Auto white balance.
 - Export WebP, a border (sized and full), and a watermark in each corner; reopen the editor and
   confirm the watermark is not on the photo.
-- Rotate the phone in Home, the editor and Settings: nothing clipped; TalkBack reads sliders
-  (name and value) and can change them; 200 % font size still fits.
+- Rotate the phone in Home, the editor and Settings: nothing clipped.
+- Accessibility (FEATURE_SPEC "How each release is checked"): with TalkBack, do the five main
+  tasks (open a photo, brighten it and bring back the sky with Light, add and change a mask, undo
+  and compare, save a copy without location); repeat with a keyboard and with Switch Access; set
+  the largest font and display size and look for overlapping text (automated tests cover cut-off
+  text, not overlap).
 

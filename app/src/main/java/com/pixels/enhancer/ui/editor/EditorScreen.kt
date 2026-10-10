@@ -17,14 +17,19 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.automirrored.outlined.Redo
 import androidx.compose.material.icons.automirrored.outlined.Undo
+import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.Compare
 import androidx.compose.material.icons.outlined.MoreVert
 import androidx.compose.material.icons.outlined.Share
@@ -63,12 +68,17 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.dp
 import com.pixels.enhancer.R
 import com.pixels.enhancer.domain.presets.SettingsGroup
@@ -76,6 +86,7 @@ import com.pixels.enhancer.ui.ErrorMessages
 import com.pixels.enhancer.ui.compare.CompareMode
 import com.pixels.enhancer.ui.compare.CompareView
 import com.pixels.enhancer.ui.compare.SplitOrientation
+import com.pixels.enhancer.ui.components.StateIconToggle
 import com.pixels.enhancer.ui.crop.CropEditor
 import com.pixels.enhancer.ui.export.ExportDialog
 import com.pixels.enhancer.ui.local.BrushMode
@@ -97,6 +108,7 @@ import com.pixels.enhancer.ui.retouch.HealCanvas
 import com.pixels.enhancer.ui.retouch.HealingPanel
 import com.pixels.enhancer.ui.theme.OnPhotoCanvas
 import com.pixels.enhancer.ui.theme.PhotoCanvas
+import com.pixels.enhancer.ui.theme.PhotoLabelBacking
 import kotlin.math.min
 
 /** Fixed panel height keeps the photo the same size whichever tool is open (portrait layout). */
@@ -122,8 +134,9 @@ fun EditorScreen(
     onOpenDebug: (() -> Unit)?,
     onPickBatchPhotos: () -> Unit,
     modifier: Modifier = Modifier,
+    initialTool: EditorTool = EditorTool.PRESETS,
 ) {
-    var tool by rememberSaveable { mutableStateOf(EditorTool.PRESETS) }
+    var tool by rememberSaveable { mutableStateOf(initialTool) }
     var compare by rememberSaveable { mutableStateOf(false) }
     var viewResetKey by rememberSaveable { mutableIntStateOf(0) }
     var brush by remember { mutableStateOf(BrushSettings()) }
@@ -268,6 +281,8 @@ private fun PhotoArea(
                 beforeLabel = stringResource(R.string.editor_before),
                 afterLabel = stringResource(R.string.editor_after),
                 resetKey = viewResetKey,
+                description = stringResource(if (compare) R.string.editor_photo_compare_description else R.string.editor_photo_description),
+                dividerDescription = stringResource(R.string.compare_divider),
                 modifier = Modifier.fillMaxSize(),
             )
             if (tool == EditorTool.GEOMETRY || tool == EditorTool.OPTICS) GridOverlay(Modifier.fillMaxSize())
@@ -303,8 +318,8 @@ private fun TapToPick(image: ImageBitmap, hint: String, onPick: (Float, Float) -
             color = OnPhotoCanvas,
             modifier = Modifier
                 .align(Alignment.TopCenter)
-                .padding(top = 8.dp)
-                .background(Color.Black.copy(alpha = 0.55f), MaterialTheme.shapes.small)
+                .padding(top = 8.dp, start = 16.dp, end = 16.dp)
+                .background(PhotoLabelBacking, MaterialTheme.shapes.small)
                 .padding(horizontal = 12.dp, vertical = 6.dp),
         )
     }
@@ -396,23 +411,34 @@ private fun ToolStrip(selected: EditorTool, state: EditorUiState.Success, onSele
     ) {
         EditorTool.entries.forEach { tool ->
             val isSelected = tool == selected
+            val edited = state.isEdited(tool)
             val tint = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+            val label = stringResource(tool.labelRes)
+            val spoken = if (edited) stringResource(R.string.a11y_edited_name, label) else label
             Column(
                 Modifier
-                    .width(66.dp)
+                    // Grows with large text instead of cutting the label; the strip scrolls.
+                    .widthIn(min = 66.dp)
                     .testTag(toolTag(tool))
                     .semantics { this.selected = isSelected }
                     .clickable(role = Role.Tab) { onSelect(tool) }
-                    .padding(vertical = 4.dp),
+                    .padding(horizontal = 4.dp, vertical = 4.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 Icon(tool.icon, contentDescription = null, tint = tint)
-                Text(stringResource(tool.labelRes), style = MaterialTheme.typography.labelSmall, color = tint, maxLines = 1)
+                Text(
+                    label,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = tint,
+                    fontWeight = if (isSelected) FontWeight.Bold else null,
+                    maxLines = 1,
+                    modifier = Modifier.semantics { contentDescription = spoken },
+                )
                 Box(
                     Modifier
                         .padding(top = 2.dp)
                         .size(4.dp)
-                        .background(if (state.isEdited(tool)) tint else Color.Transparent, MaterialTheme.shapes.extraLarge),
+                        .background(if (edited) tint else Color.Transparent, MaterialTheme.shapes.extraLarge),
                 )
             }
         }
@@ -433,37 +459,99 @@ private fun TopBar(
 ) {
     val busy = state.activity is EditorActivity.Saving
     var menu by remember { mutableStateOf(false) }
-    Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
-        IconButton(onClick = actions::onCloseRequested) { Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = stringResource(R.string.editor_close)) }
-        Spacer(Modifier.weight(1f))
-        IconButton(onClick = actions::onUndo, enabled = state.canUndo) { Icon(Icons.AutoMirrored.Outlined.Undo, contentDescription = stringResource(R.string.editor_undo)) }
-        IconButton(onClick = actions::onRedo, enabled = state.canRedo) { Icon(Icons.AutoMirrored.Outlined.Redo, contentDescription = stringResource(R.string.editor_redo)) }
-        IconButton(onClick = { onCompareChange(!compare) }) {
-            Icon(
-                Icons.Outlined.Compare,
-                contentDescription = stringResource(R.string.editor_compare),
-                tint = if (compare) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
-            )
-        }
-        Box {
-            IconButton(onClick = { menu = true }) { Icon(Icons.Outlined.MoreVert, contentDescription = stringResource(R.string.editor_more)) }
-            DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
-                DropdownMenuItem(text = { Text(stringResource(R.string.menu_copy_settings)) }, onClick = { menu = false; actions.onCopySettings() })
-                DropdownMenuItem(text = { Text(stringResource(R.string.menu_paste_settings)) }, enabled = state.canPaste, onClick = { menu = false; onPaste() })
-                DropdownMenuItem(text = { Text(stringResource(R.string.menu_apply_to_others)) }, enabled = state.batch?.running != true, onClick = { menu = false; onBatch() })
-                DropdownMenuItem(text = { Text(stringResource(R.string.menu_save_preset)) }, onClick = { menu = false; onSavePreset() })
-                HorizontalDivider()
-                DropdownMenuItem(text = { Text(stringResource(R.string.editor_reset_all)) }, onClick = { menu = false; actions.onResetAll() })
-                DropdownMenuItem(text = { Text(stringResource(R.string.editor_original_state)) }, onClick = { menu = false; actions.onShowOriginalEdit() })
-                if (onOpenDebug != null) DropdownMenuItem(text = { Text(stringResource(R.string.editor_debug)) }, onClick = { menu = false; onOpenDebug() })
+    val saveLabel = stringResource(R.string.editor_save)
+    val saveStyle = MaterialTheme.typography.labelLarge
+    val measurer = rememberTextMeasurer()
+    BoxWithConstraints(Modifier.fillMaxWidth()) {
+        // Close, Undo, More and Save always show. When large text or a narrow screen leaves no room,
+        // Share, then Compare, then Redo move into More instead of squeezing Save.
+        val saveWidth = with(LocalDensity.current) { measurer.measure(saveLabel, saveStyle).size.width.toDp() }
+        val room = maxWidth - BAR_PADDING * 2 - SAVE_END_PADDING - maxOf(SAVE_MIN_WIDTH, saveWidth + SAVE_CONTENT_PADDING) - BAR_ICON * 3
+        val optional = (room / BAR_ICON).toInt().coerceIn(0, 3)
+        val showRedo = optional >= 1
+        val showCompare = optional >= 2
+        val showShare = optional >= 3
+        Row(Modifier.fillMaxWidth().padding(horizontal = BAR_PADDING, vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
+            IconButton(onClick = actions::onCloseRequested) { Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = stringResource(R.string.editor_close)) }
+            Spacer(Modifier.weight(1f))
+            IconButton(onClick = actions::onUndo, enabled = state.canUndo) { Icon(Icons.AutoMirrored.Outlined.Undo, contentDescription = stringResource(R.string.editor_undo)) }
+            if (showRedo) {
+                IconButton(onClick = actions::onRedo, enabled = state.canRedo) { Icon(Icons.AutoMirrored.Outlined.Redo, contentDescription = stringResource(R.string.editor_redo)) }
             }
-        }
-        IconButton(onClick = actions::onShare, enabled = !busy) { Icon(Icons.Outlined.Share, contentDescription = stringResource(R.string.editor_share)) }
-        Button(shape = MaterialTheme.shapes.small, onClick = actions::onSave, enabled = !busy, modifier = Modifier.padding(end = 4.dp)) {
-            Text(stringResource(R.string.editor_save))
+            if (showCompare) StateIconToggle(compare, onCompareChange, Icons.Outlined.Compare, stringResource(R.string.editor_compare))
+            Box {
+                IconButton(onClick = { menu = true }) { Icon(Icons.Outlined.MoreVert, contentDescription = stringResource(R.string.editor_more)) }
+                DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                    OverflowActions(
+                        showRedo = showRedo,
+                        showCompare = showCompare,
+                        showShare = showShare,
+                        state = state,
+                        compare = compare,
+                        onClose = { menu = false },
+                        onRedo = actions::onRedo,
+                        onCompareChange = onCompareChange,
+                        onShare = actions::onShare,
+                    )
+                    DropdownMenuItem(text = { Text(stringResource(R.string.menu_copy_settings)) }, onClick = { menu = false; actions.onCopySettings() })
+                    DropdownMenuItem(text = { Text(stringResource(R.string.menu_paste_settings)) }, enabled = state.canPaste, onClick = { menu = false; onPaste() })
+                    DropdownMenuItem(text = { Text(stringResource(R.string.menu_apply_to_others)) }, enabled = state.batch?.running != true, onClick = { menu = false; onBatch() })
+                    DropdownMenuItem(text = { Text(stringResource(R.string.menu_save_preset)) }, onClick = { menu = false; onSavePreset() })
+                    HorizontalDivider()
+                    DropdownMenuItem(text = { Text(stringResource(R.string.editor_reset_all)) }, onClick = { menu = false; actions.onResetAll() })
+                    DropdownMenuItem(text = { Text(stringResource(R.string.editor_original_state)) }, onClick = { menu = false; actions.onShowOriginalEdit() })
+                    if (onOpenDebug != null) DropdownMenuItem(text = { Text(stringResource(R.string.editor_debug)) }, onClick = { menu = false; onOpenDebug() })
+                }
+            }
+            if (showShare) {
+                IconButton(onClick = actions::onShare, enabled = !busy) { Icon(Icons.Outlined.Share, contentDescription = stringResource(R.string.editor_share)) }
+            }
+            Button(shape = MaterialTheme.shapes.small, onClick = actions::onSave, enabled = !busy, modifier = Modifier.padding(end = SAVE_END_PADDING)) {
+                Text(saveLabel)
+            }
         }
     }
 }
+
+/** The top-bar actions that did not fit, at the top of the More menu. */
+@Suppress("LongParameterList")
+@Composable
+private fun OverflowActions(
+    showRedo: Boolean,
+    showCompare: Boolean,
+    showShare: Boolean,
+    state: EditorUiState.Success,
+    compare: Boolean,
+    onClose: () -> Unit,
+    onRedo: () -> Unit,
+    onCompareChange: (Boolean) -> Unit,
+    onShare: () -> Unit,
+) {
+    if (!showRedo) {
+        DropdownMenuItem(text = { Text(stringResource(R.string.editor_redo)) }, enabled = state.canRedo, onClick = { onClose(); onRedo() })
+    }
+    if (!showCompare) {
+        val onOff = stringResource(if (compare) R.string.a11y_on else R.string.a11y_off)
+        DropdownMenuItem(
+            text = { Text(stringResource(R.string.editor_compare)) },
+            trailingIcon = if (compare) ({ Icon(Icons.Outlined.Check, contentDescription = null) }) else null,
+            onClick = { onClose(); onCompareChange(!compare) },
+            modifier = Modifier.semantics { stateDescription = onOff },
+        )
+    }
+    if (!showShare) {
+        DropdownMenuItem(text = { Text(stringResource(R.string.editor_share)) }, enabled = state.activity !is EditorActivity.Saving, onClick = { onClose(); onShare() })
+    }
+    if (!(showRedo && showCompare && showShare)) HorizontalDivider()
+}
+
+private val BAR_ICON = 48.dp
+private val BAR_PADDING = 4.dp
+private val SAVE_END_PADDING = 4.dp
+
+/** Material's button minimum width and its horizontal content padding (24 dp each side). */
+private val SAVE_MIN_WIDTH = 58.dp
+private val SAVE_CONTENT_PADDING = 48.dp
 
 @Composable
 private fun Dialogs(
@@ -525,13 +613,15 @@ private fun SettingsGroupsDialog(
         onDismissRequest = onDismiss,
         title = { Text(title) },
         text = {
-            Column {
+            // Scrolls on small screens, so every row keeps its full 48 dp height.
+            Column(Modifier.verticalScroll(rememberScrollState())) {
                 if (message != null) Text(message, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(bottom = 8.dp))
                 SettingsGroup.entries.forEach { group ->
                     Row(
                         Modifier
                             .fillMaxWidth()
-                            .clickable(role = Role.Checkbox) { groups = if (group in groups) groups - group else groups + group },
+                            .heightIn(min = 48.dp)
+                            .toggleable(value = group in groups, role = Role.Checkbox) { checked -> groups = if (checked) groups + group else groups - group },
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Checkbox(checked = group in groups, onCheckedChange = null)

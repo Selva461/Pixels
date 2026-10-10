@@ -25,6 +25,18 @@ and the tool strip at the bottom. A dot under a tool means you changed something
   reset. The value snaps to zero (with a light tick) as you pass it.
 - **Undo / Redo** in the top bar; every finished change is one step.
 - **Reset** at the bottom of a panel resets just that panel.
+- On a narrow screen or with large text, **Share**, **Compare** and **Redo** move into the **More**
+  menu so Save always fits.
+- Selected chips are filled and show a tick; a dot after a name (for example "Red •" in the curve)
+  means that part has changes.
+
+## Accessibility
+
+Pixels works with TalkBack: every button, slider and chip has a name, sliders read their value
+and can be changed with TalkBack's adjust gestures, and tools with changes are read as "edited".
+Text follows your phone's font size up to 200 per cent; layouts wrap and scroll instead of cutting
+text off. Every control is at least 48 dp, and the before/after divider can be moved with TalkBack
+as well as by dragging. Selection never relies on colour alone.
 
 ## Tools
 

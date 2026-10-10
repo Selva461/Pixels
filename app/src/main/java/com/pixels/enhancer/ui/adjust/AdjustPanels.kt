@@ -3,8 +3,7 @@ package com.pixels.enhancer.ui.adjust
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -13,6 +12,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
@@ -29,6 +29,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
@@ -56,24 +57,29 @@ fun ColorMixerPanel(
     var band by rememberSaveable { mutableStateOf(HueBand.RED) }
     val shift = edit.colorMixer[band]
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(bottom = 12.dp)) {
-        Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+        // Each swatch is a 48 dp touch target; the row scrolls on narrow screens.
+        Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 12.dp, vertical = 4.dp)) {
             HueBand.entries.forEach { option ->
                 val selected = option == band
                 val edited = !edit.colorMixer[option].isNeutral
+                val name = if (edited) stringResource(R.string.a11y_edited_name, option.label) else option.label
                 Box(
                     Modifier
-                        .size(34.dp)
-                        .semantics {
-                            contentDescription = option.label
-                            this.selected = selected
-                        }
-                        .border(2.dp, if (selected) MaterialTheme.colorScheme.onSurface else Color.Transparent, CircleShape)
-                        .padding(5.dp)
-                        .background(option.swatch(), CircleShape)
-                        .clickable { band = option },
+                        .size(48.dp)
+                        .selectable(selected = selected, role = Role.RadioButton) { band = option }
+                        .semantics { contentDescription = name },
                     contentAlignment = Alignment.Center,
                 ) {
-                    if (edited) Box(Modifier.size(6.dp).background(Color.White, CircleShape))
+                    Box(
+                        Modifier
+                            .size(34.dp)
+                            .border(2.dp, if (selected) MaterialTheme.colorScheme.onSurface else Color.Transparent, CircleShape)
+                            .padding(5.dp)
+                            .background(option.swatch(), CircleShape),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        if (edited) Box(Modifier.size(8.dp).background(Color.White, CircleShape).border(1.dp, Color.Black, CircleShape))
+                    }
                 }
             }
         }

@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Delete
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -37,13 +36,17 @@ import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.pixels.enhancer.R
 import com.pixels.enhancer.domain.retouch.Retouch
 import com.pixels.enhancer.domain.retouch.RetouchMode
 import com.pixels.enhancer.domain.retouch.RetouchSpot
+import com.pixels.enhancer.ui.components.ChoiceChip
 import com.pixels.enhancer.ui.components.ProSlider
 import com.pixels.enhancer.ui.components.percentText
 import com.pixels.enhancer.ui.editor.EditorActions
@@ -54,7 +57,8 @@ import kotlin.math.min
 import kotlin.math.roundToInt
 
 private val SPOT_COLOR = Color.White
-private val SOURCE_COLOR = Color.White.copy(alpha = 0.7f)
+private val SOURCE_COLOR = Color.White
+private val EDGE_COLOR = Color.Black.copy(alpha = 0.6f)
 private val SELECTED_COLOR = Color(0xFFE39A72)
 
 @Composable
@@ -62,9 +66,9 @@ fun HealingPanel(retouch: Retouch, selectedId: Int?, settings: HealSettings, act
     val selected = retouch.spots.firstOrNull { it.id == selectedId }
     PanelColumn {
         Row(Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 6.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-            FilterChip(settings.mode == RetouchMode.HEAL, { actions.onHealSettingsChanged(settings.copy(mode = RetouchMode.HEAL)); actions.onEditFinished() }, { Text(stringResource(R.string.heal_mode_heal)) })
-            FilterChip(settings.mode == RetouchMode.CLONE, { actions.onHealSettingsChanged(settings.copy(mode = RetouchMode.CLONE)); actions.onEditFinished() }, { Text(stringResource(R.string.heal_mode_clone)) })
-            FilterChip(settings.mode == RetouchMode.RED_EYE, { actions.onHealSettingsChanged(settings.copy(mode = RetouchMode.RED_EYE)); actions.onEditFinished() }, { Text(stringResource(R.string.heal_mode_red_eye)) })
+            ChoiceChip(settings.mode == RetouchMode.HEAL, { actions.onHealSettingsChanged(settings.copy(mode = RetouchMode.HEAL)); actions.onEditFinished() }, stringResource(R.string.heal_mode_heal))
+            ChoiceChip(settings.mode == RetouchMode.CLONE, { actions.onHealSettingsChanged(settings.copy(mode = RetouchMode.CLONE)); actions.onEditFinished() }, stringResource(R.string.heal_mode_clone))
+            ChoiceChip(settings.mode == RetouchMode.RED_EYE, { actions.onHealSettingsChanged(settings.copy(mode = RetouchMode.RED_EYE)); actions.onEditFinished() }, stringResource(R.string.heal_mode_red_eye))
             Text(
                 pluralStringResource(R.plurals.heal_count, retouch.spots.size, retouch.spots.size),
                 style = MaterialTheme.typography.bodySmall,
@@ -111,7 +115,10 @@ fun HealCanvas(image: ImageBitmap, retouch: Retouch, selectedId: Int?, actions: 
     val spots by rememberUpdatedState(retouch.spots)
     val selection by rememberUpdatedState(selectedId)
     var dragging by remember { mutableStateOf<Pair<Int, SpotHandle>?>(null) }
-    BoxWithConstraints(modifier.clipToBounds().background(PhotoCanvas)) {
+    // Spots are at least a 48 dp target, however small they are drawn.
+    val minTouch = with(LocalDensity.current) { 24.dp.toPx() }
+    val description = stringResource(R.string.heal_hint)
+    BoxWithConstraints(modifier.clipToBounds().background(PhotoCanvas).semantics { contentDescription = description }) {
         val boxWidth = constraints.maxWidth.toFloat()
         val boxHeight = constraints.maxHeight.toFloat()
         val scale = min(boxWidth / image.width, boxHeight / image.height)
@@ -124,7 +131,7 @@ fun HealCanvas(image: ImageBitmap, retouch: Retouch, selectedId: Int?, actions: 
         fun hit(position: Offset): Pair<Int, SpotHandle>? {
             val ordered = spots.sortedByDescending { it.id == selection }
             for (spot in ordered) {
-                val r = (spot.radius * currentFrame.width).coerceAtLeast(MIN_TOUCH)
+                val r = (spot.radius * currentFrame.width).coerceAtLeast(minTouch)
                 if ((screen(spot.targetX, spot.targetY) - position).getDistance() <= r) return spot.id to SpotHandle.TARGET
                 if (spot.id == selection && (screen(spot.sourceX, spot.sourceY) - position).getDistance() <= r) return spot.id to SpotHandle.SOURCE
             }
@@ -180,11 +187,15 @@ fun HealCanvas(image: ImageBitmap, retouch: Retouch, selectedId: Int?, actions: 
                 val target = screen(spot.targetX, spot.targetY)
                 val isSelected = spot.id == selectedId
                 val color = if (isSelected) SELECTED_COLOR else SPOT_COLOR
-                drawCircle(Color.Black.copy(alpha = 0.35f), radius, target, style = Stroke(3.dp.toPx()))
-                drawCircle(color, radius, target, style = Stroke(1.5.dp.toPx()))
+                // The selected spot is also thicker, so it is not told apart by colour alone.
+                val width = (if (isSelected) 3f else 1.5f).dp.toPx()
+                drawCircle(EDGE_COLOR, radius, target, style = Stroke(width + 3.dp.toPx()))
+                drawCircle(color, radius, target, style = Stroke(width))
                 if (isSelected && spot.mode != RetouchMode.RED_EYE) {
                     val source = screen(spot.sourceX, spot.sourceY)
+                    drawCircle(EDGE_COLOR, radius, source, style = Stroke(1.5.dp.toPx() + 3.dp.toPx(), pathEffect = dash))
                     drawCircle(SOURCE_COLOR, radius, source, style = Stroke(1.5.dp.toPx(), pathEffect = dash))
+                    drawLine(EDGE_COLOR, source, target, strokeWidth = 1.dp.toPx() + 3.dp.toPx(), pathEffect = dash)
                     drawLine(SOURCE_COLOR, source, target, strokeWidth = 1.dp.toPx(), pathEffect = dash)
                 }
             }
@@ -192,4 +203,3 @@ fun HealCanvas(image: ImageBitmap, retouch: Retouch, selectedId: Int?, actions: 
     }
 }
 
-private const val MIN_TOUCH = 36f

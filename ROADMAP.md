@@ -20,9 +20,9 @@ The 74 open features in [FEATURE_SPEC.md](FEATURE_SPEC.md) (63 planned, 11 partl
 
 | PR | Title | Features | Top priority | Size | Builds on | Status |
 |---|---|---|---|---|---|---|
-| 1 | [Accessibility must-haves](#pr-1--accessibility-must-haves) | A-04, A-05, A-06, A-01 | P0 | M | — | In progress |
+| 1 | [Accessibility must-haves](#pr-1--accessibility-must-haves) | A-04, A-05, A-06, A-01, U-03 | P0 | M | — | In review |
 | 2 | [Speed baseline](#pr-2--speed-baseline) | P-01, P-02, P-03 | P0 | M | 1 | Not started |
-| 3 | [Slider and compare controls](#pr-3--slider-and-compare-controls) | A-02, A-03, A-11, U-03, A-16 | P1 | M | 1 | Not started |
+| 3 | [Slider and compare controls](#pr-3--slider-and-compare-controls) | A-02, A-03, A-11, A-16 | P1 | M | 1 | Not started |
 | 4 | [Keyboard, motion and overlays](#pr-4--keyboard-motion-and-overlays) | A-07, A-08, A-09 | P1 | M | 3 | Not started |
 | 5 | [Point colour and global hue](#pr-5--point-colour-and-global-hue) | C-07, C-05 | P1 | M | — | Not started |
 | 6 | [Masking upgrades](#pr-6--masking-upgrades) | M-04, M-05, M-10, M-11 | P1 | L | — | Not started |
@@ -55,8 +55,11 @@ Sizes: S under a day, M a few days, L about a week, XL more than a week.
 - **A-05 Touch targets of 48 dp** (P0, partial). Every tappable control is at least 48 by 48 dp, with space between neighbours. _Done when:_ an automated check finds no smaller target. Most controls pass today; small icon buttons are not yet checked.
 - **A-06 Contrast in every theme** (P0, planned). Text has 4.5:1 contrast with its background; large text, icons, slider tracks and focus rings have 3:1. _Done when:_ a test checks every colour pair in every theme, and labels on the photo sit on a solid backing.
 - **A-01 Screen reader support** (P0, partial). Every control has a spoken name, role, value and state, such as "Exposure, plus 0.35 EV". _Done when:_ a TalkBack user completes the five main tasks alone. Names and slider values are built; the walk-through on a phone is not done.
+- **U-03 Edited markers** (P1, built in PR 1). Tools you have changed show a dot, and a screen reader says "edited" after the tool's name. _Done when:_ every dot has a spoken equivalent. Tools, curve channels and colour bands say "edited".
 
 **Tests:** JVM test of every theme colour pair against 4.5:1 and 3:1; Compose UI tests on every screen for 48 dp touch targets, text at 200 % without overflow, and a spoken name on every control.
+
+**Delivered:** A-04, A-05, A-06 and U-03 are built (`ContrastTest`, `AccessibilityTest`). A-01 has names, roles, values and states on every control; it stays partial until the TalkBack walk-through on a phone. U-03 moved here from PR 3 because the same code was being changed.
 
 **Notes:** The TalkBack walk-through itself stays a manual release step (TESTING.md).
 
@@ -81,10 +84,9 @@ Sizes: S under a day, M a few days, L about a week, XL more than a week.
 - **A-02 Type exact values** (P1, planned). Tap a slider's value to type a number instead of dragging. _Done when:_ the number keyboard has a minus sign, and values outside the range are corrected and announced.
 - **A-03 Fine steps with − and +** (P1, planned). Each slider has − and + buttons. A press moves one step and holding repeats; the step is 1, 5 or 10. _Done when:_ every value of every slider can be reached without dragging, and each press is announced.
 - **A-11 Compare without holding** (P1, planned). Compare also works as a toggle, a key and a switch action, and announces "Showing original" or "Showing edit". _Done when:_ compare works with a single tap, and every change is announced.
-- **U-03 Edited markers** (P1, partial). Tools you have changed show a dot, and a screen reader says "edited" after the tool's name. _Done when:_ every dot has a spoken equivalent. The dots are built; the spoken state is not on every tool yet.
 - **A-16 Plain language and help** (P1, partial). Everyday words for tools and messages. A built-in Guide explains every tool; each tool also gets a one-line hint. _Done when:_ every message says what happened and what to do next. The Guide is built; the hints are not.
 
-**Tests:** UI tests for typing a value, − and + steps of 1, 5 and 10, compare as a toggle with announcements, and "edited" in tool names; unit tests for parsing and clamping typed values.
+**Tests:** UI tests for typing a value, − and + steps of 1, 5 and 10, and compare as a toggle with announcements; unit tests for parsing and clamping typed values.
 
 **Notes:** Follows the "Editor · Light" and "Accessibility settings" screen designs.
 

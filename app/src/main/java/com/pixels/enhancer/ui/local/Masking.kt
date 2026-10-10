@@ -30,10 +30,8 @@ import androidx.compose.material.icons.outlined.Visibility
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.IconToggleButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -64,6 +62,8 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.pixels.enhancer.R
 import com.pixels.enhancer.domain.local.BrushStroke
@@ -71,8 +71,10 @@ import com.pixels.enhancer.domain.local.LocalAdjustment
 import com.pixels.enhancer.domain.local.LocalAdjustments
 import com.pixels.enhancer.domain.local.MaskShape
 import com.pixels.enhancer.domain.local.RangeMask
+import com.pixels.enhancer.ui.components.ChoiceChip
 import com.pixels.enhancer.ui.components.PanelHeading
 import com.pixels.enhancer.ui.components.ProSlider
+import com.pixels.enhancer.ui.components.StateIconToggle
 import com.pixels.enhancer.ui.components.Tracks
 import com.pixels.enhancer.ui.components.percentText
 import com.pixels.enhancer.ui.editor.EditorActions
@@ -84,7 +86,8 @@ import kotlin.math.min
 import kotlin.math.roundToInt
 
 private val HANDLE_COLOR = Color.White
-private val OUTLINE_COLOR = Color.White.copy(alpha = 0.85f)
+private val HANDLE_EDGE = Color.Black.copy(alpha = 0.7f)
+private val OUTLINE_COLOR = Color.White
 private val BRUSH_PREVIEW = Color(0x66E5484D)
 
 /** What dragging on the photo does in the Masking tool. */
@@ -180,11 +183,11 @@ fun MaskingPanel(
                 }
             }
             adjustments.items.forEachIndexed { index, item ->
-                FilterChip(
+                ChoiceChip(
                     selected = item.id == selectedId,
                     onClick = { actions.onSelectMask(if (item.id == selectedId) null else item.id) },
-                    leadingIcon = { Icon(item.kindIcon(), contentDescription = null) },
-                    label = { Text(item.name.ifEmpty { "${index + 1} · ${stringResource(item.kindLabelRes())}" }) },
+                    label = item.name.ifEmpty { "${index + 1} · ${stringResource(item.kindLabelRes())}" },
+                    icon = item.kindIcon(),
                 )
             }
         }
@@ -194,15 +197,16 @@ fun MaskingPanel(
         }
         PanelColumn {
             Row(Modifier.padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                IconToggleButton(checked = showOverlay, onCheckedChange = actions::onMaskOverlayChanged) {
-                    Icon(Icons.Outlined.Visibility, contentDescription = stringResource(R.string.mask_overlay), tint = if (showOverlay) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-                IconToggleButton(checked = selected.invert, onCheckedChange = {
-                    actions.onLocalChanged(selected.copy(invert = it))
-                    actions.onEditFinished()
-                }) {
-                    Icon(Icons.Outlined.InvertColors, contentDescription = stringResource(R.string.local_invert), tint = if (selected.invert) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
-                }
+                StateIconToggle(showOverlay, actions::onMaskOverlayChanged, Icons.Outlined.Visibility, stringResource(R.string.mask_overlay))
+                StateIconToggle(
+                    checked = selected.invert,
+                    onCheckedChange = {
+                        actions.onLocalChanged(selected.copy(invert = it))
+                        actions.onEditFinished()
+                    },
+                    icon = Icons.Outlined.InvertColors,
+                    description = stringResource(R.string.local_invert),
+                )
                 IconButton(onClick = { actions.onDuplicateMask(selected.id) }, enabled = adjustments.items.size < LocalAdjustments.MAX_ITEMS) {
                     Icon(Icons.Outlined.ContentCopy, contentDescription = stringResource(R.string.mask_duplicate))
                 }
@@ -213,8 +217,8 @@ fun MaskingPanel(
                     Icon(Icons.Outlined.Delete, contentDescription = stringResource(R.string.local_delete))
                 }
                 Row(Modifier.weight(1f).horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    FilterChip(brush.mode == BrushMode.ADD, { onBrushChanged(brush.copy(mode = if (brush.mode == BrushMode.ADD) BrushMode.OFF else BrushMode.ADD)) }, { Text(stringResource(R.string.mask_brush_add)) })
-                    FilterChip(brush.mode == BrushMode.ERASE, { onBrushChanged(brush.copy(mode = if (brush.mode == BrushMode.ERASE) BrushMode.OFF else BrushMode.ERASE)) }, { Text(stringResource(R.string.mask_brush_erase)) })
+                    ChoiceChip(brush.mode == BrushMode.ADD, { onBrushChanged(brush.copy(mode = if (brush.mode == BrushMode.ADD) BrushMode.OFF else BrushMode.ADD)) }, stringResource(R.string.mask_brush_add))
+                    ChoiceChip(brush.mode == BrushMode.ERASE, { onBrushChanged(brush.copy(mode = if (brush.mode == BrushMode.ERASE) BrushMode.OFF else BrushMode.ERASE)) }, stringResource(R.string.mask_brush_erase))
                 }
             }
             if (brush.mode != BrushMode.OFF) {
@@ -289,7 +293,8 @@ fun MaskCanvas(
     val slop = with(LocalDensity.current) { 32.dp.toPx() }
     var handle by remember { mutableStateOf<Handle?>(null) }
     val strokePoints = remember { mutableStateListOf<Offset>() }
-    BoxWithConstraints(modifier.clipToBounds().background(PhotoCanvas)) {
+    val description = stringResource(R.string.mask_canvas_description)
+    BoxWithConstraints(modifier.clipToBounds().background(PhotoCanvas).semantics { contentDescription = description }) {
         val boxWidth = constraints.maxWidth.toFloat()
         val boxHeight = constraints.maxHeight.toFloat()
         val scale = min(boxWidth / image.width, boxHeight / image.height)
@@ -368,16 +373,26 @@ fun MaskCanvas(
             }
             val item = selected ?: return@Canvas
             val dash = PathEffect.dashPathEffect(floatArrayOf(12f, 10f))
+            // White lines and handles get a dark edge, so they show over bright skies and dark shadows alike.
+            val edge = 1.5.dp.toPx()
+            fun handleAt(position: Offset, radius: Float) {
+                drawCircle(HANDLE_EDGE, radius + edge, position)
+                drawCircle(HANDLE_COLOR, radius, position)
+            }
             when (val shape = item.shape) {
                 is MaskShape.Radial -> {
                     val center = toScreen(shape.centerX, shape.centerY)
                     val size = Size(shape.radiusX * 2 * frame.width, shape.radiusY * 2 * frame.height)
-                    drawOval(OUTLINE_COLOR, center - Offset(size.width / 2, size.height / 2), size, style = Stroke(2.dp.toPx()))
+                    val outer = center - Offset(size.width / 2, size.height / 2)
+                    drawOval(HANDLE_EDGE, outer, size, style = Stroke(2.dp.toPx() + edge * 2))
+                    drawOval(OUTLINE_COLOR, outer, size, style = Stroke(2.dp.toPx()))
                     val inner = size * (1f - shape.feather)
-                    drawOval(OUTLINE_COLOR, center - Offset(inner.width / 2, inner.height / 2), inner, style = Stroke(1.dp.toPx(), pathEffect = dash))
-                    drawCircle(HANDLE_COLOR, 7.dp.toPx(), center)
-                    drawCircle(HANDLE_COLOR, 6.dp.toPx(), toScreen(shape.centerX + shape.radiusX, shape.centerY))
-                    drawCircle(HANDLE_COLOR, 6.dp.toPx(), toScreen(shape.centerX, shape.centerY - shape.radiusY))
+                    val innerTopLeft = center - Offset(inner.width / 2, inner.height / 2)
+                    drawOval(HANDLE_EDGE, innerTopLeft, inner, style = Stroke(1.dp.toPx() + edge * 2, pathEffect = dash))
+                    drawOval(OUTLINE_COLOR, innerTopLeft, inner, style = Stroke(1.dp.toPx(), pathEffect = dash))
+                    handleAt(center, 7.dp.toPx())
+                    handleAt(toScreen(shape.centerX + shape.radiusX, shape.centerY), 6.dp.toPx())
+                    handleAt(toScreen(shape.centerX, shape.centerY - shape.radiusY), 6.dp.toPx())
                 }
                 is MaskShape.Linear -> {
                     val start = toScreen(shape.startX, shape.startY)
@@ -385,10 +400,12 @@ fun MaskCanvas(
                     val direction = end - start
                     val length = direction.getDistance().coerceAtLeast(1f)
                     val perpendicular = Offset(-direction.y / length, direction.x / length) * (frame.width + frame.height)
+                    drawLine(HANDLE_EDGE, start - perpendicular, start + perpendicular, strokeWidth = 2.dp.toPx() + edge * 2)
                     drawLine(OUTLINE_COLOR, start - perpendicular, start + perpendicular, strokeWidth = 2.dp.toPx())
+                    drawLine(HANDLE_EDGE, end - perpendicular, end + perpendicular, strokeWidth = 1.dp.toPx() + edge * 2, pathEffect = dash)
                     drawLine(OUTLINE_COLOR, end - perpendicular, end + perpendicular, strokeWidth = 1.dp.toPx(), pathEffect = dash)
-                    drawCircle(HANDLE_COLOR, 7.dp.toPx(), start)
-                    drawCircle(HANDLE_COLOR, 6.dp.toPx(), end)
+                    handleAt(start, 7.dp.toPx())
+                    handleAt(end, 6.dp.toPx())
                 }
                 MaskShape.None, MaskShape.Full -> Unit
             }
