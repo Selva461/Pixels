@@ -1,6 +1,5 @@
 package com.pixels.enhancer.ui.theme
 
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Shapes
@@ -29,11 +28,13 @@ private object Palette {
     val AccentPale = Color(0xFFF0DCD1)
     val AccentDeep = Color(0xFF3A1406)
 
-    val Night = Color(0xFF161514)
-    val NightRaised = Color(0xFF1F1E1C)
-    val NightSunken = Color(0xFF2A2826)
-    val Bone = Color(0xFFE8E4DD)
-    val BoneSoft = Color(0xFFC9C3BA)
+    // Editor greys are neutral (no warm cast) so they never bias how colour in the photo is judged.
+    val Night = Color(0xFF141414)
+    val NightRaised = Color(0xFF1D1D1D)
+    val NightSunken = Color(0xFF292929)
+    val NightRule = Color(0xFF3A3A3A)
+    val Bone = Color(0xFFEDEDED)
+    val BoneSoft = Color(0xFFA6A6A6)
     val AccentLight = Color(0xFFE39A72)
     val AccentMuted = Color(0xFF5A2A14)
 
@@ -42,7 +43,7 @@ private object Palette {
 }
 
 /** Neutral grey behind photos (not pure black), so dark images keep visible edges. */
-val PhotoCanvas = Color(0xFF141414)
+val PhotoCanvas = Color(0xFF101010)
 
 /** Text drawn on [PhotoCanvas], in both light and dark themes. */
 val OnPhotoCanvas = Color(0xFFE8E4DD)
@@ -89,7 +90,7 @@ private val DarkColors = darkColorScheme(
     surfaceContainerHigh = Palette.NightRaised,
     surfaceContainerHighest = Palette.NightSunken,
     outline = Palette.Rule,
-    outlineVariant = Palette.NightSunken,
+    outlineVariant = Palette.NightRule,
     error = Palette.ErrorLight,
 )
 
@@ -112,10 +113,14 @@ private val PixelsTypography = Typography().let { base ->
     )
 }
 
+/**
+ * The app is dark like a darkroom or a pro editor: photos are judged against a neutral dark
+ * surround, whatever the system theme. The light scheme is kept for previews and tests.
+ */
 @Composable
-fun PixelsTheme(content: @Composable () -> Unit) {
+fun PixelsTheme(darkTheme: Boolean = true, content: @Composable () -> Unit) {
     MaterialTheme(
-        colorScheme = if (isSystemInDarkTheme()) DarkColors else LightColors,
+        colorScheme = if (darkTheme) DarkColors else LightColors,
         shapes = PixelsShapes,
         typography = PixelsTypography,
         content = content,

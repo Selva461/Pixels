@@ -1,19 +1,21 @@
 package com.pixels.enhancer.ui.adjust
 
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -27,48 +29,23 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.pixels.enhancer.R
 import com.pixels.enhancer.domain.analysis.Histogram
 import com.pixels.enhancer.domain.editing.EditState
-import com.pixels.enhancer.domain.planning.ControlGroup
 import com.pixels.enhancer.domain.planning.HslShift
 import com.pixels.enhancer.domain.planning.HueBand
-import com.pixels.enhancer.domain.planning.ManualControl
-import kotlin.math.roundToInt
+import com.pixels.enhancer.ui.components.ProSlider
+import com.pixels.enhancer.ui.components.Tracks
+import com.pixels.enhancer.ui.components.percentText
 
-private const val PERCENT = 100
+/** Swatch colour for each mixer band. */
+fun HueBand.swatch(): Color = Color.hsv(centerDegrees % 360f, 0.75f, 0.9f)
 
-/** Grouped manual sliders with a short description each; tap the value to reset one slider. */
-@Composable
-fun AdjustPanel(
-    edit: EditState,
-    histogram: Histogram?,
-    onControlChanged: (ManualControl, Float) -> Unit,
-    onEditFinished: () -> Unit,
-    onResetControl: (ManualControl) -> Unit,
-) {
-    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 8.dp)) {
-        histogram?.let { HistogramView(it, Modifier.fillMaxWidth().height(56.dp)) }
-        Text(stringResource(R.string.editor_reset_control_hint), style = MaterialTheme.typography.bodySmall)
-        ControlGroup.entries.forEach { group ->
-            Text(group.label, style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = 12.dp))
-            ManualControl.entries.filter { it.group == group }.forEach { control ->
-                LabelledSlider(
-                    label = control.label,
-                    description = control.description,
-                    value = edit.manual[control],
-                    range = control.min..control.max,
-                    onChange = { onControlChanged(control, it) },
-                    onFinished = onEditFinished,
-                    onReset = { onResetControl(control) },
-                )
-            }
-        }
-    }
-}
-
-/** HSL colour mixer: pick a band, then shift its hue, saturation and luminance. */
+/** HSL colour mixer: pick a band (colour dots), then shift its hue, saturation and luminance. */
 @Composable
 fun ColorMixerPanel(
     edit: EditState,
@@ -78,68 +55,58 @@ fun ColorMixerPanel(
 ) {
     var band by rememberSaveable { mutableStateOf(HueBand.RED) }
     val shift = edit.colorMixer[band]
-    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 8.dp)) {
-        Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(bottom = 12.dp)) {
+        Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), horizontalArrangement = Arrangement.SpaceBetween) {
             HueBand.entries.forEach { option ->
+                val selected = option == band
                 val edited = !edit.colorMixer[option].isNeutral
-                FilterChip(band == option, { band = option }, { Text(if (edited) "${option.label} •" else option.label) })
+                Box(
+                    Modifier
+                        .size(34.dp)
+                        .semantics {
+                            contentDescription = option.label
+                            this.selected = selected
+                        }
+                        .border(2.dp, if (selected) MaterialTheme.colorScheme.onSurface else Color.Transparent, CircleShape)
+                        .padding(5.dp)
+                        .background(option.swatch(), CircleShape)
+                        .clickable { band = option },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    if (edited) Box(Modifier.size(6.dp).background(Color.White, CircleShape))
+                }
             }
         }
-        LabelledSlider(stringResource(R.string.mixer_hue), null, shift.hue, -1f..1f, { onShiftChanged(band, shift.copy(hue = it)) }, onEditFinished) {
-            onShiftChanged(band, shift.copy(hue = 0f))
-            onEditFinished()
+        ProSlider(stringResource(R.string.mixer_hue), shift.hue, percentText(shift.hue), { onShiftChanged(band, shift.copy(hue = it)) }, onEditFinished, track = Tracks.hue)
+        ProSlider(stringResource(R.string.mixer_saturation), shift.saturation, percentText(shift.saturation), { onShiftChanged(band, shift.copy(saturation = it)) }, onEditFinished)
+        ProSlider(stringResource(R.string.mixer_luminance), shift.luminance, percentText(shift.luminance), { onShiftChanged(band, shift.copy(luminance = it)) }, onEditFinished, track = Tracks.lightness)
+        TextButton(onClick = onResetAll, enabled = !edit.colorMixer.isNeutral, modifier = Modifier.padding(horizontal = 8.dp)) {
+            Text(stringResource(R.string.mixer_reset))
         }
-        LabelledSlider(stringResource(R.string.mixer_saturation), null, shift.saturation, -1f..1f, { onShiftChanged(band, shift.copy(saturation = it)) }, onEditFinished) {
-            onShiftChanged(band, shift.copy(saturation = 0f))
-            onEditFinished()
-        }
-        LabelledSlider(stringResource(R.string.mixer_luminance), null, shift.luminance, -1f..1f, { onShiftChanged(band, shift.copy(luminance = it)) }, onEditFinished) {
-            onShiftChanged(band, shift.copy(luminance = 0f))
-            onEditFinished()
-        }
-        TextButton(onClick = onResetAll, enabled = !edit.colorMixer.isNeutral) { Text(stringResource(R.string.mixer_reset)) }
     }
 }
 
-@Suppress("LongParameterList")
+/**
+ * Histogram of the edited preview (not the source): brightness in one neutral tone, or with [rgb]
+ * the red, green and blue channels overlaid (where they overlap the bars mix towards grey).
+ */
 @Composable
-private fun LabelledSlider(
-    label: String,
-    description: String?,
-    value: Float,
-    range: ClosedFloatingPointRange<Float>,
-    onChange: (Float) -> Unit,
-    onFinished: () -> Unit,
-    onReset: () -> Unit,
-) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Column(Modifier.weight(1f)) {
-            Text(label, style = MaterialTheme.typography.labelLarge)
-            if (description != null) Text(description, style = MaterialTheme.typography.bodySmall)
-        }
-        TextButton(onClick = onReset) { Text(formatValue(value)) }
-    }
-    Slider(value = value, onValueChange = onChange, onValueChangeFinished = onFinished, valueRange = range)
-}
-
-/** Brightness histogram of the edited preview (not the source). One neutral tone keeps it readable. */
-@Composable
-fun HistogramView(histogram: Histogram, modifier: Modifier = Modifier) {
+fun HistogramView(histogram: Histogram, modifier: Modifier = Modifier, rgb: Boolean = false) {
     val lumaColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
-    Canvas(modifier) {
-        val peak = histogram.luma.max().coerceAtLeast(1).toFloat()
+    val description = stringResource(if (rgb) R.string.histogram_rgb_description else R.string.histogram_description)
+    Canvas(modifier.semantics { contentDescription = description }) {
         val barWidth = size.width / histogram.bins
-        fun drawChannel(values: IntArray, color: Color) {
-            values.forEachIndexed { index, count ->
-                val barHeight = size.height * count / peak
-                drawRect(color, Offset(index * barWidth, size.height - barHeight), Size(barWidth, barHeight))
-            }
+        fun bars(values: IntArray, color: Color, peak: Float) = values.forEachIndexed { index, count ->
+            val barHeight = size.height * count / peak
+            drawRect(color, Offset(index * barWidth, size.height - barHeight), Size(barWidth, barHeight))
         }
-        drawChannel(histogram.luma, lumaColor)
+        if (rgb) {
+            val peak = histogram.peak.coerceAtLeast(1).toFloat()
+            bars(histogram.red, Color(0x99E5484D), peak)
+            bars(histogram.green, Color(0x9946C46B), peak)
+            bars(histogram.blue, Color(0x994D7BE5), peak)
+        } else {
+            bars(histogram.luma, lumaColor, histogram.luma.max().coerceAtLeast(1).toFloat())
+        }
     }
-}
-
-private fun formatValue(value: Float): String {
-    val percent = (value * PERCENT).roundToInt()
-    return if (percent > 0) "+$percent" else percent.toString()
 }

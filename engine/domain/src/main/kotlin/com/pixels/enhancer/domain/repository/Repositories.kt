@@ -41,10 +41,15 @@ data class SaveRequest(
 data class SavedImage(val id: String, val displayName: String)
 
 data class EnhancerSettings(
+    /** Auto Enhance strength new photos open with. */
     val strength: Float = EnhancementStrength.DEFAULT,
     val presetId: String = QualityPreset.NATURAL.id,
     /** Last-used export choices, offered again next time. */
     val export: ExportOptions = ExportOptions(),
+    /** Ask before leaving a photo whose current edit was never exported. */
+    val confirmBeforeLeaving: Boolean = true,
+    /** Light vibration when a slider snaps to zero or is reset. */
+    val hapticFeedback: Boolean = true,
 )
 
 interface SettingsRepository {

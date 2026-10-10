@@ -2,10 +2,15 @@ package com.pixels.enhancer.domain.editing
 
 import com.pixels.enhancer.domain.analysis.SceneType
 import com.pixels.enhancer.domain.geometry.Geometry
+import com.pixels.enhancer.domain.local.LocalAdjustments
+import com.pixels.enhancer.domain.planning.Calibration
+import com.pixels.enhancer.domain.planning.ColorGrading
 import com.pixels.enhancer.domain.planning.ColorMixer
 import com.pixels.enhancer.domain.planning.EnhancementStrength
 import com.pixels.enhancer.domain.planning.Look
 import com.pixels.enhancer.domain.planning.ManualAdjustments
+import com.pixels.enhancer.domain.planning.ToneCurves
+import com.pixels.enhancer.domain.retouch.Retouch
 
 /**
  * Everything the user controls for one photo — the nondestructive edit. The original pixels are
@@ -17,6 +22,13 @@ data class EditState(
     val lookId: String = Look.NONE.id,
     val geometry: Geometry = Geometry.NONE,
     val colorMixer: ColorMixer = ColorMixer.NONE,
+    val toneCurves: ToneCurves = ToneCurves.NONE,
+    val localAdjustments: LocalAdjustments = LocalAdjustments.NONE,
+    val colorGrading: ColorGrading = ColorGrading.NONE,
+    val retouch: Retouch = Retouch.NONE,
+    val calibration: Calibration = Calibration.NONE,
+    /** False = "As shot": the automatic white-balance correction is skipped. */
+    val autoWhiteBalance: Boolean = true,
     /** Overrides the detected scene for Auto Enhance; null = use detection. */
     val sceneOverride: SceneType? = null,
 ) {
@@ -54,6 +66,20 @@ class EditHistory(
         current = state
         redoStack.clear()
         return true
+    }
+
+    /** Every state oldest first: the undo steps, the current edit, then the redo steps. */
+    val timeline: List<EditState> get() = undoStack.toList() + current + redoStack.reversed()
+
+    /** Index of [current] in [timeline]. */
+    val position: Int get() = undoStack.size
+
+    /** Moves to [index] in [timeline] by undoing or redoing; returns the new current edit. */
+    fun jumpTo(index: Int): EditState {
+        require(index in 0 until undoStack.size + 1 + redoStack.size) { "No history step $index" }
+        while (position > index) undo()
+        while (position < index) redo()
+        return current
     }
 
     fun undo(): EditState? {

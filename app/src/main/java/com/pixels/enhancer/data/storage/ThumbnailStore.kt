@@ -7,9 +7,9 @@ import androidx.compose.ui.graphics.asImageBitmap
 import com.pixels.enhancer.data.decoder.BitmapConversions
 import com.pixels.enhancer.domain.image.PixelBuffer
 import com.pixels.enhancer.domain.image.PixelResampler
+import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import java.io.File
 
 /** Small JPEG previews for the Recent list, in app-private storage (never the gallery). */
 class ThumbnailStore(private val directory: File) {
@@ -35,6 +35,18 @@ class ThumbnailStore(private val directory: File) {
 
     suspend fun delete(projectId: String) {
         withContext(Dispatchers.IO) { fileFor(projectId).delete() }
+    }
+
+    /** Copies a project's preview to a new project id (duplicated edits). */
+    suspend fun copy(fromProjectId: String, toProjectId: String) {
+        withContext(Dispatchers.IO) {
+            val source = fileFor(fromProjectId)
+            if (source.exists()) source.copyTo(fileFor(toProjectId), overwrite = true)
+        }
+    }
+
+    suspend fun deleteAll() {
+        withContext(Dispatchers.IO) { directory.deleteRecursively() }
     }
 
     private fun fileFor(projectId: String) = File(directory, "${projectId.filter { it.isLetterOrDigit() || it == '-' }}.jpg")

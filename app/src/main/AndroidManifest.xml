@@ -1,22 +1,43 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- No INTERNET permission: images are processed on-device and never uploaded. -->
+    <!--
+        No permissions at all: no INTERNET (images are processed on-device and never uploaded), no
+        storage permission (MediaStore saves need none on Android 10+), no CAMERA (the camera app
+        takes the photo and writes it to a file this app offers through its FileProvider).
+    -->
 
     <application
         android:name=".PixelsApplication"
         android:allowBackup="false"
+        android:dataExtractionRules="@xml/data_extraction_rules"
         android:label="@string/app_name"
         android:largeHeap="true"
         android:supportsRtl="true"
-        android:theme="@style/Theme.Pixels">
+        android:theme="@style/Theme.Pixels"
+        android:usesCleartextTraffic="false">
 
+        <!--
+            singleTop: a photo shared while Pixels is open arrives in onNewIntent instead of stacking
+            a second editor. SEND/EDIT accept images only; the URI is validated and copied before use.
+        -->
         <activity
             android:name=".ui.MainActivity"
-            android:exported="true">
+            android:exported="true"
+            android:launchMode="singleTop">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="image/*" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.EDIT" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="image/*" />
             </intent-filter>
         </activity>
 

@@ -13,10 +13,10 @@ import com.pixels.enhancer.domain.image.PixelBuffer
 import com.pixels.enhancer.domain.image.PixelResampler
 import com.pixels.enhancer.domain.model.ImageSource
 import com.pixels.enhancer.domain.repository.ImageRepository
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 import java.io.FileNotFoundException
 import java.io.InputStream
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 /**
  * Decodes picked images. Never loads full resolution when it is not needed: the decoder
@@ -67,7 +67,12 @@ class AndroidImageRepository(private val contentResolver: ContentResolver) : Ima
         return scaled
     }
 
+    /**
+     * Only content:// URIs are read. A file:// URI handed in by another app could point at this
+     * app's private files; the photo picker, camera capture and shared imports all use content URIs.
+     */
     private fun open(uri: Uri): InputStream = try {
+        if (uri.scheme != ContentResolver.SCHEME_CONTENT) throw EnhancerException(ErrorCode.IMAGE_UNSUPPORTED, "Only content URIs can be opened")
         contentResolver.openInputStream(uri) ?: throw EnhancerException(ErrorCode.IMAGE_NOT_FOUND, "No stream for image")
     } catch (error: FileNotFoundException) {
         throw EnhancerException(ErrorCode.IMAGE_NOT_FOUND, "Image not found", error)

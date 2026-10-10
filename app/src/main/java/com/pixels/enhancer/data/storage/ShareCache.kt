@@ -9,9 +9,9 @@ import com.pixels.enhancer.core.error.ErrorCode
 import com.pixels.enhancer.data.decoder.BitmapConversions
 import com.pixels.enhancer.domain.image.PixelBuffer
 import com.pixels.enhancer.domain.repository.SaveRequest
+import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import java.io.File
 
 /** Writes a temporary JPEG for the share sheet. Only the latest shared file is kept. */
 class ShareCache(private val context: Context) {
@@ -30,6 +30,11 @@ class ShareCache(private val context: Context) {
             bitmap.recycle()
         }
         FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+    }
+
+    /** Removes the last shared copy (Settings > Clear temporary files). */
+    suspend fun clear() {
+        withContext(Dispatchers.IO) { File(context.cacheDir, DIRECTORY).deleteRecursively() }
     }
 
     private companion object {

@@ -4,15 +4,21 @@ import com.pixels.enhancer.core.timing.TimingReport
 import com.pixels.enhancer.domain.analysis.ImageAnalysis
 import com.pixels.enhancer.domain.analysis.SceneEstimate
 import com.pixels.enhancer.domain.analysis.SceneType
+import com.pixels.enhancer.domain.editing.EditState
 import com.pixels.enhancer.domain.geometry.Geometry
 import com.pixels.enhancer.domain.image.PixelBuffer
+import com.pixels.enhancer.domain.local.LocalAdjustments
 import com.pixels.enhancer.domain.model.ImageSource
+import com.pixels.enhancer.domain.planning.Calibration
+import com.pixels.enhancer.domain.planning.ColorGrading
 import com.pixels.enhancer.domain.planning.ColorMixer
 import com.pixels.enhancer.domain.planning.EnhancementPlan
 import com.pixels.enhancer.domain.planning.ManualAdjustments
 import com.pixels.enhancer.domain.planning.QualityPreset
+import com.pixels.enhancer.domain.planning.ToneCurves
 import com.pixels.enhancer.domain.processing.ProcessedImage
 import com.pixels.enhancer.domain.processing.StageConfig
+import com.pixels.enhancer.domain.retouch.Retouch
 import com.pixels.enhancer.domain.validation.ValidationResult
 
 /**
@@ -37,6 +43,15 @@ data class EnhanceRequest(
     val manual: ManualAdjustments = ManualAdjustments.NONE,
     val geometry: Geometry = Geometry.NONE,
     val colorMixer: ColorMixer = ColorMixer.NONE,
+    val toneCurves: ToneCurves = ToneCurves.NONE,
+    /** Masked adjustments, applied after geometry in output coordinates. */
+    val localAdjustments: LocalAdjustments = LocalAdjustments.NONE,
+    val colorGrading: ColorGrading = ColorGrading.NONE,
+    val calibration: Calibration = Calibration.NONE,
+    /** False keeps the camera's white balance ("As shot"); manual temperature/tint still apply. */
+    val autoWhiteBalance: Boolean = true,
+    /** Heal/clone spots, applied after geometry and before local masks. */
+    val retouch: Retouch = Retouch.NONE,
     /** User's scene choice; null uses the detected scene. */
     val sceneOverride: SceneType? = null,
     val target: RenderTarget = RenderTarget.FULL,
@@ -46,7 +61,28 @@ data class EnhanceRequest(
 )
 
 /** True when the user asked for creative changes, so validation only checks for broken output. */
-val EnhanceRequest.hasManualEdits: Boolean get() = !manual.isNeutral || !colorMixer.isNeutral
+val EnhanceRequest.hasManualEdits: Boolean
+    get() = !manual.isNeutral || !colorMixer.isNeutral || !toneCurves.isIdentity || !localAdjustments.isNeutral ||
+        !colorGrading.isNeutral || !retouch.isEmpty || !calibration.isNeutral || !autoWhiteBalance
+
+/**
+ * The render request for an edit — the one place every [EditState] field is mapped, so a new
+ * edit field can't be silently left out of previews, exports or batches.
+ */
+fun EditState.toRequest(target: RenderTarget = RenderTarget.FULL): EnhanceRequest = EnhanceRequest(
+    strength = strength,
+    manual = manual,
+    geometry = geometry,
+    colorMixer = colorMixer,
+    toneCurves = toneCurves,
+    localAdjustments = localAdjustments,
+    colorGrading = colorGrading,
+    calibration = calibration,
+    autoWhiteBalance = autoWhiteBalance,
+    retouch = retouch,
+    sceneOverride = sceneOverride,
+    target = target,
+)
 
 enum class RenderTarget {
     /** Small image for live slider feedback. */

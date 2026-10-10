@@ -9,11 +9,11 @@ import com.pixels.enhancer.domain.analysis.SharpnessEstimator
 import com.pixels.enhancer.domain.analysis.StatisticalImageAnalyzer
 import com.pixels.enhancer.testing.Degradations
 import com.pixels.enhancer.testing.SyntheticScenes
-import kotlinx.coroutines.test.runTest
 import kotlin.math.abs
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
+import kotlinx.coroutines.test.runTest
 
 class ExposureAnalysisTest {
     @Test

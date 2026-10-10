@@ -2,33 +2,50 @@ package com.pixels.enhancer.ui.editor
 
 import android.net.Uri
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.ArrowBack
+import androidx.compose.material.icons.automirrored.outlined.Redo
+import androidx.compose.material.icons.automirrored.outlined.Undo
+import androidx.compose.material.icons.outlined.Compare
+import androidx.compose.material.icons.outlined.MoreVert
+import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.FilterChip
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Slider
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
-import androidx.compose.material3.Tab
-import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -39,185 +56,525 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.pixels.enhancer.R
-import com.pixels.enhancer.domain.analysis.SceneType
-import com.pixels.enhancer.domain.editing.EditState
-import com.pixels.enhancer.domain.planning.HslShift
-import com.pixels.enhancer.domain.planning.HueBand
-import com.pixels.enhancer.ui.adjust.AdjustPanel
-import com.pixels.enhancer.ui.adjust.ColorMixerPanel
-import com.pixels.enhancer.domain.export.ExportOptions
-import com.pixels.enhancer.domain.geometry.CropRect
-import com.pixels.enhancer.domain.geometry.Geometry
-import com.pixels.enhancer.domain.planning.Look
-import com.pixels.enhancer.domain.planning.ManualControl
+import com.pixels.enhancer.domain.presets.SettingsGroup
 import com.pixels.enhancer.ui.ErrorMessages
 import com.pixels.enhancer.ui.compare.CompareMode
 import com.pixels.enhancer.ui.compare.CompareView
 import com.pixels.enhancer.ui.compare.SplitOrientation
 import com.pixels.enhancer.ui.crop.CropEditor
 import com.pixels.enhancer.ui.export.ExportDialog
-import java.util.Locale
-import kotlin.math.roundToInt
+import com.pixels.enhancer.ui.local.BrushMode
+import com.pixels.enhancer.ui.local.BrushSettings
+import com.pixels.enhancer.ui.local.MaskCanvas
+import com.pixels.enhancer.ui.local.MaskingPanel
+import com.pixels.enhancer.ui.panels.AutoPanel
+import com.pixels.enhancer.ui.panels.ColorPanel
+import com.pixels.enhancer.ui.panels.CropPanel
+import com.pixels.enhancer.ui.panels.DetailPanel
+import com.pixels.enhancer.ui.panels.EffectsPanel
+import com.pixels.enhancer.ui.panels.GeometryPanel
+import com.pixels.enhancer.ui.panels.HistoryPanel
+import com.pixels.enhancer.ui.panels.LightPanel
+import com.pixels.enhancer.ui.panels.OpticsPanel
+import com.pixels.enhancer.ui.panels.PanelControls
+import com.pixels.enhancer.ui.panels.PresetsPanel
+import com.pixels.enhancer.ui.retouch.HealCanvas
+import com.pixels.enhancer.ui.retouch.HealingPanel
+import com.pixels.enhancer.ui.theme.OnPhotoCanvas
+import com.pixels.enhancer.ui.theme.PhotoCanvas
+import kotlin.math.min
 
-private const val PERCENT = 100
+/** Fixed panel height keeps the photo the same size whichever tool is open (portrait layout). */
+private val PANEL_HEIGHT = 270.dp
 
-/** Fixed panel height keeps the photo the same size whichever tab is open. */
-private val PANEL_HEIGHT = 230.dp
+/** Width of the side column holding the panel and tools in landscape. */
+private val SIDE_PANEL_WIDTH = 360.dp
 
-private enum class EditorTab(val titleRes: Int) {
-    AUTO(R.string.editor_tab_auto),
-    LOOKS(R.string.editor_tab_looks),
-    ADJUST(R.string.editor_tab_adjust),
-    COLOR(R.string.editor_tab_color),
-    CROP(R.string.editor_tab_crop),
-}
+private enum class NamePrompt { PRESET, VERSION }
 
-/** Callbacks for the export dialog and running export. */
-class ExportActions(
-    val onOptionsChanged: (ExportOptions) -> Unit,
-    val onConfirm: () -> Unit,
-    val onDismiss: () -> Unit,
-    val onCancel: () -> Unit,
-)
+/** Which settings-group dialog is open: paste onto this photo, or apply to other photos. */
+private enum class GroupsDialog { PASTE, BATCH }
 
-/** Callbacks for scene choice and the colour mixer. */
-class ColorActions(
-    val onShiftChanged: (HueBand, HslShift) -> Unit,
-    val onResetAll: () -> Unit,
-    val onSceneSelected: (SceneType?) -> Unit,
-)
-
-/** Callbacks for the Crop tab, grouped to keep EditorScreen's signature readable. */
-class CropActions(
-    val onRotateClockwise: () -> Unit,
-    val onRotateCounterClockwise: () -> Unit,
-    val onFlip: () -> Unit,
-    val onStraightenChanged: (Float) -> Unit,
-    val onCropChanged: (CropRect) -> Unit,
-    val onAspectSelected: (CropAspect) -> Unit,
-    val onReset: () -> Unit,
-    val onCropModeChanged: (Boolean) -> Unit,
-    val ratioFor: (CropAspect) -> Float?,
-)
-
+/**
+ * The editor. Portrait: photo on top, the open tool's panel below it, the tool strip at the
+ * bottom. Landscape (phones on their side, tablets): photo on the left, panel and tools on the
+ * right, so the photo never shrinks to a sliver. Press and hold the photo to see the original.
+ */
 @Composable
 fun EditorScreen(
     state: EditorUiState.Success,
-    onClose: () -> Unit,
-    onConfirmLeave: () -> Unit,
-    onDismissLeave: () -> Unit,
-    onRedo: () -> Unit,
-    onShowOriginalEdit: () -> Unit,
-    onStrengthChanged: (Float) -> Unit,
-    onControlChanged: (ManualControl, Float) -> Unit,
-    onEditFinished: () -> Unit,
-    onLookSelected: (Look) -> Unit,
-    onResetControl: (ManualControl) -> Unit,
-    onResetAll: () -> Unit,
-    onUndo: () -> Unit,
-    onSave: () -> Unit,
-    onShare: () -> Unit,
-    onViewSaved: (Uri) -> Unit,
-    crop: CropActions,
-    export: ExportActions,
-    color: ColorActions,
+    actions: EditorActions,
     onOpenDebug: (() -> Unit)?,
+    onPickBatchPhotos: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    var mode by rememberSaveable { mutableStateOf(CompareMode.COMPARE) }
-    var split by rememberSaveable { mutableStateOf(SplitOrientation.HORIZONTAL) }
-    var tab by rememberSaveable { mutableStateOf(EditorTab.AUTO) }
+    var tool by rememberSaveable { mutableStateOf(EditorTool.PRESETS) }
+    var compare by rememberSaveable { mutableStateOf(false) }
     var viewResetKey by rememberSaveable { mutableIntStateOf(0) }
+    var brush by remember { mutableStateOf(BrushSettings()) }
+    var namePrompt by remember { mutableStateOf<NamePrompt?>(null) }
+    var groupsDialog by remember { mutableStateOf<GroupsDialog?>(null) }
+    var pickingWhiteBalance by remember { mutableStateOf(false) }
     val snackbarHostState = remember { SnackbarHostState() }
-    BackHandler(onBack = onClose)
-    ResultSnackbar(state.activity, snackbarHostState, onViewSaved)
-    LaunchedEffect(tab) { crop.onCropModeChanged(tab == EditorTab.CROP) }
-    state.exportDialog?.let { dialog ->
-        ExportDialog(dialog, export.onOptionsChanged, export.onConfirm, export.onDismiss)
+
+    BackHandler(onBack = actions::onCloseRequested)
+    ResultSnackbar(state.activity, snackbarHostState, actions::onViewSaved)
+    LaunchedEffect(tool) {
+        actions.onCropModeChanged(tool == EditorTool.CROP)
+        if (tool != EditorTool.MASKING) brush = brush.copy(mode = BrushMode.OFF)
+        if (tool != EditorTool.COLOR) pickingWhiteBalance = false
     }
-    if (state.confirmLeave) {
-        AlertDialog(
-            onDismissRequest = onDismissLeave,
-            title = { Text(stringResource(R.string.leave_title)) },
-            text = { Text(stringResource(R.string.leave_message)) },
-            confirmButton = { TextButton(onClick = onConfirmLeave) { Text(stringResource(R.string.leave_confirm)) } },
-            dismissButton = { Button(shape = MaterialTheme.shapes.small, onClick = onDismissLeave) { Text(stringResource(R.string.leave_stay)) } },
+    Dialogs(state, actions, namePrompt, onNameDone = { namePrompt = null })
+    groupsDialog?.let { which ->
+        SettingsGroupsDialog(
+            title = stringResource(if (which == GroupsDialog.PASTE) R.string.menu_paste_settings else R.string.batch_title),
+            message = if (which == GroupsDialog.BATCH) stringResource(R.string.batch_message) else null,
+            confirmLabel = stringResource(if (which == GroupsDialog.PASTE) R.string.paste else R.string.batch_choose_photos),
+            onConfirm = { groups ->
+                groupsDialog = null
+                if (which == GroupsDialog.PASTE) {
+                    actions.onPasteSettings(groups)
+                } else {
+                    actions.onBatchGroupsChosen(groups)
+                    onPickBatchPhotos()
+                }
+            },
+            onDismiss = { groupsDialog = null },
         )
     }
+    state.batch?.let { BatchDialog(it, actions) }
 
-    Box(modifier.fillMaxSize()) {
-        Column(Modifier.fillMaxSize()) {
-            TopBar(state, onClose, onUndo, onRedo, onShare, onSave, onOpenDebug)
-            if (tab == EditorTab.CROP && state.cropMode) {
-                CropEditor(
-                    image = state.enhanced,
-                    crop = state.edit.geometry.crop,
-                    pixelRatio = crop.ratioFor(state.cropAspect),
-                    onCropChanged = crop.onCropChanged,
-                    onCropFinished = onEditFinished,
-                    modifier = Modifier.weight(1f).fillMaxWidth(),
-                )
-            } else {
-                CompareView(
-                    original = state.original,
-                    enhanced = state.enhanced,
-                    mode = mode,
-                    split = split,
-                    beforeLabel = stringResource(R.string.editor_before),
-                    afterLabel = stringResource(R.string.editor_after),
-                    resetKey = viewResetKey,
-                    modifier = Modifier.weight(1f).fillMaxWidth(),
-                )
-            }
-            ActivityLine(state.activity, export.onCancel)
-            if (tab != EditorTab.CROP) ModeSelector(mode, split, onModeChange = { mode = it }, onSplitChange = { split = it })
-            TabRow(selectedTabIndex = tab.ordinal) {
-                EditorTab.entries.forEach { entry ->
-                    Tab(selected = tab == entry, onClick = { tab = entry }, text = { Text(stringResource(entry.titleRes), maxLines = 1) })
-                }
-            }
-            Box(Modifier.fillMaxWidth().height(PANEL_HEIGHT)) {
-                when (tab) {
-                    EditorTab.AUTO -> AutoPanel(state, color.onSceneSelected, onStrengthChanged, onEditFinished, onShowOriginalEdit, onResetAll = {
-                        viewResetKey++
-                        onResetAll()
-                    })
-                    EditorTab.LOOKS -> LooksPanel(state.edit.lookId, onLookSelected)
-                    EditorTab.ADJUST -> AdjustPanel(state.edit, state.histogram, onControlChanged, onEditFinished, onResetControl)
-                    EditorTab.COLOR -> ColorMixerPanel(state.edit, color.onShiftChanged, onEditFinished, color.onResetAll)
-                    EditorTab.CROP -> CropPanel(state.edit, state.cropAspect, crop, onEditFinished)
-                }
-            }
+    val topBar: @Composable () -> Unit = {
+        TopBar(
+            state = state,
+            actions = actions,
+            compare = compare,
+            onCompareChange = {
+                compare = it
+                viewResetKey++
+            },
+            onSavePreset = { namePrompt = NamePrompt.PRESET },
+            onPaste = { groupsDialog = GroupsDialog.PASTE },
+            onBatch = { groupsDialog = GroupsDialog.BATCH },
+            onOpenDebug = onOpenDebug,
+        )
+    }
+    val photo: @Composable (Modifier) -> Unit = { photoModifier ->
+        if (pickingWhiteBalance) {
+            TapToPick(
+                image = state.enhanced,
+                hint = stringResource(R.string.color_pick_wb_hint),
+                onPick = { x, y ->
+                    actions.onPickWhiteBalance(x, y)
+                    pickingWhiteBalance = false
+                },
+                modifier = photoModifier,
+            )
+        } else {
+            PhotoArea(state, tool, compare, viewResetKey, brush, actions, photoModifier)
         }
-        SnackbarHost(snackbarHostState, Modifier.align(Alignment.BottomCenter).padding(16.dp))
+    }
+    val panel: @Composable (Modifier) -> Unit = { panelModifier ->
+        Box(panelModifier.background(MaterialTheme.colorScheme.surfaceContainer)) {
+            ToolPanel(
+                state, tool, brush, onBrushChanged = { brush = it }, actions,
+                onSavePreset = { namePrompt = NamePrompt.PRESET },
+                onSaveVersion = { namePrompt = NamePrompt.VERSION },
+                pickingWhiteBalance = pickingWhiteBalance,
+                onPickWhiteBalance = { pickingWhiteBalance = !pickingWhiteBalance },
+            )
+        }
+    }
+
+    BoxWithConstraints(modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+        val landscape = maxWidth > maxHeight
+        if (landscape) {
+            Row(Modifier.fillMaxSize()) {
+                Column(Modifier.weight(1f).fillMaxHeight()) {
+                    topBar()
+                    photo(Modifier.weight(1f).fillMaxWidth())
+                    ActivityLine(state.activity, actions::onCancelExport)
+                }
+                VerticalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                Column(Modifier.width(SIDE_PANEL_WIDTH).fillMaxHeight()) {
+                    panel(Modifier.weight(1f).fillMaxWidth())
+                    ToolStrip(tool, state) { tool = it }
+                }
+            }
+            SnackbarHost(snackbarHostState, Modifier.align(Alignment.BottomStart).padding(16.dp))
+        } else {
+            Column(Modifier.fillMaxSize()) {
+                topBar()
+                photo(Modifier.weight(1f).fillMaxWidth())
+                ActivityLine(state.activity, actions::onCancelExport)
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                panel(Modifier.fillMaxWidth().height(PANEL_HEIGHT))
+                ToolStrip(tool, state) { tool = it }
+            }
+            SnackbarHost(snackbarHostState, Modifier.align(Alignment.BottomCenter).padding(bottom = PANEL_HEIGHT, start = 16.dp, end = 16.dp))
+        }
     }
 }
 
 @Composable
+private fun PhotoArea(
+    state: EditorUiState.Success,
+    tool: EditorTool,
+    compare: Boolean,
+    viewResetKey: Int,
+    brush: BrushSettings,
+    actions: EditorActions,
+    modifier: Modifier,
+) {
+    when {
+        tool == EditorTool.CROP && state.cropMode -> CropEditor(
+            image = state.enhanced,
+            crop = state.edit.geometry.crop,
+            pixelRatio = actions.aspectRatioFor(state.cropAspect),
+            onCropChanged = actions::onCropChanged,
+            onCropFinished = actions::onEditFinished,
+            modifier = modifier,
+        )
+        tool == EditorTool.MASKING -> MaskCanvas(
+            image = state.enhanced,
+            overlay = state.maskOverlay,
+            selected = state.edit.localAdjustments.byId(state.selectedMaskId ?: -1),
+            brush = brush,
+            actions = actions,
+            modifier = modifier,
+        )
+        tool == EditorTool.HEALING -> HealCanvas(state.enhanced, state.edit.retouch, state.selectedSpotId, actions, modifier)
+        else -> Box(modifier) {
+            CompareView(
+                original = state.original,
+                enhanced = state.enhanced,
+                mode = if (compare) CompareMode.COMPARE else CompareMode.ENHANCED,
+                split = SplitOrientation.HORIZONTAL,
+                beforeLabel = stringResource(R.string.editor_before),
+                afterLabel = stringResource(R.string.editor_after),
+                resetKey = viewResetKey,
+                modifier = Modifier.fillMaxSize(),
+            )
+            if (tool == EditorTool.GEOMETRY || tool == EditorTool.OPTICS) GridOverlay(Modifier.fillMaxSize())
+        }
+    }
+}
+
+/** The edited photo, fitted; one tap reports the normalised position on the photo. */
+@Composable
+private fun TapToPick(image: ImageBitmap, hint: String, onPick: (Float, Float) -> Unit, modifier: Modifier) {
+    BoxWithConstraints(modifier.background(PhotoCanvas)) {
+        val boxWidth = constraints.maxWidth.toFloat()
+        val boxHeight = constraints.maxHeight.toFloat()
+        val scale = min(boxWidth / image.width, boxHeight / image.height)
+        val left = (boxWidth - image.width * scale) / 2f
+        val top = (boxHeight - image.height * scale) / 2f
+        Image(
+            image,
+            contentDescription = hint,
+            contentScale = ContentScale.Fit,
+            // Keyed on the fitted frame too, so a resized window never maps taps with stale numbers.
+            modifier = Modifier.fillMaxSize().pointerInput(image, scale, left, top) {
+                detectTapGestures { position ->
+                    val x = (position.x - left) / (image.width * scale)
+                    val y = (position.y - top) / (image.height * scale)
+                    if (x in 0f..1f && y in 0f..1f) onPick(x, y)
+                }
+            },
+        )
+        Text(
+            hint,
+            style = MaterialTheme.typography.labelLarge,
+            color = OnPhotoCanvas,
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .padding(top = 8.dp)
+                .background(Color.Black.copy(alpha = 0.55f), MaterialTheme.shapes.small)
+                .padding(horizontal = 12.dp, vertical = 6.dp),
+        )
+    }
+}
+
+/** Thirds plus a fine grid, to judge straight lines while correcting perspective and lens distortion. */
+@Composable
+private fun GridOverlay(modifier: Modifier) {
+    Box(
+        modifier.drawWithContent {
+            drawContent()
+            val fine = Color.White.copy(alpha = 0.16f)
+            val coarse = Color.White.copy(alpha = 0.35f)
+            val steps = 12
+            for (i in 1 until steps) {
+                val x = size.width * i / steps
+                val y = size.height * i / steps
+                val color = if (i % 4 == 0) coarse else fine
+                drawLine(color, Offset(x, 0f), Offset(x, size.height), strokeWidth = 1f)
+                drawLine(color, Offset(0f, y), Offset(size.width, y), strokeWidth = 1f)
+            }
+        },
+    )
+}
+
+@Suppress("LongParameterList")
+@Composable
+private fun ToolPanel(
+    state: EditorUiState.Success,
+    tool: EditorTool,
+    brush: BrushSettings,
+    onBrushChanged: (BrushSettings) -> Unit,
+    actions: EditorActions,
+    onSavePreset: () -> Unit,
+    onSaveVersion: () -> Unit,
+    pickingWhiteBalance: Boolean,
+    onPickWhiteBalance: () -> Unit,
+) {
+    val edit = state.edit
+    when (tool) {
+        EditorTool.PRESETS -> PresetsPanel(state.userPresets, state.appliedPreset, actions, onSavePreset)
+        EditorTool.AUTO -> AutoPanel(edit, state.detectedScene, actions)
+        EditorTool.CROP -> CropPanel(edit, state.cropAspect, actions)
+        EditorTool.LIGHT -> LightPanel(edit, state.histogram, state.showClipping, actions)
+        EditorTool.COLOR -> ColorPanel(edit, pickingWhiteBalance, onPickWhiteBalance, actions)
+        EditorTool.EFFECTS -> EffectsPanel(edit, actions)
+        EditorTool.DETAIL -> DetailPanel(edit, actions)
+        EditorTool.OPTICS -> OpticsPanel(edit, actions)
+        EditorTool.GEOMETRY -> GeometryPanel(edit.geometry, actions)
+        EditorTool.MASKING -> MaskingPanel(edit.localAdjustments, state.selectedMaskId, state.showMaskOverlay, brush, onBrushChanged, actions)
+        EditorTool.HEALING -> HealingPanel(edit.retouch, state.selectedSpotId, state.healSettings, actions)
+        EditorTool.HISTORY -> HistoryPanel(state.historyLabels, state.historyPosition, state.versions, actions, onSaveVersion)
+    }
+}
+
+/** Test tag of a tool strip entry. */
+fun toolTag(tool: EditorTool) = "tool:${tool.name}"
+
+/** True when a tool has changes, shown as a dot under its icon. */
+private fun EditorUiState.Success.isEdited(tool: EditorTool): Boolean {
+    val e = edit
+    val g = e.geometry
+    return when (tool) {
+        EditorTool.PRESETS -> appliedPreset != null
+        EditorTool.AUTO -> e.sceneOverride != null
+        EditorTool.CROP -> g.quarterTurns != 0 || g.flipHorizontal || g.straightenDegrees != 0f || !g.crop.isFull
+        EditorTool.LIGHT -> PanelControls.edited(e, PanelControls.LIGHT) || !e.toneCurves.isIdentity
+        EditorTool.COLOR -> PanelControls.edited(e, PanelControls.COLOR) || !e.colorMixer.isNeutral || !e.colorGrading.isNeutral ||
+            !e.calibration.isNeutral || !e.autoWhiteBalance
+        EditorTool.EFFECTS -> PanelControls.edited(e, PanelControls.EFFECTS)
+        EditorTool.DETAIL -> PanelControls.edited(e, PanelControls.DETAIL)
+        EditorTool.OPTICS -> !g.lens.isIdentity || PanelControls.edited(e, PanelControls.OPTICS)
+        EditorTool.GEOMETRY -> !g.perspective.isIdentity
+        EditorTool.MASKING -> e.localAdjustments.items.isNotEmpty()
+        EditorTool.HEALING -> !e.retouch.isEmpty
+        EditorTool.HISTORY -> versions.isNotEmpty()
+    }
+}
+
+@Composable
+private fun ToolStrip(selected: EditorTool, state: EditorUiState.Success, onSelect: (EditorTool) -> Unit) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .background(MaterialTheme.colorScheme.background)
+            .horizontalScroll(rememberScrollState())
+            .padding(horizontal = 6.dp, vertical = 6.dp),
+        horizontalArrangement = Arrangement.spacedBy(2.dp),
+    ) {
+        EditorTool.entries.forEach { tool ->
+            val isSelected = tool == selected
+            val tint = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+            Column(
+                Modifier
+                    .width(66.dp)
+                    .testTag(toolTag(tool))
+                    .semantics { this.selected = isSelected }
+                    .clickable(role = Role.Tab) { onSelect(tool) }
+                    .padding(vertical = 4.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Icon(tool.icon, contentDescription = null, tint = tint)
+                Text(stringResource(tool.labelRes), style = MaterialTheme.typography.labelSmall, color = tint, maxLines = 1)
+                Box(
+                    Modifier
+                        .padding(top = 2.dp)
+                        .size(4.dp)
+                        .background(if (state.isEdited(tool)) tint else Color.Transparent, MaterialTheme.shapes.extraLarge),
+                )
+            }
+        }
+    }
+}
+
+@Suppress("LongParameterList")
+@Composable
 private fun TopBar(
     state: EditorUiState.Success,
-    onClose: () -> Unit,
-    onUndo: () -> Unit,
-    onRedo: () -> Unit,
-    onShare: () -> Unit,
-    onSave: () -> Unit,
+    actions: EditorActions,
+    compare: Boolean,
+    onCompareChange: (Boolean) -> Unit,
+    onSavePreset: () -> Unit,
+    onPaste: () -> Unit,
+    onBatch: () -> Unit,
     onOpenDebug: (() -> Unit)?,
 ) {
     val busy = state.activity is EditorActivity.Saving
-    Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-        TextButton(onClick = onClose) { Text(stringResource(R.string.editor_close)) }
-        if (onOpenDebug != null) TextButton(onClick = onOpenDebug) { Text(stringResource(R.string.editor_debug)) }
+    var menu by remember { mutableStateOf(false) }
+    Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
+        IconButton(onClick = actions::onCloseRequested) { Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = stringResource(R.string.editor_close)) }
         Spacer(Modifier.weight(1f))
-        TextButton(onClick = onUndo, enabled = state.canUndo) { Text(stringResource(R.string.editor_undo)) }
-        TextButton(onClick = onRedo, enabled = state.canRedo) { Text(stringResource(R.string.editor_redo)) }
-        TextButton(onClick = onShare, enabled = !busy) { Text(stringResource(R.string.editor_share)) }
-        Button(shape = MaterialTheme.shapes.small, onClick = onSave, enabled = !busy) { Text(stringResource(R.string.editor_save)) }
+        IconButton(onClick = actions::onUndo, enabled = state.canUndo) { Icon(Icons.AutoMirrored.Outlined.Undo, contentDescription = stringResource(R.string.editor_undo)) }
+        IconButton(onClick = actions::onRedo, enabled = state.canRedo) { Icon(Icons.AutoMirrored.Outlined.Redo, contentDescription = stringResource(R.string.editor_redo)) }
+        IconButton(onClick = { onCompareChange(!compare) }) {
+            Icon(
+                Icons.Outlined.Compare,
+                contentDescription = stringResource(R.string.editor_compare),
+                tint = if (compare) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+            )
+        }
+        Box {
+            IconButton(onClick = { menu = true }) { Icon(Icons.Outlined.MoreVert, contentDescription = stringResource(R.string.editor_more)) }
+            DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                DropdownMenuItem(text = { Text(stringResource(R.string.menu_copy_settings)) }, onClick = { menu = false; actions.onCopySettings() })
+                DropdownMenuItem(text = { Text(stringResource(R.string.menu_paste_settings)) }, enabled = state.canPaste, onClick = { menu = false; onPaste() })
+                DropdownMenuItem(text = { Text(stringResource(R.string.menu_apply_to_others)) }, enabled = state.batch?.running != true, onClick = { menu = false; onBatch() })
+                DropdownMenuItem(text = { Text(stringResource(R.string.menu_save_preset)) }, onClick = { menu = false; onSavePreset() })
+                HorizontalDivider()
+                DropdownMenuItem(text = { Text(stringResource(R.string.editor_reset_all)) }, onClick = { menu = false; actions.onResetAll() })
+                DropdownMenuItem(text = { Text(stringResource(R.string.editor_original_state)) }, onClick = { menu = false; actions.onShowOriginalEdit() })
+                if (onOpenDebug != null) DropdownMenuItem(text = { Text(stringResource(R.string.editor_debug)) }, onClick = { menu = false; onOpenDebug() })
+            }
+        }
+        IconButton(onClick = actions::onShare, enabled = !busy) { Icon(Icons.Outlined.Share, contentDescription = stringResource(R.string.editor_share)) }
+        Button(shape = MaterialTheme.shapes.small, onClick = actions::onSave, enabled = !busy, modifier = Modifier.padding(end = 4.dp)) {
+            Text(stringResource(R.string.editor_save))
+        }
     }
 }
+
+@Composable
+private fun Dialogs(
+    state: EditorUiState.Success,
+    actions: EditorActions,
+    namePrompt: NamePrompt?,
+    onNameDone: () -> Unit,
+) {
+    state.exportDialog?.let { dialog ->
+        ExportDialog(dialog, actions::onExportOptionsChanged, actions::onExportConfirmed, actions::onExportDismissed)
+    }
+    if (state.confirmLeave) {
+        AlertDialog(
+            onDismissRequest = actions::onLeaveDismissed,
+            title = { Text(stringResource(R.string.leave_title)) },
+            text = { Text(stringResource(R.string.leave_message)) },
+            confirmButton = { TextButton(onClick = actions::onClose) { Text(stringResource(R.string.leave_confirm)) } },
+            dismissButton = { Button(shape = MaterialTheme.shapes.small, onClick = actions::onLeaveDismissed) { Text(stringResource(R.string.leave_stay)) } },
+        )
+    }
+    namePrompt?.let { prompt ->
+        var name by remember(prompt) { mutableStateOf("") }
+        AlertDialog(
+            onDismissRequest = onNameDone,
+            title = { Text(stringResource(if (prompt == NamePrompt.PRESET) R.string.menu_save_preset else R.string.versions_save)) },
+            text = {
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it.take(MAX_NAME) },
+                    singleLine = true,
+                    label = { Text(stringResource(R.string.name_label)) },
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    enabled = prompt == NamePrompt.VERSION || name.isNotBlank(),
+                    onClick = {
+                        if (prompt == NamePrompt.PRESET) actions.onSavePreset(name) else actions.onSaveVersion(name)
+                        onNameDone()
+                    },
+                ) { Text(stringResource(R.string.save)) }
+            },
+            dismissButton = { TextButton(onClick = onNameDone) { Text(stringResource(R.string.cancel)) } },
+        )
+    }
+}
+
+/** Ticks for the settings groups to copy (paste, or apply to other photos). */
+@Composable
+private fun SettingsGroupsDialog(
+    title: String,
+    message: String?,
+    confirmLabel: String,
+    onConfirm: (Set<SettingsGroup>) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    var groups by remember { mutableStateOf(SettingsGroup.ALL) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(title) },
+        text = {
+            Column {
+                if (message != null) Text(message, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(bottom = 8.dp))
+                SettingsGroup.entries.forEach { group ->
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .clickable(role = Role.Checkbox) { groups = if (group in groups) groups - group else groups + group },
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Checkbox(checked = group in groups, onCheckedChange = null)
+                        Text(group.label, modifier = Modifier.padding(start = 8.dp))
+                    }
+                }
+            }
+        },
+        confirmButton = { TextButton(enabled = groups.isNotEmpty(), onClick = { onConfirm(groups) }) { Text(confirmLabel) } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) } },
+    )
+}
+
+/** Progress of "apply to other photos", then a summary. */
+@Composable
+private fun BatchDialog(batch: BatchProgress, actions: EditorActions) {
+    AlertDialog(
+        onDismissRequest = { if (!batch.running) actions.onDismissBatch() },
+        title = { Text(stringResource(if (batch.running) R.string.batch_running_title else R.string.batch_done_title)) },
+        text = {
+            Column {
+                if (batch.running) {
+                    LinearProgressIndicator(progress = { if (batch.total == 0) 0f else batch.done / batch.total.toFloat() }, modifier = Modifier.fillMaxWidth())
+                    Text(pluralStringResource(R.plurals.batch_progress, batch.total, batch.done, batch.total), modifier = Modifier.padding(top = 8.dp))
+                } else {
+                    Text(stringResource(R.string.batch_summary, batch.saved, batch.failed))
+                    if (batch.cancelled) Text(stringResource(R.string.batch_cancelled))
+                    if (batch.skipped > 0) Text(pluralStringResource(R.plurals.batch_skipped, batch.skipped, batch.skipped))
+                    Text(stringResource(R.string.batch_where), style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 8.dp))
+                }
+            }
+        },
+        confirmButton = {
+            if (batch.running) {
+                TextButton(onClick = actions::onCancelBatch) { Text(stringResource(R.string.cancel)) }
+            } else {
+                TextButton(onClick = actions::onDismissBatch) { Text(stringResource(R.string.batch_ok)) }
+            }
+        },
+    )
+}
+
+private const val MAX_NAME = 40
 
 @Composable
 private fun ResultSnackbar(activity: EditorActivity, hostState: SnackbarHostState, onViewSaved: (Uri) -> Unit) {
@@ -239,127 +596,14 @@ private fun ResultSnackbar(activity: EditorActivity, hostState: SnackbarHostStat
 }
 
 @Composable
-private fun AutoPanel(
-    state: EditorUiState.Success,
-    onSceneSelected: (SceneType?) -> Unit,
-    onStrengthChanged: (Float) -> Unit,
-    onEditFinished: () -> Unit,
-    onShowOriginalEdit: () -> Unit,
-    onResetAll: () -> Unit,
-) {
-    val strength = state.edit.strength
-    val override = state.edit.sceneOverride
-    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp)) {
-        Text(stringResource(R.string.editor_strength, (strength * PERCENT).roundToInt()), style = MaterialTheme.typography.titleSmall)
-        Slider(value = strength, onValueChange = onStrengthChanged, onValueChangeFinished = onEditFinished)
-        Text(stringResource(R.string.editor_auto_hint), style = MaterialTheme.typography.bodySmall)
-        Text(stringResource(R.string.editor_hold_hint), style = MaterialTheme.typography.bodySmall)
-        Text(
-            stringResource(R.string.editor_scene, (override ?: state.detectedScene).label, state.detectedScene.label),
-            style = MaterialTheme.typography.labelLarge,
-            modifier = Modifier.padding(top = 8.dp),
-        )
-        Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            FilterChip(override == null, { onSceneSelected(null) }, { Text(stringResource(R.string.editor_scene_auto)) })
-            SceneType.entries.forEach { scene ->
-                FilterChip(override == scene, { onSceneSelected(scene) }, { Text(scene.label) })
-            }
-        }
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            TextButton(onClick = onResetAll) { Text(stringResource(R.string.editor_reset_all)) }
-            TextButton(onClick = onShowOriginalEdit) { Text(stringResource(R.string.editor_original_state)) }
-        }
-    }
-}
-
-@Composable
-private fun LooksPanel(selectedLookId: String, onLookSelected: (Look) -> Unit) {
-    Row(
-        Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(16.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        Look.ALL.forEach { look ->
-            FilterChip(selected = look.id == selectedLookId, onClick = { onLookSelected(look) }, label = { Text(look.name) })
-        }
-    }
-}
-
-@Composable
-private fun CropPanel(edit: EditState, aspect: CropAspect, crop: CropActions, onEditFinished: () -> Unit) {
-    val straighten = edit.geometry.straightenDegrees
-    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 8.dp)) {
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            OutlinedButton(shape = MaterialTheme.shapes.small, onClick = crop.onRotateCounterClockwise) { Text(stringResource(R.string.crop_rotate_left), maxLines = 1) }
-            OutlinedButton(shape = MaterialTheme.shapes.small, onClick = crop.onRotateClockwise) { Text(stringResource(R.string.crop_rotate_right), maxLines = 1) }
-            OutlinedButton(shape = MaterialTheme.shapes.small, onClick = crop.onFlip) { Text(stringResource(R.string.crop_flip), maxLines = 1) }
-        }
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                stringResource(R.string.crop_straighten, String.format(Locale.ROOT, "%.1f", straighten)),
-                style = MaterialTheme.typography.labelLarge,
-                modifier = Modifier.weight(1f),
-            )
-            TextButton(onClick = crop.onReset) { Text(stringResource(R.string.crop_reset)) }
-        }
-        Slider(
-            value = straighten,
-            onValueChange = crop.onStraightenChanged,
-            onValueChangeFinished = onEditFinished,
-            valueRange = -Geometry.MAX_STRAIGHTEN_DEGREES..Geometry.MAX_STRAIGHTEN_DEGREES,
-        )
-        Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            CropAspect.entries.forEach { option ->
-                FilterChip(selected = option == aspect, onClick = { crop.onAspectSelected(option) }, label = { Text(option.label) })
-            }
-        }
-    }
-}
-
-
-@Composable
-private fun ModeSelector(
-    mode: CompareMode,
-    split: SplitOrientation,
-    onModeChange: (CompareMode) -> Unit,
-    onSplitChange: (SplitOrientation) -> Unit,
-) {
-    Row(
-        Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        FilterChip(mode == CompareMode.ORIGINAL, { onModeChange(CompareMode.ORIGINAL) }, { Text(stringResource(R.string.editor_mode_original)) })
-        FilterChip(mode == CompareMode.ENHANCED, { onModeChange(CompareMode.ENHANCED) }, { Text(stringResource(R.string.editor_mode_enhanced)) })
-        FilterChip(mode == CompareMode.COMPARE, { onModeChange(CompareMode.COMPARE) }, { Text(stringResource(R.string.editor_mode_compare)) })
-        if (mode == CompareMode.COMPARE) {
-            FilterChip(
-                split == SplitOrientation.HORIZONTAL,
-                { onSplitChange(SplitOrientation.HORIZONTAL) },
-                { Text(stringResource(R.string.editor_split_horizontal)) },
-            )
-            FilterChip(
-                split == SplitOrientation.VERTICAL,
-                { onSplitChange(SplitOrientation.VERTICAL) },
-                { Text(stringResource(R.string.editor_split_vertical)) },
-            )
-        }
-    }
-}
-
-@Composable
 private fun ActivityLine(activity: EditorActivity, onCancelExport: () -> Unit) {
-    val modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp)
     when (activity) {
-        is EditorActivity.Reprocessing -> Column(modifier) {
-            LinearProgressIndicator(progress = { activity.progress }, modifier = Modifier.fillMaxWidth())
-            Text(stringResource(R.string.editor_updating), style = MaterialTheme.typography.bodySmall)
+        is EditorActivity.Reprocessing -> LinearProgressIndicator(progress = { activity.progress }, modifier = Modifier.fillMaxWidth().height(2.dp))
+        is EditorActivity.Saving -> Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
+            LinearProgressIndicator(progress = { activity.progress }, modifier = Modifier.weight(1f))
+            Text(stringResource(R.string.editor_saving), style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(horizontal = 8.dp))
+            TextButton(onClick = onCancelExport) { Text(stringResource(R.string.editor_cancel_export)) }
         }
-        is EditorActivity.Saving -> Column(modifier) {
-            LinearProgressIndicator(progress = { activity.progress }, modifier = Modifier.fillMaxWidth())
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(stringResource(R.string.editor_saving), style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f))
-                TextButton(onClick = onCancelExport) { Text(stringResource(R.string.editor_cancel_export)) }
-            }
-        }
-        else -> Spacer(Modifier.height(4.dp))
+        else -> Spacer(Modifier.height(2.dp))
     }
 }

@@ -21,11 +21,16 @@ data class Project(
     val exportOptions: ExportOptions = ExportOptions(),
     /** The edit as it was at the last successful export; null if never exported. */
     val lastExportedEdit: EditState? = null,
+    /** Named snapshots the user saved ("Versions"), oldest first. */
+    val versions: List<EditVersion> = emptyList(),
     val engineVersion: String = ENHANCEMENT_ALGORITHM_VERSION,
 ) {
     /** True when the current edit has not been exported yet. */
     val hasUnexportedChanges: Boolean get() = lastExportedEdit != edit && edit != EditState()
 }
+
+/** A named snapshot of an edit. */
+data class EditVersion(val name: String, val createdAtMillis: Long, val edit: EditState)
 
 interface ProjectStore {
     suspend fun save(project: Project)

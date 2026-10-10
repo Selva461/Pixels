@@ -17,13 +17,13 @@ import com.pixels.enhancer.testing.Degradations
 import com.pixels.enhancer.testing.InMemoryImageRepository
 import com.pixels.enhancer.testing.RecordingImageSaver
 import com.pixels.enhancer.testing.SyntheticScenes
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.test.runTest
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotEquals
 import kotlin.test.assertTrue
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.test.runTest
 
 class SceneClassifierTest {
     private suspend fun classify(image: PixelBuffer): Classified {

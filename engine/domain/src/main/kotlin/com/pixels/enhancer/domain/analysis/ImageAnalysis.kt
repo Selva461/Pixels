@@ -28,6 +28,10 @@ data class ImageAnalysis(
     /** Relative per-channel edge energy of near-neutral pixels (grey-edge) — the white-balance reference. */
     val neutralBalance: ChannelBalance,
     val luminance: LuminancePercentiles,
+    /** Faces found by the platform detector (empty when none or unsupported). */
+    val faces: List<FaceRegion> = emptyList(),
+    /** Mean luma of the detected faces, or null without faces. */
+    val faceLuma: Float? = null,
 )
 
 data class LuminancePercentiles(

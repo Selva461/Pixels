@@ -1,4 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Only these app-private folders are reachable through the FileProvider. -->
 <paths>
     <cache-path name="shared" path="shared/" />
+    <files-path name="captures" path="captures/" />
+    <files-path name="imports" path="imports/" />
 </paths>

@@ -2,11 +2,11 @@ package com.pixels.enhancer.domain.project
 
 import com.pixels.enhancer.core.logging.EnhancerLogger
 import com.pixels.enhancer.core.logging.NoOpLogger
+import java.io.File
+import java.io.IOException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import java.io.File
-import java.io.IOException
 
 /**
  * One JSON file per project in [directory]. Writes go to a temp file that is then renamed over the

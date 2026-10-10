@@ -15,7 +15,7 @@ class ToneStage : ProcessingStage {
     override fun isEnabled(context: ProcessingContext): Boolean {
         val plan = context.plan
         return plan.contrast.enabled || plan.highlights.enabled || plan.shadows.enabled ||
-            plan.whites.enabled || plan.blacks.enabled || plan.midtones.enabled
+            plan.whites.enabled || plan.blacks.enabled || plan.midtones.enabled || plan.brightness.enabled || plan.gamma.enabled
     }
 
     override suspend fun execute(input: PixelBuffer, context: ProcessingContext): PixelBuffer {
@@ -27,6 +27,8 @@ class ToneStage : ProcessingStage {
             whites = context.effectiveAmount(id, plan.whites),
             blacks = context.effectiveAmount(id, plan.blacks),
             midtones = context.effectiveAmount(id, plan.midtones),
+            brightness = context.effectiveAmount(id, plan.brightness),
+            gammaLog2 = context.effectiveAmount(id, plan.gamma),
         )
         val pixels = input.pixels
         for (index in pixels.indices) {

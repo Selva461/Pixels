@@ -41,6 +41,7 @@ class CropRect private constructor(val left: Float, val top: Float, val right: F
 
 /**
  * User geometry, applied in this order: [quarterTurns] clockwise, horizontal [flipHorizontal],
+ * [lens] correction and [perspective] (one warp, auto-zoomed so no empty edges appear),
  * [straightenDegrees] (with automatic crop so no empty corners appear), then [crop].
  *
  * The helper functions keep what the user *sees* consistent: e.g. rotating a flipped image
@@ -51,21 +52,41 @@ data class Geometry(
     val flipHorizontal: Boolean = false,
     val straightenDegrees: Float = 0f,
     val crop: CropRect = CropRect.FULL,
+    val lens: LensCorrection = LensCorrection.NONE,
+    val perspective: Perspective = Perspective.NONE,
 ) {
-    val isIdentity: Boolean get() = quarterTurns == 0 && !flipHorizontal && straightenDegrees == 0f && crop.isFull
+    val isIdentity: Boolean
+        get() = quarterTurns == 0 && !flipHorizontal && straightenDegrees == 0f && crop.isFull && lens.isIdentity && perspective.isIdentity
 
     /** True when the output's width and height are swapped relative to the source. */
     val swapsAxes: Boolean get() = quarterTurns % 2 == 1
 
-    fun rotatedClockwise(): Geometry =
-        copy(quarterTurns = Math.floorMod(quarterTurns + if (flipHorizontal) -1 else 1, TURNS), crop = crop.rotatedClockwise())
+    fun rotatedClockwise(): Geometry = copy(
+        quarterTurns = Math.floorMod(quarterTurns + if (flipHorizontal) -1 else 1, TURNS),
+        crop = crop.rotatedClockwise(),
+        perspective = perspective.rotatedClockwise(),
+    )
 
-    fun rotatedCounterClockwise(): Geometry =
-        copy(quarterTurns = Math.floorMod(quarterTurns + if (flipHorizontal) 1 else -1, TURNS), crop = crop.rotatedCounterClockwise())
+    fun rotatedCounterClockwise(): Geometry = copy(
+        quarterTurns = Math.floorMod(quarterTurns + if (flipHorizontal) 1 else -1, TURNS),
+        crop = crop.rotatedCounterClockwise(),
+        perspective = perspective.rotatedClockwise().rotatedClockwise().rotatedClockwise(),
+    )
 
     /** Mirroring a straightened image reverses the tilt, so the angle is negated to keep the picture level. */
-    fun flipped(): Geometry =
-        copy(flipHorizontal = !flipHorizontal, straightenDegrees = -straightenDegrees, crop = crop.flippedHorizontally())
+    fun flipped(): Geometry = copy(
+        flipHorizontal = !flipHorizontal,
+        straightenDegrees = negate(straightenDegrees),
+        crop = crop.flippedHorizontally(),
+        perspective = perspective.mirrored(),
+    )
+
+    fun withLens(value: LensCorrection): Geometry = copy(lens = value.clamped())
+
+    fun withPerspective(value: Perspective): Geometry = copy(perspective = value.clamped())
+
+    /** Upside-down mirror of what is on screen: a horizontal flip followed by a half turn. */
+    fun flippedVertically(): Geometry = flipped().rotatedClockwise().rotatedClockwise()
 
     fun straightened(degrees: Float): Geometry = copy(straightenDegrees = degrees.coerceIn(-MAX_STRAIGHTEN_DEGREES, MAX_STRAIGHTEN_DEGREES))
 

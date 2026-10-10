@@ -2,8 +2,11 @@ package com.pixels.enhancer.domain.processing.ops
 
 import com.pixels.enhancer.domain.analysis.ChannelBalance
 import com.pixels.enhancer.domain.image.Luma
+import com.pixels.enhancer.domain.image.Srgb
 import com.pixels.enhancer.domain.planning.NaturalLimits
+import kotlin.math.log2
 import kotlin.math.pow
+import kotlin.math.sqrt
 
 data class ChannelGains(val red: Float, val green: Float, val blue: Float) {
     companion object {
@@ -39,6 +42,25 @@ object WhiteBalanceGains {
         val brightness = Luma.of(red, green, blue)
         return ChannelGains(red / brightness, green / brightness, blue / brightness)
     }
+
+    /**
+     * White-balance picker: the temperature and tint slider changes (−1..1 scale) that make the
+     * sampled colour [red],[green],[blue] (8-bit sRGB, as currently shown) neutral grey. Gains are
+     * log-additive, so the result is added to the current slider values. Null when the sample is
+     * too dark or clipped to measure.
+     */
+    fun neutralizingShift(red: Int, green: Int, blue: Int): Pair<Float, Float>? {
+        if (maxOf(red, green, blue) >= PICKER_CLIPPED || minOf(red, green, blue) <= PICKER_TOO_DARK) return null
+        val r = Srgb.toLinear(red)
+        val g = Srgb.toLinear(green)
+        val b = Srgb.toLinear(blue)
+        val temperature = -log2(r / b) / (2f * TEMPERATURE_STOPS)
+        val tint = log2(g / sqrt(r * b)) / TINT_STOPS
+        return temperature to tint
+    }
+
+    private const val PICKER_CLIPPED = 250
+    private const val PICKER_TOO_DARK = 8
 
     /** Full-scale temperature moves red and blue by ±0.3 stop in opposite directions. */
     private const val TEMPERATURE_STOPS = 0.3f

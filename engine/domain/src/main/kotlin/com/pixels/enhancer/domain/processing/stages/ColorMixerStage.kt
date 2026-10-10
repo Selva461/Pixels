@@ -21,10 +21,10 @@ class ColorMixerStage : ProcessingStage {
     override val id = StageIds.COLOR_MIXER
     override val displayName = "Color Mixer"
 
-    override fun isEnabled(context: ProcessingContext) = !context.plan.colorMixer.isNeutral
+    override fun isEnabled(context: ProcessingContext) = !context.plan.colorMixer.isNeutral || context.plan.globalHue.enabled
 
     override suspend fun execute(input: PixelBuffer, context: ProcessingContext): PixelBuffer {
-        val table = HueTable.build(context.plan.colorMixer)
+        val table = HueTable.build(context.plan.colorMixer, context.plan.globalHue.takeIf { it.enabled }?.amount ?: 0f)
         val pixels = input.pixels
         for (index in pixels.indices) pixels[index] = apply(pixels[index], table)
         return input
@@ -68,13 +68,13 @@ class ColorMixerStage : ProcessingStage {
     /** Per-degree blended shifts, built once per render. */
     private class HueTable(val cos: FloatArray, val sin: FloatArray, val saturation: FloatArray, val luminance: FloatArray) {
         companion object {
-            fun build(mixer: ColorMixer): HueTable {
+            fun build(mixer: ColorMixer, globalHue: Float = 0f): HueTable {
                 val cos = FloatArray(DEGREES)
                 val sin = FloatArray(DEGREES)
                 val saturation = FloatArray(DEGREES)
                 val luminance = FloatArray(DEGREES)
                 for (degree in 0 until DEGREES) {
-                    var hue = 0f
+                    var hue = globalHue
                     var sat = 0f
                     var lum = 0f
                     for ((band, weight) in weights(degree.toFloat())) {

@@ -5,42 +5,76 @@ on:
     branches: ["**"]
   workflow_dispatch:
 
+# Least privilege: jobs only read the repository and upload artifacts.
+permissions:
+  contents: read
+
+# A newer push to the same branch supersedes the run in progress.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
 
-      - uses: actions/setup-java@v4
+      - name: Security gate
+        run: python3 scripts/security_gate.py
+
+      - name: String resource check
+        run: python3 scripts/check_resources.py
+
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: "17"
 
-      - uses: gradle/actions/setup-gradle@v4
+      # Also verifies gradle-wrapper.jar against Gradle's published checksums.
+      - uses: gradle/actions/setup-gradle@v5
 
-      - name: Engine tests
-        run: ./gradlew -p engine test
+      - name: Engine build and tests (compiler warnings are errors)
+        run: ./gradlew -p engine build
 
-      - name: Build debug APK
-        run: ./gradlew :app:assembleDebug
+      # --continue: one run reports unit-test, lint and compile problems together; any failure still fails the job.
+      - name: App unit tests, lint and debug APK
+        run: ./gradlew --continue :app:testDebugUnitTest :app:lintDebug :app:assembleDebug
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
+        if: success() || failure()
         with:
           name: pixels-debug-apk
           path: app/build/outputs/apk/debug/*.apk
+          if-no-files-found: warn
+
+      - name: Upload test and lint reports
+        if: success() || failure()
+        uses: actions/upload-artifact@v6
+        with:
+          name: build-reports
+          path: |
+            engine/domain/build/reports/
+            app/build/reports/
+          if-no-files-found: ignore
 
   device-tests:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 50
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
 
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: "17"
 
-      - uses: gradle/actions/setup-gradle@v4
+      - uses: gradle/actions/setup-gradle@v5
 
       - name: Enable KVM
         run: |
@@ -48,7 +82,7 @@ jobs:
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
 
-      - name: Instrumented tests on emulator
+      - name: Instrumented and Compose UI tests on emulator
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 30
@@ -56,3 +90,11 @@ jobs:
           target: default
           disable-animations: true
           script: ./gradlew :app:connectedDebugAndroidTest
+
+      - name: Upload device test reports
+        if: success() || failure()
+        uses: actions/upload-artifact@v6
+        with:
+          name: device-test-reports
+          path: app/build/reports/androidTests/
+          if-no-files-found: ignore

@@ -19,11 +19,11 @@ import com.pixels.enhancer.domain.processing.stages.ToneStage
 import com.pixels.enhancer.domain.processing.stages.WhiteBalanceStage
 import com.pixels.enhancer.goodAnalysis
 import com.pixels.enhancer.testing.Degradations
-import kotlinx.coroutines.test.runTest
 import kotlin.math.abs
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
+import kotlinx.coroutines.test.runTest
 
 private fun withPlan(transform: (EnhancementPlan) -> EnhancementPlan, analysis: com.pixels.enhancer.domain.analysis.ImageAnalysis = goodAnalysis()) =
     contextFor(analysis = analysis, planOverride = transform)

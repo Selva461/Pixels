@@ -28,6 +28,8 @@ enum class AdjustmentKind(val label: String) {
     WHITES("Whites"),
     BLACKS("Blacks"),
     MIDTONES("Midtones"),
+    BRIGHTNESS("Brightness"),
+    GAMMA("Gamma"),
     DEHAZE("Dehaze"),
     WHITE_BALANCE("White Balance"),
     TEMPERATURE("Temperature"),
@@ -36,9 +38,23 @@ enum class AdjustmentKind(val label: String) {
     GLOBAL_SATURATION("Saturation"),
     NOISE_REDUCTION("Denoise"),
     DETAIL("Clarity"),
+    TEXTURE("Texture"),
     SHARPENING("Sharpen"),
+    SHARPEN_MASKING("Sharpen masking"),
+    COLOR_NOISE_REDUCTION("Color denoise"),
+    FACE_EXPOSURE("Face exposure"),
     VIGNETTE("Vignette"),
     GRAIN("Grain"),
+    SHARPEN_RADIUS("Sharpen radius"),
+    SHARPEN_DETAIL("Sharpen detail"),
+    VIGNETTE_MIDPOINT("Vignette midpoint"),
+    VIGNETTE_FEATHER("Vignette feather"),
+    VIGNETTE_ROUNDNESS("Vignette roundness"),
+    GRAIN_SIZE("Grain size"),
+    GRAIN_ROUGHNESS("Grain roughness"),
+    GLOBAL_HUE("Hue"),
+    DEFRINGE_PURPLE("Defringe purple"),
+    DEFRINGE_GREEN("Defringe green"),
 }
 
 /**
@@ -75,8 +91,33 @@ data class EnhancementPlan(
     val blacks: Adjustment = Adjustment.MANUAL_ONLY,
     val midtones: Adjustment = Adjustment.MANUAL_ONLY,
     val dehaze: Adjustment = Adjustment.MANUAL_ONLY,
+    val brightness: Adjustment = Adjustment.MANUAL_ONLY,
+    /** log2 of the gamma value: 0 = 1.0, ±1 = 2.0 / 0.5. */
+    val gamma: Adjustment = Adjustment.MANUAL_ONLY,
+    val texture: Adjustment = Adjustment.MANUAL_ONLY,
+    val sharpenMasking: Adjustment = Adjustment.MANUAL_ONLY,
+    val colorNoiseReduction: Adjustment = Adjustment.MANUAL_ONLY,
+    /** EV applied softly around detected faces (portraits). */
+    val faceExposure: Adjustment = Adjustment.none("No faces detected"),
+    val sharpenRadius: Adjustment = Adjustment.MANUAL_ONLY,
+    val sharpenDetail: Adjustment = Adjustment.MANUAL_ONLY,
+    val vignetteMidpoint: Adjustment = Adjustment.MANUAL_ONLY,
+    val vignetteFeather: Adjustment = Adjustment.MANUAL_ONLY,
+    val vignetteRoundness: Adjustment = Adjustment.MANUAL_ONLY,
+    val grainSize: Adjustment = Adjustment.MANUAL_ONLY,
+    val grainRoughness: Adjustment = Adjustment.MANUAL_ONLY,
+    /** Rotates every hue; −1..1 = ±30°. */
+    val globalHue: Adjustment = Adjustment.MANUAL_ONLY,
+    val defringePurple: Adjustment = Adjustment.MANUAL_ONLY,
+    val defringeGreen: Adjustment = Adjustment.MANUAL_ONLY,
     /** Per-hue-band HSL shifts (manual only). */
     val colorMixer: ColorMixer = ColorMixer.NONE,
+    /** Colour grading wheels and black-and-white treatment (manual only). */
+    val colorGrading: ColorGrading = ColorGrading.NONE,
+    /** Primary hue/saturation and shadows tint (manual only). */
+    val calibration: Calibration = Calibration.NONE,
+    /** User tone curves (manual only). */
+    val toneCurves: ToneCurves = ToneCurves.NONE,
     val algorithmVersion: String = ENHANCEMENT_ALGORITHM_VERSION,
 ) {
     operator fun get(kind: AdjustmentKind): Adjustment = when (kind) {
@@ -87,6 +128,12 @@ data class EnhancementPlan(
         AdjustmentKind.WHITES -> whites
         AdjustmentKind.BLACKS -> blacks
         AdjustmentKind.MIDTONES -> midtones
+        AdjustmentKind.BRIGHTNESS -> brightness
+        AdjustmentKind.GAMMA -> gamma
+        AdjustmentKind.TEXTURE -> texture
+        AdjustmentKind.SHARPEN_MASKING -> sharpenMasking
+        AdjustmentKind.COLOR_NOISE_REDUCTION -> colorNoiseReduction
+        AdjustmentKind.FACE_EXPOSURE -> faceExposure
         AdjustmentKind.DEHAZE -> dehaze
         AdjustmentKind.WHITE_BALANCE -> whiteBalance
         AdjustmentKind.TEMPERATURE -> temperature
@@ -98,6 +145,16 @@ data class EnhancementPlan(
         AdjustmentKind.SHARPENING -> sharpening
         AdjustmentKind.VIGNETTE -> vignette
         AdjustmentKind.GRAIN -> grain
+        AdjustmentKind.SHARPEN_RADIUS -> sharpenRadius
+        AdjustmentKind.SHARPEN_DETAIL -> sharpenDetail
+        AdjustmentKind.VIGNETTE_MIDPOINT -> vignetteMidpoint
+        AdjustmentKind.VIGNETTE_FEATHER -> vignetteFeather
+        AdjustmentKind.VIGNETTE_ROUNDNESS -> vignetteRoundness
+        AdjustmentKind.GRAIN_SIZE -> grainSize
+        AdjustmentKind.GRAIN_ROUGHNESS -> grainRoughness
+        AdjustmentKind.GLOBAL_HUE -> globalHue
+        AdjustmentKind.DEFRINGE_PURPLE -> defringePurple
+        AdjustmentKind.DEFRINGE_GREEN -> defringeGreen
     }
 
     fun entries(): List<Pair<AdjustmentKind, Adjustment>> = AdjustmentKind.entries.map { it to get(it) }
@@ -110,6 +167,12 @@ data class EnhancementPlan(
         whites = transform(AdjustmentKind.WHITES, whites),
         blacks = transform(AdjustmentKind.BLACKS, blacks),
         midtones = transform(AdjustmentKind.MIDTONES, midtones),
+        brightness = transform(AdjustmentKind.BRIGHTNESS, brightness),
+        gamma = transform(AdjustmentKind.GAMMA, gamma),
+        texture = transform(AdjustmentKind.TEXTURE, texture),
+        sharpenMasking = transform(AdjustmentKind.SHARPEN_MASKING, sharpenMasking),
+        colorNoiseReduction = transform(AdjustmentKind.COLOR_NOISE_REDUCTION, colorNoiseReduction),
+        faceExposure = transform(AdjustmentKind.FACE_EXPOSURE, faceExposure),
         dehaze = transform(AdjustmentKind.DEHAZE, dehaze),
         whiteBalance = transform(AdjustmentKind.WHITE_BALANCE, whiteBalance),
         temperature = transform(AdjustmentKind.TEMPERATURE, temperature),
@@ -121,7 +184,17 @@ data class EnhancementPlan(
         sharpening = transform(AdjustmentKind.SHARPENING, sharpening),
         vignette = transform(AdjustmentKind.VIGNETTE, vignette),
         grain = transform(AdjustmentKind.GRAIN, grain),
+        sharpenRadius = transform(AdjustmentKind.SHARPEN_RADIUS, sharpenRadius),
+        sharpenDetail = transform(AdjustmentKind.SHARPEN_DETAIL, sharpenDetail),
+        vignetteMidpoint = transform(AdjustmentKind.VIGNETTE_MIDPOINT, vignetteMidpoint),
+        vignetteFeather = transform(AdjustmentKind.VIGNETTE_FEATHER, vignetteFeather),
+        vignetteRoundness = transform(AdjustmentKind.VIGNETTE_ROUNDNESS, vignetteRoundness),
+        grainSize = transform(AdjustmentKind.GRAIN_SIZE, grainSize),
+        grainRoughness = transform(AdjustmentKind.GRAIN_ROUGHNESS, grainRoughness),
+        globalHue = transform(AdjustmentKind.GLOBAL_HUE, globalHue),
+        defringePurple = transform(AdjustmentKind.DEFRINGE_PURPLE, defringePurple),
+        defringeGreen = transform(AdjustmentKind.DEFRINGE_GREEN, defringeGreen),
     )
 
-    val hasAnyCorrection: Boolean get() = AdjustmentKind.entries.any { get(it).enabled } || !colorMixer.isNeutral
+    val hasAnyCorrection: Boolean get() = AdjustmentKind.entries.any { get(it).enabled } || !colorMixer.isNeutral || !toneCurves.isIdentity || !colorGrading.isNeutral || !calibration.isNeutral
 }

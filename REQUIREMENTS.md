@@ -722,3 +722,68 @@ readable full-resolution images and remain maintainable.
 framework, image-processing libraries and platform-specific
 implementation must be selected based on the repository, not assumed in
 advance.
+
+------------------------------------------------------------------------
+
+## 16. Requirements Added During Development
+
+_Added 2026-10-07/08 at the owner's request ("all the features of a paid pro editor, no AI";
+"strict development, QA, security, UI, audit and documentation"). Same rules as above: natural,
+non-generative, on-device. Status: ✅ done and verified as stated · 🟡 partial · ⬜ open._
+
+### 16.1 Editing
+
+| ID | Requirement | Acceptance criteria | Status | Evidence |
+|---|---|---|---|---|
+| R-ED-01 | Calibration | Red/green/blue primary hue and saturation (±) and shadows tint; neutral greys stay neutral; stored in projects; copy/paste group "Calibration" | ✅ | `CalibrationStage`, `ProEditorExtrasTest` |
+| R-ED-02 | Defringe | Purple and green amount sliders remove coloured fringes only next to high-contrast edges | ✅ | `DefringeStage`, `ProEditorExtrasTest` |
+| R-ED-03 | White-balance modes | Auto, As shot (automatic correction skipped), Pick (tap a neutral spot) | ✅ | `EnhanceImageUseCase`, `ProEditorExtrasTest` |
+| R-ED-04 | Curve presets | Linear, Medium contrast, Strong contrast, Lift shadows, Faded per channel | ✅ | `CurvePreset`, `ProEditorExtrasTest` |
+| R-ED-05 | Panel reset | Every adjustment panel resets only its own controls; button disabled when nothing to reset | ✅ | `PanelControlsTest`, `EditorScreenTest` |
+| R-ED-06 | Named history | Every step listed with what changed; tapping a step restores it; redo steps remain until a new change | ✅ | `EditDiff`, `EditHistory.jumpTo`, `EditorScreenTest` |
+| R-ED-07 | Mask management | Duplicate and rename masks (max 12, names ≤ 40 characters, control characters removed) | ✅ | `LocalAdjustments`, `ProEditorExtrasTest` |
+| R-ED-08 | Preset amount | 0 % returns the edit from before the preset exactly; 100 % applies it; up to 200 % | ✅ | `PresetMath.apply`, `ProEditorExtrasTest` |
+| R-ED-09 | More crop ratios | 5:4, 21:9, 3:4, 2:3 in addition to the existing ratios | ✅ | `CropAspect` |
+
+### 16.2 Import, export and batch
+
+| ID | Requirement | Acceptance criteria | Status | Evidence |
+|---|---|---|---|---|
+| R-IO-01 | Camera capture | Home > Take a photo uses the camera app via `TakePicture`; no CAMERA permission; cancelled captures leave no file | ✅ | `MainActivity`, `IncomingImages` |
+| R-IO-02 | Share / Edit with Pixels | Accept `ACTION_SEND` and `ACTION_EDIT` for `image/*`; content URIs only; own provider refused; supported MIME types only; ≤ 200 MB; copied into app storage | ✅ | `IncomingImagesTest` |
+| R-IO-03 | WebP export | WebP with quality; decodes back at the requested size | ✅ | `SaveFlowTest.webpExportIsAWebpFileAtFullSize` |
+| R-IO-04 | Border | Thin/medium/thick (1.5/4/8 % of the long edge), white or black; sized exports include the border in the requested size; dialog shows exact output size | ✅ | `SaveFlowTest.borderFramesTheExportInTheChosenColour` |
+| R-IO-05 | Watermark | Text ≤ 60 characters (control characters removed), 5 positions, size, opacity; drawn only on the export, never on the open photo | ✅ | `WatermarkDecoratorTest`, `SaveFlowTest` |
+| R-IO-06 | Apply to other photos | Choose settings groups, pick up to 50 photos, each saved as a new file and recorded in Recent; progress, cancel, summary with saved/failed/skipped | ✅ | `ProEditorExtrasTest` (batch), `EditorScreenTest` |
+| R-IO-07 | Safe file names | Exported names keep only safe characters, ≤ 80 characters, correct extension | ✅ | `OutputNaming`, `ProEditorExtrasTest` |
+
+### 16.3 App
+
+| ID | Requirement | Acceptance criteria | Status | Evidence |
+|---|---|---|---|---|
+| R-APP-01 | Settings screen | Default Auto strength, haptics, confirm-before-leaving, export defaults, storage used, clear temporary files, delete presets, delete all edits; destructive actions confirm | ✅ | `SettingsScreen`, `HomeAndSettingsTest` |
+| R-APP-02 | Settings robustness | Unknown, damaged or wrongly typed stored values fall back to defaults; older export settings migrate | ✅ | `SettingsRepositoryTest` |
+| R-APP-03 | Recent edits management | Rename, duplicate (with preview), remove with confirmation; the photo is never deleted | ✅ | `HomeAndSettingsTest`, `ProEditorExtrasTest` (duplicate, rename) |
+| R-APP-04 | Landscape layouts | Home and editor usable with the phone sideways; nothing clipped | ✅ | Code review; device check ⬜ |
+| R-APP-05 | Haptics | Light tick when a slider reaches zero or is reset; can be turned off | ✅ | `ProSlider` |
+| R-APP-06 | Accessibility | Sliders expose label, value, range and set-progress (not when disabled); tabs expose selection; icon buttons have descriptions | ✅ | `EditorScreenTest` uses these semantics; TalkBack device pass ⬜ |
+| R-APP-07 | Wording | Counts use plural forms; every string exists and receives the right arguments | ✅ | `scripts/check_resources.py` |
+
+### 16.4 Security and quality gates
+
+| ID | Requirement | Acceptance criteria | Status | Evidence |
+|---|---|---|---|---|
+| R-SEC-01 | No permissions | The manifest requests no permissions | ✅ | `scripts/security_gate.py` |
+| R-SEC-02 | Minimal exposure | Only the launcher activity exported; FileProvider private with exactly `cache/shared`, `files/captures`, `files/imports` | ✅ | Security gate |
+| R-SEC-03 | No data leaves via backup | `allowBackup=false`; data-extraction rules exclude every domain for cloud backup and device transfer | ✅ | Security gate |
+| R-SEC-04 | No risky APIs or secrets | No WebView, dynamic code, shell, world-readable files, custom TLS, network classes, stray logging; no secrets or keystores committed | ✅ | Security gate |
+| R-SEC-05 | Least-privilege CI | Read-only token, no persisted credentials, no `pull_request_target`, no untrusted event text in scripts | ✅ | Security gate |
+| R-QA-01 | Engine strictness | Compiler warnings fail the engine build; seeded fuzz tests for rendering and save/load | ✅ | `engine/build.gradle.kts`, `EditFuzzTest` |
+| R-QA-02 | App checks in CI | Android lint (errors fail), app unit tests, debug APK, device and Compose UI tests on every push; reports uploaded | ✅ | `.github/workflows/android.yml` |
+| R-QA-03 | Compile check without Google Maven | The app, its unit tests and device tests can be type-checked offline | ✅ | `tools/offline-typecheck/` |
+
+### 16.5 Status of the § 10 acceptance checklist
+
+Tracked with evidence in [AUDIT.md](AUDIT.md) § Requirements traceability. All items are met in
+code and automated tests; the remaining manual checks on real phones (comparison gestures,
+restart after force-stop, HEIC input, performance, TalkBack) are listed there as open items.

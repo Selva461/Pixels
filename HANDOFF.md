@@ -1,31 +1,114 @@
 # HANDOFF
 
-_Last updated: 2026-10-03 · algorithm version 1.1_
+_Last updated: 2026-10-08 (strict development, QA, security, audit and docs pass) · algorithm version 1.1_
 
-## Current status (2026-10-03)
+## Current status (2026-10-08)
 
-- Engine: `./gradlew -p engine build` — 149 tests pass, no warnings.
-- Last green CI (APK + 3 device tests): commit 91a359a (crop/rotate).
-- **CI has been blocked since commit 39fe15c** by a GitHub billing error on the repository owner's
-  account ("recent account payments have failed or your spending limit needs to be increased").
-  Therefore everything in `app/` added since 91a359a — export dialog, projects/Home, redo,
-  press-and-hold, leave prompt, grouped Adjust panel, Color tab, scene chips, and the 3 new device
-  tests — has **not been compiled or run**. Expect possible compile fixes on the next CI run.
+- **All green in CI** for the app commit `f8a353a` (branch `claude/premium-editor-5`, run
+  [37731711223](https://github.com/Selva461/Pixels/actions/runs/37731711223)): security gate, string
+  check, engine build (warnings are errors, 222 tests), Android lint (errors fail), 5 app unit
+  tests, debug APK, and **28 device tests including 10 Compose UI tests** on an API 30 emulator.
+- The documentation commit goes on a new branch (pushes to existing branches are refused by the
+  repository ruleset) and the pull request is opened from the final branch; it supersedes PR #2.
+- Development containers without Google Maven can still compile-check the whole app:
+  `tools/offline-typecheck/run.sh` (see its README). Use it before every push.
+- Release state: debug APK only. No release signing, R8 or store listing yet (see AUDIT.md).
 
 ## Known issues
 
-- See IMPLEMENTATION_PLAN.md for unimplemented requirements (curves, masks, lens/perspective,
-  portrait face tools, eyedropper, HEIC, colour profiles, Kelvin temperature, settings/help).
-- Scene classifier and all thresholds are tuned on synthetic images only.
-- Preview renders on every slider move at 1280 px; not yet benchmarked on a phone.
+- **Target SDK 35.** Google Play raises the required target API every August; check before
+  publishing whether API 36 is required, then test on Android 16. Lint reports it as a warning.
+- Not yet checked on real phones: performance on a mid-range device, TalkBack, 200 % font size,
+  OEM camera and gallery apps (camera capture, sharing), HEIC input. Checklist in TESTING.md.
+- Lint warnings are not triaged (errors fail CI; warnings are in the `build-reports` artifact).
+- Face detection uses the legacy `android.media.FaceDetector` (upright faces, eyes visible); it only
+  places a soft exposure region. Scene classifier and thresholds are tuned on synthetic images.
+- Not implemented: HEIC and colour-profile export. AI masks and
+  generative tools are excluded by the owner's choice ("no AI").
+- Supply chain: actions use major-version tags (not commit SHAs); no Gradle dependency verification.
+  Recommended owner actions are in SECURITY.md.
 
 ## Next single action
 
-Restore GitHub Actions (fix billing or make the repository public), let CI build commit HEAD, fix
-any compile errors in `app/`, and confirm the 6 device tests pass. Then review real photos with the
-debug report to calibrate the scene classifier.
+Owner: review and merge the pull request that supersedes #2, then install the debug APK from its
+CI run on a phone and work through the manual checklist in TESTING.md (especially camera,
+sharing from a gallery app, landscape and TalkBack).
 
 ## What changed
+
+### 2026-10-08 — strict pass: features, QA, security, audit, documentation
+
+The owner asked for "more and more features" with very strict development, QA, security, UI,
+audit and documentation, and an APK. No AI, as before.
+
+- **Engine** (`0102952`): `CalibrationStage` (primaries hue/saturation, shadows tint; column-scaled
+  matrix keeps white neutral), `DefringeStage` (purple/green fringes next to edges), white-balance
+  As shot, curve presets, WebP, `Border`/`BorderOps`, watermark settings and the `ExportDecorator`
+  hook, `BatchExportUseCase` (≤50 photos), named history (`EditDiff`, `EditHistory.jumpTo`),
+  project duplicate/rename, mask duplicate/rename, `PresetMath.apply` blending, `EditState.toRequest()`
+  as the single edit → request mapping, signed-zero fix in geometry, export-options codec,
+  safe output names. Compiler warnings are errors; seeded fuzz tests (`EditFuzzTest`).
+- **App** (`f8a353a`): Settings screen, camera capture (`TakePicture` into `files/captures`, no
+  permission), Share/Edit with Pixels (`IncomingImages`: content URIs only, own provider refused,
+  MIME and 200 MB checks, copied into `files/imports`), Apply to other photos, History panel,
+  panel Reset buttons (`PanelControls` is the single list of which slider is in which panel),
+  calibration UI, WB Auto/As shot/Pick, curve presets, RGB histogram, mask duplicate/rename,
+  recent-edit rename/duplicate/remove, landscape layouts, haptics, export WebP/border/watermark
+  (`AndroidWatermarkDecorator`), `AppStorage` for the storage figure.
+- **Fixed in review** (details and guards in AUDIT.md): watermark leaking into the open photo,
+  crash on wrongly typed settings, share-import crashes, background storage crashes, preset
+  Amount 0 %, signed zero, grading not saved, calibration saturation, edits not rendered,
+  stale tap-to-pick, disabled-slider accessibility, Home clipped in landscape, plurals.
+- **QA:** app unit tests (`PanelControlsTest`), device tests (`SaveFlowTest` WebP/border/
+  watermark, `WatermarkDecoratorTest`, `IncomingImagesTest`, `SettingsRepositoryTest`), Compose UI
+  tests (`EditorScreenTest`, `HomeAndSettingsTest`) using a recording `EditorActions` proxy,
+  Android lint gate, `scripts/check_resources.py`, `tools/offline-typecheck/`.
+- **Security:** `scripts/security_gate.py` (permissions, exported components, FileProvider paths,
+  backup rules, risky APIs, logging, secrets, workflow permissions), data-extraction rules, decoder
+  accepts content URIs only, read-only CI token without persisted credentials. SECURITY.md has the
+  threat model.
+- **Docs:** AUDIT.md, SECURITY.md, CHANGELOG.md, CONTRIBUTING.md (no outside contributions),
+  USER_GUIDE.md, REQUIREMENTS.md § 16 (new requirement IDs with evidence); README, ARCHITECTURE,
+  IMPLEMENTATION_PLAN and TESTING updated.
+
+### 2026-10-07 — extra tools and guides
+
+White-balance picker, Auto straighten / Auto upright (`geometry/AutoGeometry.kt`: Sobel edge
+angles; level = histogram peak, upright = 1-D searches on a 256 px copy), red-eye retouch mode,
+global Hue slider, clipping warnings, and an offline in-app Guide (Home > Guide). A user guide
+was also written as a shareable doc.
+
+### 2026-10-07 — pro editor (Premium-level tools, no AI)
+
+The user asked for the features of a paid pro mobile editor and a similar UI, keeping the engine.
+Nothing was copied from another app: tools were implemented from scratch and the UI uses the
+common pro-editor layout (photo, panel, tool strip) with Pixels' own palette and icons from
+Material Symbols. The user chose "no AI", so subject/sky/people masks, AI denoise and generative
+remove are not included.
+
+- Engine: `geometry/Optics.kt` + `OpticsWarp` (lens and perspective in one auto-fitted warp),
+  brush/range masks (`local/MaskRaster.kt`), `retouch/` (heal/clone + automatic source),
+  `ColorGradingStage` + B&W treatment, sharpen radius/detail, vignette midpoint/feather/roundness,
+  grain size/roughness, `presets/` (library, amount, user presets, copy/paste), project versions.
+  Project files stay schema 1 (all new fields optional).
+- App: dark workspace, `EditorTool` strip, `ProSlider`, panels in `ui/panels/`, `ui/local/Masking.kt`
+  (mask canvas + panel), `ui/retouch/Healing.kt`, `EditorActions` implemented by the view model.
+- Ruleset note: updates to existing branches are refused ("changes must be made through a pull
+  request"); each push needs a new branch until the ruleset is narrowed to the default branch.
+
+### 2026-10-07 — remaining editing requirements
+
+- Controls: exposure ±3 EV, brightness, gamma, exposure compensation, midtones, texture, colour
+  noise reduction and sharpening masking ("More controls" reveals the advanced ones).
+- Geometry: flip vertical, 4:3 and 9:16 crops. HEIC/HEIF accepted on import.
+- Tone curves (`planning/ToneCurves.kt`, `CurvesStage`, `ui/adjust/CurvePanel.kt`): master and
+  R/G/B, monotone cubic so curves never overshoot; stored in projects.
+- Local adjustments (`domain/local/`, `ui/local/LocalPanel.kt`): radial and linear masks with
+  exposure, contrast, saturation, temperature, feather and invert, drawn on the photo with drag
+  handles; rendered after geometry; stored in projects.
+- Face exposure (`analysis/Faces.kt`, `FaceExposureStage`, `AndroidFaceLocator`): faces found on
+  device lift toward a natural target (max +0.9 EV auto); backlit faces are not darkened by the
+  global exposure cut. Manual "Face exposure" slider in the Portrait group.
 
 ### 2026-10-03 — design pass against a "looks auto-generated" checklist
 

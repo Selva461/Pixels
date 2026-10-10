@@ -8,6 +8,10 @@ import com.pixels.enhancer.domain.analysis.SceneType
 import com.pixels.enhancer.domain.debug.DebugSection
 import com.pixels.enhancer.domain.editing.EditState
 import com.pixels.enhancer.domain.export.ExportOptions
+import com.pixels.enhancer.domain.presets.Preset
+import com.pixels.enhancer.domain.project.EditVersion
+import com.pixels.enhancer.domain.retouch.RetouchMode
+import com.pixels.enhancer.domain.retouch.RetouchSpot
 
 /** Single state model for the whole flow — no independent isLoading / hasError flags. */
 sealed interface EditorUiState {
@@ -41,6 +45,25 @@ sealed interface EditorUiState {
         val activity: EditorActivity,
         /** Present only in developer builds. */
         val debug: DebugInfo?,
+        val userPresets: List<Preset> = emptyList(),
+        /** Preset applied last, with its amount slider (0..2). */
+        val appliedPreset: AppliedPreset? = null,
+        val versions: List<EditVersion> = emptyList(),
+        /** True once settings were copied and can be pasted. */
+        val canPaste: Boolean = false,
+        val selectedMaskId: Int? = null,
+        /** Red overlay showing where the selected mask applies, when switched on. */
+        val maskOverlay: ImageBitmap? = null,
+        val showMaskOverlay: Boolean = false,
+        val selectedSpotId: Int? = null,
+        val healSettings: HealSettings = HealSettings(),
+        /** Clipped highlights/shadows are marked on [enhanced]. */
+        val showClipping: Boolean = false,
+        /** What each history step changed, oldest first; [historyPosition] is the current step. */
+        val historyLabels: List<String> = emptyList(),
+        val historyPosition: Int = 0,
+        /** Non-null while a batch runs and until its summary is dismissed. */
+        val batch: BatchProgress? = null,
     ) : EditorUiState
 
     data class Error(val code: ErrorCode) : EditorUiState
@@ -55,6 +78,26 @@ sealed interface EditorActivity {
     data class Failed(val code: ErrorCode) : EditorActivity
 }
 
+/** Progress and outcome of "apply these settings to other photos". */
+data class BatchProgress(
+    val total: Int,
+    val done: Int,
+    val saved: Int,
+    val failed: Int,
+    val running: Boolean,
+    val cancelled: Boolean = false,
+    /** Photos beyond the per-batch limit that were not processed. */
+    val skipped: Int = 0,
+)
+
+data class AppliedPreset(val preset: Preset, val amount: Float)
+
+/** Brush for new heal/clone spots. */
+data class HealSettings(val mode: RetouchMode = RetouchMode.HEAL, val radius: Float = RetouchSpot.DEFAULT_RADIUS, val feather: Float = RetouchSpot.DEFAULT_FEATHER)
+
+/** Kinds of mask the user can add. */
+enum class MaskKind { BRUSH, LINEAR, RADIAL, LUMINANCE, COLOR }
+
 data class ExportDialogState(val options: ExportOptions, val width: Int, val height: Int)
 
 data class RecentProject(val id: String, val name: String, val modifiedAtMillis: Long, val thumbnail: ImageBitmap?)
@@ -64,9 +107,15 @@ enum class CropAspect(val label: String, val ratio: Float?) {
     FREE("Free", null),
     ORIGINAL("Original", null),
     SQUARE("1:1", 1f),
-    PORTRAIT_4_5("4:5", 4f / 5f),
+    LANDSCAPE_5_4("5:4", 5f / 4f),
+    LANDSCAPE_4_3("4:3", 4f / 3f),
     LANDSCAPE_3_2("3:2", 3f / 2f),
     WIDE_16_9("16:9", 16f / 9f),
+    CINEMA_21_9("21:9", 21f / 9f),
+    PORTRAIT_4_5("4:5", 4f / 5f),
+    PORTRAIT_3_4("3:4", 3f / 4f),
+    PORTRAIT_2_3("2:3", 2f / 3f),
+    TALL_9_16("9:16", 9f / 16f),
 }
 
 data class DebugInfo(
