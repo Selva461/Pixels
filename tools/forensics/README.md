@@ -33,8 +33,13 @@ with the original using `src/roundtrip_check.py`.
 | --- | --- | --- |
 | 1. Measurement harness | done | 4 passed, 1 skipped |
 | 2. Colour-managed I/O | done | crushed channels 12.37 % → passes (sRGB copy alone: 0.64 %); P3 round trip ΔE00 mean 0.00, p99 0.00 |
+| 3. Edge-aware mattes | partly | halo 6 px / area 18.8 → 6 px / 16.7 (rules subject); with a person mask: 25 px / 117 → 6 px / 30.0; coverage 0.21 passes |
 
-Still failing on the app render after Task 2 (Tasks 3–5): halo extent 6 px, halo area 18.8, sky noise ×1.79,
-skin ΔE00 4.60 / hue −3.15°, global fit 1.17.
+Still failing on the app render after Task 3: halo extent 6 px, halo area 16.7, sky noise ×1.79, skin ΔE00 4.50 /
+hue −3.14°, global fit 1.13. Masks are now refined with a colour-guided filter and evaluated on the photo at full size
+(`GuidedMatte`), never blurred. What still drives the halo is not feathering: the desktop harness has no people model,
+so the rules-based subject covers only the torso and the sky detector takes the grass field for sky; with a person
+mask at the phone model's 257 × 257, the brief's own reference pipeline also fails (8 px / 23.6), and Smart edit's
+subject lift (+0.84 EV plus shadows) is about 2.4× the reference's +0.35 EV.
 Never loosen a threshold in `tests/test_acceptance.py` to get green; they were calibrated on one
 photo and must be re-calibrated on 20+ varied pairs before release.
