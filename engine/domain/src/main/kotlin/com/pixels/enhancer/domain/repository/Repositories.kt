@@ -1,5 +1,6 @@
 package com.pixels.enhancer.domain.repository
 
+import com.pixels.enhancer.domain.color.RgbColorSpace
 import com.pixels.enhancer.domain.export.ExportOptions
 import com.pixels.enhancer.domain.export.MetadataPolicy
 import com.pixels.enhancer.domain.image.PixelBuffer
@@ -31,6 +32,8 @@ data class SaveRequest(
     val metadata: MetadataPolicy = MetadataPolicy.REMOVE_LOCATION,
     /** Original image to copy metadata from; null copies nothing. */
     val metadataSourceId: String? = null,
+    /** The space the pixels are encoded in; its ICC profile is embedded in the file. */
+    val colorSpace: RgbColorSpace = RgbColorSpace.SRGB,
 ) {
     companion object {
         const val MIME_JPEG = "image/jpeg"

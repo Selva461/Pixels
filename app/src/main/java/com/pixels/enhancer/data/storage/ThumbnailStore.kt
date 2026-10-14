@@ -5,6 +5,8 @@ import android.graphics.BitmapFactory
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import com.pixels.enhancer.data.decoder.BitmapConversions
+import com.pixels.enhancer.domain.color.ColorConversion
+import com.pixels.enhancer.domain.color.RgbColorSpace
 import com.pixels.enhancer.domain.image.PixelBuffer
 import com.pixels.enhancer.domain.image.PixelResampler
 import java.io.File
@@ -14,9 +16,10 @@ import kotlinx.coroutines.withContext
 /** Small JPEG previews for the Recent list, in app-private storage (never the gallery). */
 class ThumbnailStore(private val directory: File) {
 
-    suspend fun save(projectId: String, image: PixelBuffer) = withContext(Dispatchers.IO) {
+    /** [image] is encoded in [colorSpace]; thumbnails are stored as sRGB. */
+    suspend fun save(projectId: String, image: PixelBuffer, colorSpace: RgbColorSpace = RgbColorSpace.SRGB) = withContext(Dispatchers.IO) {
         directory.mkdirs()
-        val small = PixelResampler.downscaleToFit(image, LONG_EDGE)
+        val small = ColorConversion.convert(PixelResampler.downscaleToFit(image, LONG_EDGE), colorSpace, RgbColorSpace.SRGB)
         val bitmap = BitmapConversions.toBitmap(small)
         val temp = File(directory, "$projectId.tmp")
         try {

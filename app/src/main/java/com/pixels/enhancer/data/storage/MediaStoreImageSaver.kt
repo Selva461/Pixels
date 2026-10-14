@@ -66,7 +66,8 @@ class MediaStoreImageSaver(
 
     private fun encode(uri: Uri, image: PixelBuffer, request: SaveRequest) {
         val format = compressFormatFor(request.mimeType)
-        val bitmap = BitmapConversions.toBitmap(image)
+        // Tagged with the pixels' space, so the encoder embeds that ICC profile.
+        val bitmap = BitmapConversions.toBitmap(image, request.colorSpace)
         try {
             val stream = contentResolver.openOutputStream(uri) ?: throw EnhancerException(ErrorCode.SAVE_FAILED, "Cannot open output")
             val encoded = stream.use { bitmap.compress(format, request.quality, it) }

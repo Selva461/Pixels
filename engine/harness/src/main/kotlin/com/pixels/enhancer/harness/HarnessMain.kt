@@ -1,6 +1,8 @@
 package com.pixels.enhancer.harness
 
 import com.pixels.enhancer.core.error.OperationResult
+import com.pixels.enhancer.domain.color.ColorConversion
+import com.pixels.enhancer.domain.color.RgbColorSpace
 import com.pixels.enhancer.domain.analysis.StatisticalImageAnalyzer
 import com.pixels.enhancer.domain.debug.DebugReport
 import com.pixels.enhancer.domain.image.Argb
@@ -80,6 +82,10 @@ private suspend fun processFile(file: File, options: HarnessOptions): Boolean {
         is OperationResult.Failure -> return reportFailure(file, opened)
         is OperationResult.Success -> opened.value
     }
+    if (options.noEdit) {
+        writeRenders(session.original, session.source.colorSpace, options)
+        return true
+    }
     val request = EnhanceRequest(
         strength = options.strength,
         manual = Look.byId(options.look).adjustments,
@@ -92,12 +98,7 @@ private suspend fun processFile(file: File, options: HarnessOptions): Boolean {
         is OperationResult.Success -> enhanced.value
     }
     val final = if (options.smart) writeSmartEdit(useCase, session, request, outcome, file, options) ?: return false else outcome
-    options.renderPath?.let { path ->
-        // The finished picture as the app renders it (working resolution, geometry and masks applied).
-        File(path).absoluteFile.parentFile?.mkdirs()
-        ImageIO.write(ImageIoConversions.toBufferedImage(final.output), "png", File(path))
-        println("  wrote $path (${final.output.width}x${final.output.height})")
-    }
+    writeRenders(final.output, session.source.colorSpace, options)
     useCase.save(session, request)
     val stem = file.nameWithoutExtension
     ImageIO.write(
@@ -116,6 +117,22 @@ private suspend fun processFile(file: File, options: HarnessOptions): Boolean {
         }
     }
     return true
+}
+
+/**
+ * The finished picture as the app exports it (working resolution, geometry and masks applied):
+ * `--output` gets the sRGB copy, `--output-native` the photo's own space; both carry their ICC profile.
+ * A `.jpg` path is written like the app's default export (JPEG quality 95), anything else as PNG.
+ */
+private fun writeRenders(image: PixelBuffer, space: RgbColorSpace, options: HarnessOptions) {
+    options.renderPath?.let { path ->
+        ColorManagedFiles.write(ColorConversion.convert(image, space, RgbColorSpace.SRGB), RgbColorSpace.SRGB, File(path))
+        println("  wrote $path (sRGB, ${image.width}x${image.height})")
+    }
+    options.nativeRenderPath?.let { path ->
+        ColorManagedFiles.write(image, space, File(path))
+        println("  wrote $path (${space.name}, ${image.width}x${image.height})")
+    }
 }
 
 private suspend fun writeSmartEdit(
@@ -186,10 +203,14 @@ private data class HarnessOptions(
     val look: String?,
     val smart: Boolean,
     val renderPath: String?,
+    val nativeRenderPath: String?,
+    /** Skip all editing: decode and export only, to measure the colour round trip. */
+    val noEdit: Boolean,
 ) {
     companion object {
         const val USAGE = "usage: harness [--synthetic] [--out DIR] [--strength 0..1] [--until STAGE] " +
-            "[--disable STAGE,STAGE] [--look ID] [--smart] [--output FILE.png] [--verbose] [files...]"
+            "[--disable STAGE,STAGE] [--look ID] [--smart] [--output FILE.jpg|png] [--output-native FILE.jpg|png] [--no-edit] " +
+            "[--verbose] [files...]"
 
         fun parse(args: Array<String>): HarnessOptions? {
             val inputs = mutableListOf<String>()
@@ -202,6 +223,8 @@ private data class HarnessOptions(
             var look: String? = null
             var smart = false
             var renderPath: String? = null
+            var nativeRenderPath: String? = null
+            var noEdit = false
             val iterator = args.iterator()
             while (iterator.hasNext()) {
                 when (val arg = iterator.next()) {
@@ -213,11 +236,13 @@ private data class HarnessOptions(
                     "--verbose" -> verbose = true
                     "--smart" -> smart = true
                     "--output" -> renderPath = iterator.nextOrNull() ?: return null
+                    "--output-native" -> nativeRenderPath = iterator.nextOrNull() ?: return null
+                    "--no-edit" -> noEdit = true
                     "--look" -> look = iterator.nextOrNull() ?: return null
                     else -> if (arg.startsWith("--")) return null else inputs += arg
                 }
             }
-            return HarnessOptions(inputs, output, strength, until, disabled, synthetic, verbose, look, smart, renderPath)
+            return HarnessOptions(inputs, output, strength, until, disabled, synthetic, verbose, look, smart, renderPath, nativeRenderPath, noEdit)
         }
 
         private fun Iterator<String>.nextOrNull(): String? = if (hasNext()) next() else null

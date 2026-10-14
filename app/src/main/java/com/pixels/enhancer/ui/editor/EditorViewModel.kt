@@ -21,6 +21,7 @@ import com.pixels.enhancer.data.storage.ShareCache
 import com.pixels.enhancer.data.storage.ThumbnailStore
 import com.pixels.enhancer.domain.analysis.Histogram
 import com.pixels.enhancer.domain.analysis.SceneType
+import com.pixels.enhancer.domain.color.RgbColorSpace
 import com.pixels.enhancer.domain.debug.DebugReport
 import com.pixels.enhancer.domain.editing.EditDiff
 import com.pixels.enhancer.domain.editing.EditHistory
@@ -933,7 +934,7 @@ class EditorViewModel(
                 val latest = project?.takeIf { it.id == saved.id } ?: saved
                 attempt { projectManager.recordHistory(latest, snapshot) }
                     .onSuccess { updated -> if (project?.id == updated.id) project = updated }
-                outcome?.output?.let { attempt { thumbnails.save(saved.id, it) } }
+                outcome?.output?.let { output -> attempt { thumbnails.save(saved.id, output, workingColorSpace) } }
             }
         }
     }
@@ -999,7 +1000,7 @@ class EditorViewModel(
                 is OperationResult.Success -> result.value
             }
             val name = OutputNaming.enhancedName(currentSession.source.displayName)
-            when (val written = runControlled(ErrorCode.OUTPUT_ENCODE_FAILED) { shareCache.write(rendered.output, name) }) {
+            when (val written = runControlled(ErrorCode.OUTPUT_ENCODE_FAILED) { shareCache.write(rendered.output, currentSession.source.colorSpace, name) }) {
                 is OperationResult.Failure -> setActivity(EditorActivity.Failed(written.code))
                 is OperationResult.Success -> {
                     setActivity(EditorActivity.None)
@@ -1173,8 +1174,13 @@ class EditorViewModel(
         _uiState.update { state -> if (state is EditorUiState.Success) state.copy(activity = activity) else state }
     }
 
-    private suspend fun toImageBitmap(buffer: PixelBuffer): ImageBitmap =
-        withContext(Dispatchers.Default) { BitmapConversions.toBitmap(buffer).asImageBitmap() }
+    /** The space the session's pixels are encoded in; previews are tagged with it so wide colours show as they are. */
+    private val workingColorSpace: RgbColorSpace get() = session?.source?.colorSpace ?: RgbColorSpace.SRGB
+
+    private suspend fun toImageBitmap(buffer: PixelBuffer): ImageBitmap {
+        val space = workingColorSpace
+        return withContext(Dispatchers.Default) { BitmapConversions.toBitmap(buffer, space).asImageBitmap() }
+    }
 
     private fun clearSession() {
         previewRequests.value = null

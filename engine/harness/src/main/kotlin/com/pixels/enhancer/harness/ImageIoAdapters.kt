@@ -4,6 +4,7 @@ import com.pixels.enhancer.core.error.EnhancerException
 import com.pixels.enhancer.core.error.ErrorCode
 import com.pixels.enhancer.core.logging.EnhancerLogger
 import com.pixels.enhancer.core.logging.LogFormat
+import com.pixels.enhancer.domain.color.RgbColorSpace
 import com.pixels.enhancer.domain.image.PixelBuffer
 import com.pixels.enhancer.domain.image.PixelResampler
 import com.pixels.enhancer.domain.model.ImageSource
@@ -25,11 +26,21 @@ class FileImageRepository : ImageRepository {
         val file = File(sourceId)
         if (!file.exists()) throw EnhancerException(ErrorCode.IMAGE_NOT_FOUND, "Missing file")
         val image = read(file)
-        return ImageSource(sourceId, file.name, mimeTypeOf(file), image.width, image.height, rotationDegrees = 0, mirrored = false)
+        // A wide-gamut profile is kept as the working space; sRGB or unreadable profiles decode as before.
+        val space = ColorManagedFiles.colorSpaceOf(file)?.takeUnless { it.isSrgb } ?: RgbColorSpace.SRGB
+        return ImageSource(sourceId, file.name, mimeTypeOf(file), image.width, image.height, rotationDegrees = 0, mirrored = false, colorSpace = space)
     }
 
-    override suspend fun loadWorkingImage(source: ImageSource, maxLongEdge: Int): PixelBuffer =
-        PixelResampler.downscaleToFit(ImageIoConversions.toPixelBuffer(read(File(source.id))), maxLongEdge)
+    override suspend fun loadWorkingImage(source: ImageSource, maxLongEdge: Int): PixelBuffer {
+        val file = File(source.id)
+        val decoded = if (source.colorSpace.isSrgb) {
+            ImageIoConversions.toPixelBuffer(read(file))
+        } else {
+            ColorManagedFiles.readStoredPixels(file)
+                ?: throw EnhancerException(ErrorCode.IMAGE_DECODE_FAILED, "Cannot read the stored colours of ${file.name}")
+        }
+        return PixelResampler.downscaleToFit(decoded, maxLongEdge)
+    }
 
     private fun read(file: File): BufferedImage =
         ImageIO.read(file) ?: throw EnhancerException(ErrorCode.IMAGE_DECODE_FAILED, "ImageIO could not decode ${file.name}")
@@ -46,7 +57,7 @@ class DirectoryImageSaver(private val directory: File) : ImageSaver {
     override suspend fun save(image: PixelBuffer, request: SaveRequest): SavedImage {
         val name = request.displayName.substringBeforeLast('.') + ".png"
         val file = File(directory, name)
-        ImageIO.write(ImageIoConversions.toBufferedImage(image), "png", file)
+        ColorManagedFiles.writePng(image, request.colorSpace, file)
         return SavedImage(file.path, name)
     }
 }
