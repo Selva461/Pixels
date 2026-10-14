@@ -39,6 +39,7 @@ class AndroidImageRepository(private val contentResolver: ContentResolver) : Ima
             height = bounds.outHeight,
             rotationDegrees = orientation.rotationDegrees,
             mirrored = orientation.mirrored,
+            colorSpace = PlatformColorSpaces.workingSpaceFor(bounds.outColorSpace),
         )
     }
 
@@ -47,6 +48,8 @@ class AndroidImageRepository(private val contentResolver: ContentResolver) : Ima
         val options = BitmapFactory.Options().apply {
             inSampleSize = PixelResampler.powerOfTwoSubsample(source.width, source.height, maxLongEdge)
             inPreferredConfig = Bitmap.Config.ARGB_8888
+            // Decode into the working space (Display P3 for wide-gamut photos) instead of clipping to sRGB.
+            inPreferredColorSpace = PlatformColorSpaces.toAndroid(source.colorSpace)
         }
         val decoded = open(uri).use { BitmapFactory.decodeStream(it, null, options) }
             ?: throw EnhancerException(ErrorCode.IMAGE_DECODE_FAILED, "Decoder returned no bitmap")

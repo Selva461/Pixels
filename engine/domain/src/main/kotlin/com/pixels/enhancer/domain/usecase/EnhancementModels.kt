@@ -111,6 +111,12 @@ data class EnhancementOutcome(
     val subjectHint: SubjectHint? = null,
 )
 
-data class ExportResult(val saved: com.pixels.enhancer.domain.repository.SavedImage, val width: Int, val height: Int)
+data class ExportResult(
+    val saved: com.pixels.enhancer.domain.repository.SavedImage,
+    val width: Int,
+    val height: Int,
+    /** For a wide-gamut photo: the sRGB copy saved next to [saved]; null for sRGB photos or if the copy failed. */
+    val srgbCopy: com.pixels.enhancer.domain.repository.SavedImage? = null,
+)
 
 fun EnhancementSession.sceneFor(request: EnhanceRequest): SceneType = request.sceneOverride ?: scene.scene

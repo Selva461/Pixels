@@ -4,6 +4,7 @@ import com.pixels.enhancer.core.error.EnhancerException
 import com.pixels.enhancer.core.error.ErrorCode
 import com.pixels.enhancer.core.logging.EnhancerLogger
 import com.pixels.enhancer.core.logging.LogFormat
+import com.pixels.enhancer.domain.color.RgbColorSpace
 import com.pixels.enhancer.domain.image.PixelBuffer
 import com.pixels.enhancer.domain.image.PixelResampler
 import com.pixels.enhancer.domain.model.ImageSource
@@ -15,11 +16,12 @@ import com.pixels.enhancer.domain.repository.SavedImage
 class InMemoryImageRepository(
     private val images: Map<String, PixelBuffer>,
     private val mimeType: String = "image/jpeg",
+    private val colorSpace: RgbColorSpace = RgbColorSpace.SRGB,
 ) : ImageRepository {
 
     override suspend fun readSource(sourceId: String): ImageSource {
         val image = images[sourceId] ?: throw EnhancerException(ErrorCode.IMAGE_NOT_FOUND, "No image $sourceId")
-        return ImageSource(sourceId, "$sourceId.jpg", mimeType, image.width, image.height, rotationDegrees = 0, mirrored = false)
+        return ImageSource(sourceId, "$sourceId.jpg", mimeType, image.width, image.height, rotationDegrees = 0, mirrored = false, colorSpace = colorSpace)
     }
 
     override suspend fun loadWorkingImage(source: ImageSource, maxLongEdge: Int): PixelBuffer =

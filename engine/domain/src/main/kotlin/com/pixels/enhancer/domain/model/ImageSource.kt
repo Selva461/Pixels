@@ -1,5 +1,7 @@
 package com.pixels.enhancer.domain.model
 
+import com.pixels.enhancer.domain.color.RgbColorSpace
+
 /**
  * Metadata for a picked image. [id] is an opaque platform reference (a content URI on Android)
  * and is never logged.
@@ -14,6 +16,11 @@ data class ImageSource(
     /** Clockwise rotation required for display: 0, 90, 180 or 270. */
     val rotationDegrees: Int,
     val mirrored: Boolean,
+    /**
+     * The space the decoded pixels are encoded in — the photo's own profile when the platform can
+     * keep it (e.g. Display P3), so wide-gamut colours are never clipped on the way in.
+     */
+    val colorSpace: RgbColorSpace = RgbColorSpace.SRGB,
 ) {
     private val swapsAxes: Boolean get() = rotationDegrees == QUARTER_TURN || rotationDegrees == THREE_QUARTER_TURN
 
@@ -49,6 +56,12 @@ object OutputNaming {
      * `._-()` kept, no leading dots, length capped.
      */
     fun enhancedName(originalName: String?, extension: String = "jpg"): String = "${safeBaseName(originalName)}$SUFFIX.$extension"
+
+    /** `IMG_1234_enhanced.jpg` -> `IMG_1234_enhanced_srgb.jpg`: the sRGB copy saved next to a wide-gamut export. */
+    fun srgbCopyName(exportName: String): String =
+        if (exportName.contains('.')) "${exportName.substringBeforeLast('.')}$SRGB_SUFFIX.${exportName.substringAfterLast('.')}" else exportName + SRGB_SUFFIX
+
+    private const val SRGB_SUFFIX = "_srgb"
 
     fun safeBaseName(originalName: String?): String {
         val withoutPath = originalName?.substringAfterLast('/')?.substringAfterLast('\\')

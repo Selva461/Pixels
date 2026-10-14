@@ -82,6 +82,22 @@ Deviations from the requirement's suggested sequence, and why:
   noise reduction working on the camera's colours.
 - Exposure and white balance run in linear light; tone and colour operations on gamma-encoded values.
 
+## Colour management
+
+- **Decode.** The source's ICC profile decides the working space. sRGB photos work in sRGB as before;
+  wide-gamut photos (Display P3, Adobe RGB…) are decoded into Display P3 on Android
+  (`BitmapFactory.inPreferredColorSpace`, raw values read with `copyPixelsToBuffer`, since `getPixels`
+  clips to sRGB). The harness parses the embedded matrix/TRC profile itself (`IccProfiles`).
+  `ImageSource.colorSpace` records the space the session's pixels are in.
+- **Edit.** Stages run on the 8-bit values in that space, so nothing is clipped on the way in. Analysis,
+  face detection, scene and the people model look at an sRGB view, because their thresholds are tuned
+  on sRGB values. A float pipeline end to end is the later base/detail work (brief Task 4).
+- **Export.** The file is written in the photo's own space with its profile embedded (no conversion,
+  so an unedited photo round-trips exactly). A wide-gamut photo also gets `<name>_srgb.<ext>`:
+  converted in float linear light, chroma softly compressed in Oklab at constant lightness and hue
+  (knee 0.85 of the sRGB boundary), TPDF-dithered once to 8 bits (`ColorConversion`). Shared files and
+  Recent thumbnails are sRGB too; the editor shows previews tagged with the working space.
+
 ## Key rules
 
 - Originals are never written. Exports are new MediaStore entries; projects store only references.

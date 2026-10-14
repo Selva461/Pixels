@@ -17,6 +17,8 @@ import com.pixels.enhancer.domain.analysis.FaceMetrics
 import com.pixels.enhancer.domain.analysis.ImageAnalysis
 import com.pixels.enhancer.domain.analysis.ImageAnalyzer
 import com.pixels.enhancer.domain.analysis.SceneClassifier
+import com.pixels.enhancer.domain.color.ColorConversion
+import com.pixels.enhancer.domain.color.RgbColorSpace
 import com.pixels.enhancer.domain.export.BorderOps
 import com.pixels.enhancer.domain.export.ExportDecorator
 import com.pixels.enhancer.domain.export.ExportOptions
@@ -100,22 +102,25 @@ class EnhanceImageUseCase(
             }
             if (decoded is OperationResult.Failure) return@withContext logFailure("OPEN_FAILED", null, decoded)
             val working = (decoded as OperationResult.Success).value
+            // Analysis thresholds, face detection and the people model are tuned on sRGB values, so
+            // they look at an sRGB view; the session keeps the photo's own (possibly wider) colours.
+            val srgbView = ColorConversion.convert(working.value, source.colorSpace, RgbColorSpace.SRGB)
 
-            val analyzed = runControlled(ErrorCode.ANALYSIS_FAILED) { clock.measure { analyzer.analyze(working.value) } }
+            val analyzed = runControlled(ErrorCode.ANALYSIS_FAILED) { clock.measure { analyzer.analyze(srgbView) } }
             if (analyzed is OperationResult.Failure) return@withContext logFailure("OPEN_FAILED", null, analyzed)
             val measured = (analyzed as OperationResult.Success).value
-            val faces = runControlled(ErrorCode.ANALYSIS_FAILED) { faceLocator.locate(working.value) }
+            val faces = runControlled(ErrorCode.ANALYSIS_FAILED) { faceLocator.locate(srgbView) }
                 .let { if (it is OperationResult.Success) it.value else emptyList() }
             val analysis = measured.copy(
-                value = measured.value.copy(faces = faces, faceLuma = FaceMetrics.meanLuma(working.value, faces)),
+                value = measured.value.copy(faces = faces, faceLuma = FaceMetrics.meanLuma(srgbView, faces)),
             )
             logAnalysis(analysis.value)
             // Optional and best effort: without it Smart edit finds the subject by rules.
             val people = clock.measure {
-                runControlled(ErrorCode.ANALYSIS_FAILED) { subjectSegmenter.segment(working.value) }
+                runControlled(ErrorCode.ANALYSIS_FAILED) { subjectSegmenter.segment(srgbView) }
                     .let { if (it is OperationResult.Success) it.value else null }
             }
-            val scene = clock.measure { SceneClassifier.classify(working.value, analysis.value) }
+            val scene = clock.measure { SceneClassifier.classify(srgbView, analysis.value) }
             logger.event("SCENE_DETECTED", mapOf("scene" to scene.value.scene, "confidence" to scene.value.confidence))
 
             OperationResult.Success(
@@ -293,10 +298,12 @@ class EnhanceImageUseCase(
             quality = options.quality,
             metadata = options.metadata,
             metadataSourceId = session.source.id,
+            colorSpace = session.source.colorSpace,
         )
         when (val result = runControlled(ErrorCode.SAVE_FAILED) { clock.measure { saver.save(image, saveRequest) } }) {
             is OperationResult.Failure -> logFailure("EXPORT_FAILED", outcome.processingId, result)
             is OperationResult.Success -> {
+                val srgbCopy = saveSrgbCopy(image, saveRequest, outcome.processingId)
                 logger.event(
                     "EXPORT_COMPLETE",
                     mapOf(
@@ -307,7 +314,28 @@ class EnhanceImageUseCase(
                         "durationMs" to result.value.durationMs,
                     ),
                 )
-                OperationResult.Success(ExportResult(result.value.value, image.width, image.height))
+                OperationResult.Success(ExportResult(result.value.value, image.width, image.height, srgbCopy))
+            }
+        }
+    }
+
+    /**
+     * A wide-gamut photo is exported in its own space (nothing clipped, its profile embedded) plus
+     * an sRGB copy for apps and sites that ignore profiles: converted in float with soft gamut
+     * compression and dither, never a hard clip. The main export already succeeded, so a failed
+     * copy is logged and reported as missing rather than failing the export.
+     */
+    private suspend fun saveSrgbCopy(image: PixelBuffer, request: SaveRequest, processingId: String): SavedImage? {
+        if (request.colorSpace.isSrgb) return null
+        val copyRequest = request.copy(displayName = OutputNaming.srgbCopyName(request.displayName), colorSpace = RgbColorSpace.SRGB)
+        val saved = runControlled(ErrorCode.SAVE_FAILED) {
+            saver.save(ColorConversion.convert(image, request.colorSpace, RgbColorSpace.SRGB), copyRequest)
+        }
+        return when (saved) {
+            is OperationResult.Success -> saved.value
+            is OperationResult.Failure -> {
+                logger.error("EXPORT_SRGB_COPY_FAILED", mapOf("processingId" to processingId, "code" to saved.code))
+                null
             }
         }
     }

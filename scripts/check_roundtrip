@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+# Colour round trip (Task 2 of tools/forensics/CLAUDE_CODE_BRIEF.md): opens the Display P3 sample
+# through Pixels' colour-managed decoder, exports it with no edit in its own profile, and checks the
+# export shows the same colours: mean CIEDE2000 < 0.1 and 99th percentile < 1.5. The P3 file is a PNG
+# so the check measures the colour path, not JPEG loss (re-saving the sample at JPEG quality 95 with any
+# encoder costs mean 0.28 / p99 1.9 on its own). Also writes the sRGB copy and prints how many of its
+# pixels have a crushed channel (must stay <= 3 %).
+#
+#   PYTHON=.venv/bin/python scripts/check_roundtrip
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+PYTHON="${PYTHON:-python3}"
+case "$PYTHON" in /*) ;; */*) PYTHON="$PWD/$PYTHON" ;; esac
+OUT="${OUT_DIR:-$ROOT/build/check_roundtrip}"
+SAMPLE="$ROOT/tools/forensics/samples/original_p3.jpg"
+
+mkdir -p "$OUT"
+# shellcheck disable=SC2086
+"$ROOT/gradlew" -q ${GRADLE_FLAGS:-} -p "$ROOT/engine" :harness:run \
+  --args="--no-edit --out $OUT --output $OUT/no_edit_srgb.jpg --output-native $OUT/no_edit_p3.png $SAMPLE" | grep -E "wrote|FAILED" || true
+
+cd "$ROOT/tools/forensics/src"
+"$PYTHON" - "$OUT/no_edit_srgb.jpg" <<'PY'
+import sys, numpy as np
+from PIL import Image
+a = np.asarray(Image.open(sys.argv[1]).convert('RGB'))
+print('sRGB copy: %.2f %% of pixels with a channel <= 1' % (100 * (a <= 1).any(-1).mean()))
+PY
+echo "P3 round trip (limits: mean < 0.1, p99 < 1.5):"
+"$PYTHON" roundtrip_check.py "$SAMPLE" "$OUT/no_edit_p3.png"

@@ -3,6 +3,7 @@ package com.pixels.enhancer.usecase
 import com.pixels.enhancer.core.error.ErrorCode
 import com.pixels.enhancer.core.error.OperationResult
 import com.pixels.enhancer.domain.analysis.StatisticalImageAnalyzer
+import com.pixels.enhancer.domain.color.RgbColorSpace
 import com.pixels.enhancer.domain.export.ExportFormat
 import com.pixels.enhancer.domain.export.ExportOptions
 import com.pixels.enhancer.domain.export.ExportSize
@@ -36,8 +37,8 @@ class ExportTest {
     /** 3200×2400 source: larger than the 2560 working size, so full export must re-decode. */
     private val source = GoldenScenario.UNDEREXPOSED.render(3200, 2400)
 
-    private fun useCase(imageSaver: ImageSaver = saver) = EnhanceImageUseCase(
-        InMemoryImageRepository(mapOf("photo" to source)),
+    private fun useCase(imageSaver: ImageSaver = saver, colorSpace: RgbColorSpace = RgbColorSpace.SRGB) = EnhanceImageUseCase(
+        InMemoryImageRepository(mapOf("photo" to source), colorSpace = colorSpace),
         StatisticalImageAnalyzer(),
         NaturalEnhancementPlanner(),
         // Small tile threshold so the export path exercises tiling in tests.
@@ -116,5 +117,25 @@ class ExportTest {
     @Test
     fun `quality outside the supported range is rejected`() {
         assertTrue(runCatching { ExportOptions(quality = 10) }.isFailure)
+    }
+
+    @Test
+    fun `sRGB photo exports one sRGB file`() = runTest {
+        val useCase = useCase()
+        val result = useCase.export(open(useCase), EnhanceRequest(0.45f), ExportOptions()) as OperationResult.Success
+        assertEquals(RgbColorSpace.SRGB, saver.saved.single().first.colorSpace)
+        assertEquals(null, result.value.srgbCopy)
+    }
+
+    @Test
+    fun `wide-gamut photo exports in its own space plus an sRGB copy`() = runTest {
+        val useCase = useCase(colorSpace = RgbColorSpace.DISPLAY_P3)
+        val result = useCase.export(open(useCase), EnhanceRequest(0.45f), ExportOptions()) as OperationResult.Success
+        val (native, copy) = saver.saved
+        assertEquals(RgbColorSpace.DISPLAY_P3, native.first.colorSpace)
+        assertEquals(RgbColorSpace.SRGB, copy.first.colorSpace)
+        assertEquals("photo_enhanced_srgb.jpg", copy.first.displayName)
+        assertEquals(native.second.width to native.second.height, copy.second.width to copy.second.height)
+        assertEquals("photo_enhanced_srgb.jpg", result.value.srgbCopy?.displayName)
     }
 }
