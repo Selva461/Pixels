@@ -12,6 +12,14 @@ class ToneCurve private constructor(private val table: FloatArray) {
 
     fun map(luma: Float): Float = table[(luma.coerceIn(0f, 1f) * LAST_INDEX + 0.5f).toInt()]
 
+    /** Linearly interpolated, so a smooth gradient (a clear sky) comes out smooth rather than in 1/1024 steps. */
+    fun mapSmooth(luma: Float): Float {
+        val position = luma.coerceIn(0f, 1f) * LAST_INDEX
+        val index = position.toInt().coerceAtMost(LAST_INDEX - 1)
+        val t = position - index
+        return table[index] + (table[index + 1] - table[index]) * t
+    }
+
     companion object {
         private const val SIZE = 1024
         private const val LAST_INDEX = SIZE - 1
