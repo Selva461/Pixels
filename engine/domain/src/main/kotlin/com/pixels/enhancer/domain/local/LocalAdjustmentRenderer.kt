@@ -47,8 +47,10 @@ object LocalAdjustmentRenderer {
     private fun regionsFor(items: List<LocalAdjustment>, reference: PixelBuffer, hint: SubjectHint?, width: Int, height: Int): ((RegionKind) -> FloatArray)? {
         if (items.none { it.shape is MaskShape.Region }) return null
         val maps = RegionDetector.detect(reference, hint)
-        // Resized per use rather than kept: at export size each map is tens of megabytes.
-        return { kind -> maps.weights(kind, width, height) }
+        // Built per use rather than kept: at export size each map is tens of megabytes. Edges
+        // follow the reference photo's own edges when it is the frame being edited.
+        val guide = reference.takeIf { it.width == width && it.height == height }
+        return { kind -> if (guide != null) maps.weights(kind, guide) else maps.weights(kind, width, height) }
     }
 
     private fun maskOf(image: PixelBuffer, adjustment: LocalAdjustment, regions: ((RegionKind) -> FloatArray)?): FloatArray {

@@ -6,8 +6,9 @@
 #   scripts/check_output                 # needs Java 17 and Python with tools/forensics/requirements.txt
 #   PYTHON=.venv/bin/python GRADLE_FLAGS=--offline scripts/check_output
 #
-# Note: the desktop harness has no people model (the phone runs DeepLab v3), so the subject comes
-# from Smart edit's rules unless tools/forensics/samples/original_p3.people.png exists.
+# The desktop harness has no people model; the phone runs DeepLab v3 at 257 x 257. To measure what the
+# phone does, the sample's subject matte is squashed to 257 x 257 (the model's own resolution) and
+# handed to the harness as its people mask. PEOPLE=rules uses Smart edit's rules-based subject instead.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -19,6 +20,14 @@ SAMPLE="$ROOT/tools/forensics/samples/original_p3.jpg"
 RENDER="$OUT/app_render.jpg"
 
 mkdir -p "$OUT"
+if [ "${PEOPLE:-model}" != rules ]; then
+  # A copy of the sample next to its stand-in people mask (<name>.people.png, read by the harness).
+  mkdir -p "$OUT/input"
+  cp "$SAMPLE" "$OUT/input/original_p3.jpg"
+  "$PYTHON" -c "import sys; from PIL import Image; Image.open(sys.argv[1]).convert('L').resize((257, 257), Image.BILINEAR).save(sys.argv[2])" \
+    "$ROOT/tools/forensics/samples/subject_matte.png" "$OUT/input/original_p3.people.png"
+  SAMPLE="$OUT/input/original_p3.jpg"
+fi
 echo "== Rendering $SAMPLE through the Pixels engine"
 # shellcheck disable=SC2086
 "$ROOT/gradlew" -q ${GRADLE_FLAGS:-} -p "$ROOT/engine" :harness:run \

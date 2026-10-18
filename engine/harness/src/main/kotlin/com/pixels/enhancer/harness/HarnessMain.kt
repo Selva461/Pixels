@@ -39,7 +39,7 @@ import kotlinx.coroutines.runBlocking
  * For each input it writes <name>_enhanced.png, <name>_compare.png (before | after) and
  * <name>_report.txt (the same debug report as the app's debug screen). With --smart it also runs
  * Smart edit and writes <name>_smart.png (before | Auto only | Smart edit) and <name>_regions.png
- * (sky tinted blue, subject tinted red). A greyscale `<name>.people.png` next to an input stands in
+ * (sky tinted blue, subject tinted red) plus <name>_subject.png and <name>_sky.png (the masks). A greyscale `<name>.people.png` next to an input stands in
  * for the phone's people segmentation.
  */
 fun main(args: Array<String>) {
@@ -156,8 +156,8 @@ private suspend fun writeSmartEdit(
     val before = PixelResampler.downscaleToFit(auto.originalView, maxOf(auto.output.width, auto.output.height))
     ImageIO.write(ImageIoConversions.sideBySide(before, autoAndSmart), "png", File(options.outputDirectory, "${stem}_smart.png"))
     val maps = RegionDetector.detect(auto.originalView, auto.subjectHint)
-    val sky = maps.weights(RegionKind.SKY, auto.originalView.width, auto.originalView.height)
-    val subject = maps.weights(RegionKind.SUBJECT, auto.originalView.width, auto.originalView.height)
+    val sky = maps.weights(RegionKind.SKY, auto.originalView)
+    val subject = maps.weights(RegionKind.SUBJECT, auto.originalView)
     val tinted = PixelBuffer(
         auto.originalView.width,
         auto.originalView.height,
@@ -171,6 +171,9 @@ private suspend fun writeSmartEdit(
         },
     )
     ImageIO.write(ImageIoConversions.toBufferedImage(tinted), "png", File(options.outputDirectory, "${stem}_regions.png"))
+    fun grey(map: FloatArray) = PixelBuffer(auto.originalView.width, auto.originalView.height, IntArray(map.size) { i -> (map[i] * 255f + 0.5f).toInt().let { Argb.opaque(it, it, it) } })
+    ImageIO.write(ImageIoConversions.toBufferedImage(grey(subject)), "png", File(options.outputDirectory, "${stem}_subject.png"))
+    ImageIO.write(ImageIoConversions.toBufferedImage(grey(sky)), "png", File(options.outputDirectory, "${stem}_sky.png"))
     println("  smart edit (subject confidence ${"%.2f".format(maps.subjectConfidence)}, sky ${"%.0f".format(maps.skyFraction * 100)} %):")
     masks.forEach { println("    $it") }
     return smart

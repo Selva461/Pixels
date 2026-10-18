@@ -29,6 +29,8 @@ class RegionMaps(
     val sky: FloatArray,
     val subject: FloatArray,
     val subjectConfidence: Float,
+    private val skyModel: GuidedMatte? = null,
+    private val subjectModel: GuidedMatte? = null,
 ) {
     val skyFraction: Float = sky.average().toFloat()
     val subjectFraction: Float = subject.average().toFloat()
@@ -42,6 +44,33 @@ class RegionMaps(
     /** The map of [kind] resized (bilinear) to [outWidth]×[outHeight]. */
     fun weights(kind: RegionKind, outWidth: Int, outHeight: Int): FloatArray =
         RegionDetector.resize(map(kind), width, height, outWidth, outHeight)
+
+    /**
+     * The map of [kind] at [guide]'s size, with edges placed on [guide]'s own edges (the photo the
+     * maps were detected on, any size). Stretching the small map instead would spread every edge
+     * over a few pixels and spill a subject's lift onto the background around it (a halo).
+     */
+    fun weights(kind: RegionKind, guide: PixelBuffer): FloatArray {
+        val skyAt = skyModel?.Sampler(guide.width, guide.height) ?: return weights(kind, guide.width, guide.height)
+        val subjectAt = subjectModel?.Sampler(guide.width, guide.height) ?: return weights(kind, guide.width, guide.height)
+        val out = FloatArray(guide.pixelCount)
+        for (y in 0 until guide.height) {
+            skyAt.row(y)
+            subjectAt.row(y)
+            val row = y * guide.width
+            for (x in 0 until guide.width) {
+                val color = guide.pixels[row + x]
+                val sky = skyAt.valueAt(x, color)
+                val subject = subjectAt.valueAt(x, color) * (1f - sky)
+                out[row + x] = when (kind) {
+                    RegionKind.SKY -> sky
+                    RegionKind.SUBJECT -> subject
+                    RegionKind.BACKGROUND -> (1f - sky) * (1f - subject)
+                }
+            }
+        }
+        return out
+    }
 
     fun fraction(kind: RegionKind): Float = when (kind) {
         RegionKind.SKY -> skyFraction
@@ -60,9 +89,12 @@ class RegionMaps(
  * - **Subject**: what is in focus (sharp against a soft background), what differs in colour from
  *   the rest of the scene, and skin, weighted towards the centre; the strongest blob(s) are kept.
  *
- * Detection runs at [DETECT_LONG_EDGE]; edges are then refined against the photo's own luma at
- * [REFINE_LONG_EDGE] with a guided filter so masks follow hair, branches and horizons. Both sizes
- * are fixed, so the preview and a full-size export get the same masks.
+ * Detection runs at [DETECT_LONG_EDGE] (a people model's mask is used at its own size); edges are
+ * then refined against the photo's own colours at [REFINE_LONG_EDGE] with a colour-guided filter
+ * ([GuidedMatte]) so masks follow hair, branches and horizons, and [RegionMaps.weights] applies that
+ * filter to the photo at full size so edges stay sharp there. Masks are never blurred or feathered:
+ * a soft edge spills a region's edit onto its neighbour (a halo). Both sizes are fixed, so the
+ * preview and a full-size export get the same masks.
  */
 object RegionDetector {
     const val DETECT_LONG_EDGE = 256
@@ -93,29 +125,36 @@ object RegionDetector {
         val small = PixelResampler.downscaleToFit(image, DETECT_LONG_EDGE)
         val planes = Planes.of(small)
         val sky = detectSky(planes)
+        val refine = PixelResampler.downscaleToFit(image, REFINE_LONG_EDGE)
         val (subject, confidence) = if (hint != null && hint.hasSubject) {
-            // A person is never sky, even a dark silhouette against it.
             val person = resize(hint.weights, hint.width, hint.height, small.width, small.height)
             // Keep the main person (and anyone as prominent), not stray patches the model is unsure of.
             val core = FloatArray(person.size) { i -> if (person[i] > SubjectHint.CONFIDENT) 1f else 0f }
             keepStrongestBlobs(core, person, small.width, small.height)
             val near = FloatArray(core.size).also { BoxBlur.blur(core, it, small.width, small.height, MORPH_RADIUS, FloatArray(core.size)) }
-            for (i in person.indices) {
-                person[i] = if (near[i] > 0f) smoothstep(HINT_LOW, HINT_HIGH, person[i]) else 0f
-                sky[i] *= 1f - person[i]
-            }
-            person to HINT_CONFIDENCE
+            // A person is never sky, even a dark silhouette against it.
+            for (i in person.indices) if (near[i] > 0f) sky[i] *= 1f - smoothstep(HINT_LOW, HINT_HIGH, person[i])
+            // The model's own edge, at the refine size rather than the coarser detection size.
+            val keep = resize(near, small.width, small.height, refine.width, refine.height)
+            val fine = resize(hint.weights, hint.width, hint.height, refine.width, refine.height)
+            for (i in fine.indices) fine[i] = if (keep[i] > 0f) smoothstep(HINT_LOW, HINT_HIGH, fine[i]) else 0f
+            fine to HINT_CONFIDENCE
         } else {
-            detectSubject(planes, sky)
+            val (rules, confidence) = detectSubject(planes, sky)
+            resize(rules, small.width, small.height, refine.width, refine.height) to confidence
         }
 
-        val refine = PixelResampler.downscaleToFit(image, REFINE_LONG_EDGE)
-        val guide = FloatArray(refine.pixelCount) { Luma.ofPixel(refine.pixels[it]) }
+        // Coarse masks snap to the photo's colour edges (colour-guided filter, never a blur): a wide
+        // first pass lets a coarse edge move onto the true one, then narrow passes on the
+        // re-sharpened result pull the subject's edge in tight so its lift stays on the subject.
         val radius = max(2, max(refine.width, refine.height) / GUIDE_RADIUS_DIVISOR)
-        val skyFine = refineMask(resize(sky, small.width, small.height, refine.width, refine.height), guide, refine.width, refine.height, radius, SKY_EPSILON)
-        val subjectFine = refineMask(resize(subject, small.width, small.height, refine.width, refine.height), guide, refine.width, refine.height, radius, SUBJECT_EPSILON)
+        val skyModel = GuidedMatte.fit(resize(sky, small.width, small.height, refine.width, refine.height), refine, radius, SKY_EPSILON)
+        val snapRadius = max(2, max(refine.width, refine.height) / SNAP_RADIUS_DIVISOR)
+        val subjectModel = GuidedMatte.snap(subject, refine, radius, snapRadius, SNAP_PASSES, SUBJECT_EPSILON)
+        val skyFine = skyModel.evaluate(refine)
+        val subjectFine = subjectModel.evaluate(refine)
         for (i in subjectFine.indices) subjectFine[i] *= 1f - skyFine[i]
-        return RegionMaps(refine.width, refine.height, skyFine, subjectFine, confidence)
+        return RegionMaps(refine.width, refine.height, skyFine, subjectFine, confidence, skyModel, subjectModel)
     }
 
     // --- Sky ---
@@ -193,6 +232,9 @@ object RegionDetector {
         }
         // Clouds of another colour (sunset, grey) that touch the sky, down to just below its lower edge.
         val cloudLimit = max(lowest, (h * CLOUD_MAX_V).toInt())
+        // Under a blue or pale sky, clouds are white or grey: a saturated warm colour next to it is
+        // land (golden grass, a sunlit hill), not a sunset cloud.
+        val warmSky = meanCr > meanCb + WARM_SKY_MARGIN
         var tail = 0
         for (i in 0 until n) if (mask[i] == 1f) queue[tail++] = i
         var head = 0
@@ -201,7 +243,7 @@ object RegionDetector {
             val x = i % w
             val y = i / w
             fun visit(j: Int) {
-                if (mask[j] == 1f || j / w > cloudLimit || !cloudLike(p, j, likelihood[j])) return
+                if (mask[j] == 1f || j / w > cloudLimit || !cloudLike(p, j, likelihood[j], warmSky)) return
                 mask[j] = 1f
                 queue[tail++] = j
             }
@@ -215,9 +257,12 @@ object RegionDetector {
 
     /**
      * Cloud next to the sky: any sky-like colour, or a fairly smooth, not dark, non-foliage pixel
-     * (grey storm cloud, orange sunset cloud). Reeds, branches and hills are dark, green or rough.
+     * (grey storm cloud, orange sunset cloud). Reeds, branches and hills are dark, green or rough;
+     * a saturated warm colour counts only when the sky itself is warm (a sunset).
      */
-    private fun cloudLike(p: Planes, i: Int, likelihood: Float): Boolean {
+    private fun cloudLike(p: Planes, i: Int, likelihood: Float, warmSky: Boolean): Boolean {
+        val warmColour = p.chroma[i] > FOLIAGE_MIN_CHROMA && (p.hue[i] < FOLIAGE_HUES.start || p.hue[i] > WARM_HUE_LOW_WRAP)
+        if (!warmSky && warmColour) return false
         if (likelihood >= CLOUD_LIKELIHOOD) return true
         val foliage = p.hue[i] in FOLIAGE_HUES && p.chroma[i] > FOLIAGE_MIN_CHROMA
         return !foliage && p.luma[i] > CLOUD_MIN_LUMA && p.texture[i] < CLOUD_MAX_TEXTURE
@@ -386,26 +431,6 @@ object RegionDetector {
 
     // --- Shared maths ---
 
-    /** Edge-aware smoothing of [mask] guided by [guide] (He et al.), so mask edges snap to photo edges. */
-    internal fun refineMask(mask: FloatArray, guide: FloatArray, w: Int, h: Int, radius: Int, epsilon: Float): FloatArray {
-        val n = w * h
-        val scratch = FloatArray(n)
-        val meanI = FloatArray(n).also { BoxBlur.blur(guide, it, w, h, radius, scratch) }
-        val meanP = FloatArray(n).also { BoxBlur.blur(mask, it, w, h, radius, scratch) }
-        val corrIp = FloatArray(n) { guide[it] * mask[it] }.also { BoxBlur.blur(it, it, w, h, radius, scratch) }
-        val varI = FloatArray(n) { guide[it] * guide[it] }.also { BoxBlur.blur(it, it, w, h, radius, scratch) }
-        val a = FloatArray(n)
-        val b = FloatArray(n)
-        for (i in 0 until n) {
-            val variance = (varI[i] - meanI[i] * meanI[i]).coerceAtLeast(0f)
-            a[i] = (corrIp[i] - meanI[i] * meanP[i]) / (variance + epsilon)
-            b[i] = meanP[i] - a[i] * meanI[i]
-        }
-        BoxBlur.blur(a, a, w, h, radius, scratch)
-        BoxBlur.blur(b, b, w, h, radius, scratch)
-        return FloatArray(n) { i -> (a[i] * guide[i] + b[i]).coerceIn(0f, 1f) }
-    }
-
     /** Bilinear resize of a plane. */
     fun resize(source: FloatArray, sw: Int, sh: Int, dw: Int, dh: Int): FloatArray {
         if (sw == dw && sh == dh) return source.copyOf()
@@ -533,15 +558,17 @@ object RegionDetector {
     }
 
     private const val EPS = 1e-4f
-    private const val HINT_LOW = 0.25f
-    private const val HINT_HIGH = 0.6f
+    private const val HINT_LOW = 0.45f
+    private const val HINT_HIGH = 0.55f
     private const val HINT_CONFIDENCE = 0.9f
     private const val CB_SCALE = 0.5389f
     private const val CR_SCALE = 0.6350f
     private const val TEXTURE_RADIUS = 2
-    private const val GUIDE_RADIUS_DIVISOR = 96
-    private const val SKY_EPSILON = 0.004f
-    private const val SUBJECT_EPSILON = 0.01f
+    private const val GUIDE_RADIUS_DIVISOR = 64
+    private const val SNAP_RADIUS_DIVISOR = 192
+    private const val SNAP_PASSES = 3
+    private const val SKY_EPSILON = 1e-3f
+    private const val SUBJECT_EPSILON = 1e-4f
     private const val FINGERPRINT_SAMPLES = 4096
 
     // Sky colour and texture rules.
@@ -575,6 +602,7 @@ object RegionDetector {
     private const val GAP_LUMA_WEIGHT = 0.5f
     private const val GAP_COLOUR_DISTANCE = 0.07f
     private const val CLOUD_LIKELIHOOD = 0.4f
+    private const val WARM_SKY_MARGIN = 0.02f
     private const val CLOUD_MAX_V = 0.85f
     private const val CLOUD_MIN_LUMA = 0.22f
     private const val CLOUD_MAX_TEXTURE = 0.07f

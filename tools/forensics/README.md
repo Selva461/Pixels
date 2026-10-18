@@ -33,8 +33,17 @@ with the original using `src/roundtrip_check.py`.
 | --- | --- | --- |
 | 1. Measurement harness | done | 4 passed, 1 skipped |
 | 2. Colour-managed I/O | done | crushed channels 12.37 % → passes (sRGB copy alone: 0.64 %); P3 round trip ΔE00 mean 0.00, p99 0.00 |
+| 3. Edge-aware mattes | partly | with the phone-resolution person mask: halo 25 px / 117 → 4 px / 30.2 (limit 3 px / 15); mask coverage 0.16 passes |
 
-Still failing on the app render after Task 2 (Tasks 3–5): halo extent 6 px, halo area 18.8, sky noise ×1.79,
-skin ΔE00 4.60 / hue −3.15°, global fit 1.17.
+`scripts/check_output` now hands the harness a stand-in for the phone's people model: the sample's subject matte
+squashed to DeepLab's 257 × 257 (`PEOPLE=rules` uses the rules-based subject instead). With a person found, Smart edit
+really edits the subject, so subject checks that the rules path hid now show.
+
+Still failing after Task 3: halo extent 4 px, halo area 30.2, subject highlight texture 0.952, sky noise ×1.74, skin
+ΔE00 8.61 / hue −3.33°, logo 1.68, folds 1.400. Global fit, crushed channels (0.75 %) and mask coverage pass.
+Masks are refined with a colour-guided filter and evaluated on the photo at full size (`GuidedMatte`), never blurred,
+and the sky detector no longer takes golden grass under a blue sky for a sunset cloud (sky 70 % → 31 %). The halo
+left is the mask's resolution, not feathering: fed the same 257 × 257 mask, the brief's own reference pipeline also
+fails (8 px / 23.6); it passes only with a full-resolution matte.
 Never loosen a threshold in `tests/test_acceptance.py` to get green; they were calibrated on one
 photo and must be re-calibrated on 20+ varied pairs before release.
