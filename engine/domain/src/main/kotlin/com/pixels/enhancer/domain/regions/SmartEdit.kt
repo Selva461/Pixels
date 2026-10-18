@@ -45,8 +45,9 @@ data class RegionStats(
  *
  * - **Subject** brighter where it is darker than the scene, open shadows, more detail and a
  *   little colour (gentler on skin).
- * - **Sky** highlights recovered, cloud detail and contrast brought out, its own colour deepened
- *   (bluer for blue or grey skies, warmer for sunsets).
+ * - **Sky** highlights recovered, cloud contrast brought out on the base layer, its own colour
+ *   deepened (bluer for blue or grey skies, warmer for sunsets). No clarity: the sky's fine detail
+ *   is mostly sensor noise, and adding detail gain there multiplies it.
  * - **Background** slightly darker, calmer and less saturated than the subject so the eye goes
  *   to the subject; with no subject, the land gets open shadows and detail instead.
  *
@@ -154,7 +155,6 @@ object SmartEdit {
             exposure = ev / LocalAdjustment.MAX_EXPOSURE_EV,
             highlights = -(SKY_HIGHLIGHTS_BASE + SKY_HIGHLIGHTS_RANGE * smoothstep(SKY_P90_LOW, SKY_P90_HIGH, s.p90)),
             contrast = SKY_CONTRAST + if (s.detail < FLAT_SKY) SKY_CONTRAST_FLAT else 0f,
-            clarity = if (s.detail < FLAT_SKY) SKY_CLARITY_FLAT else SKY_CLARITY,
             saturation = when {
                 s.chroma < GREY_SKY_CHROMA -> SKY_SATURATION_GREY
                 s.chroma > VIVID_SKY_CHROMA -> SKY_SATURATION_VIVID
@@ -308,8 +308,6 @@ object SmartEdit {
     private const val SKY_CONTRAST = 0.25f
     private const val SKY_CONTRAST_FLAT = 0.15f
     private const val FLAT_SKY = 0.025f
-    private const val SKY_CLARITY_FLAT = 0.4f
-    private const val SKY_CLARITY = 0.25f
     private const val GREY_SKY_CHROMA = 0.05f
     private const val VIVID_SKY_CHROMA = 0.3f
     private const val SKY_SATURATION_GREY = 0.2f
