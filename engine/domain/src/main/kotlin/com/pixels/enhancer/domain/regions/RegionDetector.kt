@@ -232,6 +232,9 @@ object RegionDetector {
         }
         // Clouds of another colour (sunset, grey) that touch the sky, down to just below its lower edge.
         val cloudLimit = max(lowest, (h * CLOUD_MAX_V).toInt())
+        // Under a blue or pale sky, clouds are white or grey: a saturated warm colour next to it is
+        // land (golden grass, a sunlit hill), not a sunset cloud.
+        val warmSky = meanCr > meanCb + WARM_SKY_MARGIN
         var tail = 0
         for (i in 0 until n) if (mask[i] == 1f) queue[tail++] = i
         var head = 0
@@ -240,7 +243,7 @@ object RegionDetector {
             val x = i % w
             val y = i / w
             fun visit(j: Int) {
-                if (mask[j] == 1f || j / w > cloudLimit || !cloudLike(p, j, likelihood[j])) return
+                if (mask[j] == 1f || j / w > cloudLimit || !cloudLike(p, j, likelihood[j], warmSky)) return
                 mask[j] = 1f
                 queue[tail++] = j
             }
@@ -254,9 +257,12 @@ object RegionDetector {
 
     /**
      * Cloud next to the sky: any sky-like colour, or a fairly smooth, not dark, non-foliage pixel
-     * (grey storm cloud, orange sunset cloud). Reeds, branches and hills are dark, green or rough.
+     * (grey storm cloud, orange sunset cloud). Reeds, branches and hills are dark, green or rough;
+     * a saturated warm colour counts only when the sky itself is warm (a sunset).
      */
-    private fun cloudLike(p: Planes, i: Int, likelihood: Float): Boolean {
+    private fun cloudLike(p: Planes, i: Int, likelihood: Float, warmSky: Boolean): Boolean {
+        val warmColour = p.chroma[i] > FOLIAGE_MIN_CHROMA && (p.hue[i] < FOLIAGE_HUES.start || p.hue[i] > WARM_HUE_LOW_WRAP)
+        if (!warmSky && warmColour) return false
         if (likelihood >= CLOUD_LIKELIHOOD) return true
         val foliage = p.hue[i] in FOLIAGE_HUES && p.chroma[i] > FOLIAGE_MIN_CHROMA
         return !foliage && p.luma[i] > CLOUD_MIN_LUMA && p.texture[i] < CLOUD_MAX_TEXTURE
@@ -596,6 +602,7 @@ object RegionDetector {
     private const val GAP_LUMA_WEIGHT = 0.5f
     private const val GAP_COLOUR_DISTANCE = 0.07f
     private const val CLOUD_LIKELIHOOD = 0.4f
+    private const val WARM_SKY_MARGIN = 0.02f
     private const val CLOUD_MAX_V = 0.85f
     private const val CLOUD_MIN_LUMA = 0.22f
     private const val CLOUD_MAX_TEXTURE = 0.07f
